@@ -14,7 +14,11 @@ arguments
     opts.DataRoot  (1,:) char = fullfile('data','extracted')
     opts.ModelName (1,:) char = 'parameter_estimation_model_pid_v3'
     opts.Theta     (1,:) char = 'procest'
-    opts.ThetaMats (1,1) struct = struct('ideal_v2', fullfile('models','sysid_ideal_v2.mat'))
+    % mesmo roteamento do orquestrador: .mat -> run_one_mat (com SE(2))
+    opts.ThetaMats (1,1) struct = struct( ...
+        'ideal_v2', fullfile('models','sysid_ideal_v2.mat'), ...
+        'procest',  fullfile('results','sysid_initial.mat'), ...
+        'bayesopt', fullfile('results','sysid_bayesopt.mat'))
     opts.WindowSec (1,1) double = 2.5
     opts.Overlap   (1,1) double = 0.5
     opts.OutDir    (1,:) char = fullfile('results','debug')
@@ -41,12 +45,12 @@ else
     out = run_one(opts.ModelName, canon_path, opts.Theta);
 end
 
-% --- series na grade do split ---
+% --- series na grade do split (posicao alinhada SE(2) se disponivel) ---
 s  = out.SplitInfo;
 tt = s.t;  xt = s.pos_x_truth.Data;  yt = s.pos_y_truth.Data;
-psx = out.get('pos_x_out');  psy = out.get('pos_y_out');
-xs = interp1(psx.Time, squeeze(psx.Data), tt, 'linear', 'extrap');
-ys = interp1(psy.Time, squeeze(psy.Data), tt, 'linear', 'extrap');
+[tsim, px, py] = extract_sim_position(out);
+xs = interp1(tsim, px, tt, 'linear', 'extrap');
+ys = interp1(tsim, py, tt, 'linear', 'extrap');
 
 % --- metricas ---
 rmse_free = sqrt(mean((xs - xt).^2 + (ys - yt).^2));            % free-run, sem re-ancoragem

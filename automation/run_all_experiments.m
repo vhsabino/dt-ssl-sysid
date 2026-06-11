@@ -36,9 +36,13 @@ arguments
     opts.DataRoot   (1,:) char   = fullfile('data','extracted')
     opts.ModelName  (1,:) char   = 'parameter_estimation_model_pid_v3'
     opts.ThetaNames (1,:) cell   = {'ideal_v2','procest','bayesopt'}
-    % nomes de theta resolvidos por .mat (rota run_one_mat); os demais
-    % nomes sao delegados a run_one
-    opts.ThetaMats  (1,1) struct = struct('ideal_v2', fullfile('models','sysid_ideal_v2.mat'))
+    % nomes de theta resolvidos por .mat (rota run_one_mat, que aplica a
+    % correcao SE(2) pos-sim); os demais nomes sao delegados a run_one.
+    % procest/bayesopt apontam para os MESMOS .mat que run_one usa.
+    opts.ThetaMats  (1,1) struct = struct( ...
+        'ideal_v2', fullfile('models','sysid_ideal_v2.mat'), ...
+        'procest',  fullfile('results','sysid_initial.mat'), ...
+        'bayesopt', fullfile('results','sysid_bayesopt.mat'))
     opts.Label      (1,:) char   = ''      % '' = todos os labels
     opts.Chunk      (1,:) char   = 'commands'  % chunk de origem do canonical_split
     opts.HorizonsSec (1,:) double = 2.5    % janela(s) de re-ancoragem do custo real
@@ -214,26 +218,6 @@ function msg = clean_msg(msg)
 %CLEAN_MSG Remove markup de hyperlink do MATLAB/Simulink e quebras de linha.
 msg = regexprep(msg, '<[^>]+>', '');
 msg = strrep(msg, newline, ' ');
-end
-
-% =========================================================================
-function [t, px, py] = extract_sim_position(out)
-%EXTRACT_SIM_POSITION Localiza posicao simulada (m) no SimulationOutput.
-% Nomes reais observados em parameter_estimation_model_pid_v3 via out.who
-% (inspecao 2026-06-11): pos_x_out, pos_y_out (timeseries), alem de
-% pos_*_truth_out, theta_out, vx_out, rmse, tout...
-candX = ["pos_x_out","pos_x_sim","pos_x"];
-candY = ["pos_y_out","pos_y_sim","pos_y"];
-avail = string(out.who);
-nx = candX(find(ismember(candX, avail), 1));
-ny = candY(find(ismember(candY, avail), 1));
-if isempty(nx) || isempty(ny)
-    error(['Nao achei posicao simulada (esperado: %s / %s). ' ...
-        'Disponivel no SimulationOutput: %s'], strjoin(candX,','), ...
-        strjoin(candY,','), strjoin(avail, ', '));
-end
-vx = out.get(char(nx));  vy = out.get(char(ny));
-t = vx.Time;  px = squeeze(vx.Data);  py = squeeze(vy.Data);
 end
 
 % =========================================================================
