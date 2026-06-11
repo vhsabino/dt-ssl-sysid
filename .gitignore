@@ -33,6 +33,3 @@ build/canonical_splits/
 
 # Saidas de smoke/debug (nao sao resultados oficiais)
 results/debug/
-
-# Dados brutos gravados (~70 MB de .mat; promover a DVC quando decidido)
-data/recorded/*.mat
