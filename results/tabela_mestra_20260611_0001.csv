@@ -1,0 +1,2 @@
+log,label,event,theta,horizonte_s,rmse_pos_m,status
+2026-05-18_19-2-15,square,square_01_01,ideal,2.5,NaN,"erro: Error evaluating <a href=""matlab:Simulink.internal.OpenCallbackParamsDialog(['parameter_estimation_model_pid_v3'],'InitFcn');"">'InitFcn'</a> callback of block_diagram '<a href=""matlab:open_system ('parameter_estimation_model_pid_v3')"">parameter_estimation_model_pid_v3</a>'.  Callback string is 'control_parameters'"

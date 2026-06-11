@@ -1,0 +1,2 @@
+log,label,event,theta,horizonte_s,rmse_pos_m,status
+2026-05-18_19-2-15,square,square_01_01,ideal,2.5,NaN,"erro: Invalid setting in '<a href=""matlab:open_and_hilite_hyperlink ('parameter_estimation_model_pid_v3/Digital Twin/Transfer Fcn','error')"">parameter_estimation_model_pid_v3/Digital Twin/Transfer Fcn</a>' for parameter 'Denominator'."

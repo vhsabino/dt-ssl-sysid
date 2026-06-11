@@ -1,0 +1,2 @@
+log,label,event,theta,horizonte_s,rmse_pos_m,status
+2026-05-18_19-2-15,square,square_01_01,ideal,2.5,NaN,"erro: Unable to create or open data dictionary 'config/ssl_robot.sldd' because another dictionary with the same file name is already open. To create or open this dictionary, close all open dictionaries by calling 'Simulink.data.dictionary.closeAll' and reopen.  Open file: 'C:\Users\victo\Documents\digitaltwin\scripts\ssl_robot.sldd'  "
