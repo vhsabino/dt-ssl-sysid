@@ -51,6 +51,12 @@ tt = s.t;  xt = s.pos_x_truth.Data;  yt = s.pos_y_truth.Data;
 [tsim, px, py] = extract_sim_position(out);
 xs = interp1(tsim, px, tt, 'linear', 'extrap');
 ys = interp1(tsim, py, tt, 'linear', 'extrap');
+% theta simulado (alinhado se disponivel) e truth, na grade do split
+candTh = ["theta_aligned","theta_out"];
+nth = candTh(find(ismember(candTh, string(out.who)), 1));
+pth = out.get(char(nth));
+ths_t = interp1(pth.Time, squeeze(pth.Data), tt, 'linear', 'extrap');
+tht   = s.theta_truth.Data;
 
 % --- metricas ---
 rmse_free = sqrt(mean((xs - xt).^2 + (ys - yt).^2));            % free-run, sem re-ancoragem
@@ -67,8 +73,8 @@ fprintf('  RMSE re-ancorado (janela %.1fs/overlap %.1f): %.4f m\n', ...
 fprintf('  Sinal ''rmse'' interno do modelo (ultimo valor): %.4f\n', rmse_model);
 
 % --- figura overlay ---
-fig = figure('Color','w', 'Position',[100 100 1100 420]);
-tiledlayout(fig, 1, 3, 'Padding','compact');
+fig = figure('Color','w', 'Position',[100 100 1000 760]);
+tiledlayout(fig, 2, 2, 'Padding','compact');
 
 nexttile; hold on;
 plot(xt, yt, 'k-', 'LineWidth', 1.5, 'DisplayName','truth');
@@ -87,6 +93,11 @@ legend({'truth', ['sim ' opts.Theta]}, 'Location','best');
 nexttile; hold on;
 plot(tt, yt, 'k-', tt, ys, 'r--', 'LineWidth', 1.2);
 grid on; box on; xlabel('t (s)'); ylabel('y (m)'); title('y(t)');
+legend({'truth', ['sim ' opts.Theta]}, 'Location','best');
+
+nexttile; hold on;
+plot(tt, tht, 'k-', tt, ths_t, 'r--', 'LineWidth', 1.2);
+grid on; box on; xlabel('t (s)'); ylabel('\theta (rad)'); title('\theta(t)');
 legend({'truth', ['sim ' opts.Theta]}, 'Location','best');
 
 sgtitle(sprintf('%s x %s | free-run %.3f m | re-anc(%.1fs) %.3f m', ...

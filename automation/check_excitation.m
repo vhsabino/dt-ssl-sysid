@@ -1,4 +1,4 @@
-function E = check_excitation(opts)
+function E = check_excitation(label, opts)
 %CHECK_EXCITATION Diagnostico de excitacao dos comandos por split/evento.
 % Responde a pergunta dos criterios de aceite da identificacao omega
 % (CLAUDE.md): "excitacao? std(cmd_vw)?" — nos dados reais o comando
@@ -19,9 +19,11 @@ function E = check_excitation(opts)
 %
 % USO:
 %   E = check_excitation();                  % todos os labels
-%   E = check_excitation('Label','square');  % so um label
+%   E = check_excitation('square');          % so um label (posicional)
+%   E = check_excitation('Label','square');  % equivalente name-value
 
 arguments
+    label            (1,:) char    = ''     % atalho posicional p/ Label
     opts.DataRoot    (1,:) char    = fullfile('data','extracted')
     opts.Label       (1,:) char    = ''     % '' = todos
     opts.RobotId     (1,1) double  = NaN    % NaN = nao filtra
@@ -29,6 +31,8 @@ arguments
     opts.MinTotalSec (1,1) double  = 5.0    % s de excitacao omega recomendados
     opts.SaveCsv     (1,1) logical = false
 end
+
+if isempty(opts.Label), opts.Label = label; end
 
 repo_root = bootstrap_paths();
 data_root = opts.DataRoot;
