@@ -62,6 +62,12 @@ repo_root = bootstrap_paths();   % adiciona paths e faz cd na raiz
 rng(opts.Seed);
 smoke = strcmp(opts.Mode, 'smoke');
 
+% Proveniencia capturada ANTES das sims: apply_theta (dentro de run_one/
+% run_one_mat) escreve no SLDD versionado durante a rodada, o que sujaria
+% o hash se capturado no fim. O hash de inicio identifica o codigo/dados
+% que produziram a rodada.
+githash = get_git_hash(repo_root, ~smoke);   % fail-loud no modo 'full'
+
 % list_splits exige raiz ABSOLUTA pra recortar log/label/event/chunk do path
 data_root = opts.DataRoot;
 if ~startsWith(data_root, repo_root)
@@ -162,7 +168,6 @@ T = cell2table(rows, 'VariableNames', ...
 
 % --- salvar com proveniencia (Definition of Done do CLAUDE.md) ---
 stamp = char(datetime('now','Format','yyyyMMdd_HHmm'));
-githash = get_git_hash(repo_root, ~smoke);   % fail-loud no modo 'full'
 
 if smoke
     outdir = fullfile('results','debug');
