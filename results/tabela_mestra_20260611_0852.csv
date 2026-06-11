@@ -1,0 +1,3 @@
+log,label,event,theta,horizonte_s,rmse_pos_m,status
+2026-05-18_19-2-15,square,square_01_01,ideal_analytic,2.5,0.817504399256359,ok
+2026-05-18_19-2-15,square,square_01_01,procest,2.5,0.405278862729362,ok
