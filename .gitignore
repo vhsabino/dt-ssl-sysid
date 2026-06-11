@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+*.egg-info/
+
+# Isaac Sim & Omniverse Lixo
+*.log
+omniverse_logs/
+runs/
+outputs/
+_output/
+
+# IDE
+.vscode/
+.idea/
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# MATLAB / Simulink
+*.asv
+*.autosave
+*.slxc
+slprj/
+
+# Caches locais do pipeline (reconstruiveis; >2 GB em scripts/local)
+scripts/local/
+build/canonical_splits/
+
+# Saidas de smoke/debug (nao sao resultados oficiais)
+results/debug/
+
+# Dados brutos gravados (~70 MB de .mat; promover a DVC quando decidido)
+data/recorded/*.mat
