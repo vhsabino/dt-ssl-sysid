@@ -68,6 +68,11 @@ smoke = strcmp(opts.Mode, 'smoke');
 % que produziram a rodada.
 githash = get_git_hash(repo_root, ~smoke);   % fail-loud no modo 'full'
 
+% Higiene: apply_theta (em run_one/run_one_mat) escreve no SLDD versionado
+% durante a rodada; restaura o estado comitado ao final (sucesso ou erro).
+sldd_restore = onCleanup(@() system(sprintf( ...
+    'git -C "%s" restore config/ssl_robot.sldd', repo_root))); %#ok<NASGU>
+
 % list_splits exige raiz ABSOLUTA pra recortar log/label/event/chunk do path
 data_root = opts.DataRoot;
 if ~startsWith(data_root, repo_root)
@@ -82,19 +87,6 @@ end
 fprintf('run_all_experiments[%s]: %d splits (chunk=%s), thetas={%s}, horizontes=[%s] s\n', ...
     opts.Mode, height(S), opts.Chunk, strjoin(opts.ThetaNames, ','), num2str(opts.HorizonsSec));
 
-% --- Pre-requisitos do modelo (workarounds documentados; .slx NUNCA e salvo) ---
-% O InitFcn legado 'control_parameters' carrega um .mat de caminho local;
-% o original versionado vive em data/recorded — copia (cache) se faltar.
-init_mat = fullfile(repo_root,'scripts','local','train','robocin_tests_id5.mat');
-if ~isfile(init_mat)
-    src_mat = fullfile(repo_root,'data','recorded','robocin_tests_id5.mat');
-    if ~isfile(src_mat)
-        error('InitFcn do modelo exige %s e a origem %s nao existe.', init_mat, src_mat);
-    end
-    if ~isfolder(fileparts(init_mat)), mkdir(fileparts(init_mat)); end
-    copyfile(src_mat, init_mat);
-    fprintf('Cache local p/ InitFcn: %s\n', init_mat);
-end
 ensure_model_ready(opts.ModelName);
 
 rows = {};
