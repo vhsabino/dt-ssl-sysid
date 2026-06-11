@@ -27,6 +27,11 @@ Tese: gêmeo digital de **fidelidade observacional comportamental** do robô SSL
 - **`run_one` só simula — métrica no orquestrador** (`automation/rmse_pos_rebased.m`: RMSE de posição em janelas re-ancoradas, window 2.5 s / overlap 0.5, mesmo esquema de `compute_rmse_position`).
 - Bounds do SLDD: **τ ≥ 0.01 s** (Min/Max não alteráveis). θ "ideal" com τ < 0.01 não simula; o baseline **ideal oficial é `ideal_analytic`** — dead-reckoning analítico (`automation/ideal_deadreckoning.m`), avaliado com a mesma métrica; o ideal simulável mínimo é `models/sysid_ideal_v3.mat` (τ=0.01).
 
+## Estado atual (2026-06-11, commit eb97620+)
+- **Zonas mortas da cadeia de rodas parametrizadas com default 0** (eram |vx|<0.1, |vy|<0.1, |ω|<0.3 e engoliam 84% do cmd_vw do square). Com isso o gêmeo ideal_v3 é totalmente explicável: reconciliação analítico (FOH exato + Euler 60 Hz) vs Simulink fecha em max|Δx|=0.0046 m, |Δy|=0.0057 m, |Δθ|=0.0009 rad no square_01_01.
+- **RMSE re-ancorado (h=2.5 s), mediana em square_01_01 + 5 hold-outs shoot_to_goal**: ideal_analytic **0.490 m**; procest (ω placeholder K=1, τ=0.1) **0.548 m**; procest + ω candidato (K=1.353, τ=0.0354, Td=0.1058; fit_val 52.6%) **0.656 m** — o candidato ω **piora** posição (ganho 1.35 amplifica deriva de heading em malha aberta) e **não foi promovido**.
+- Próximos passos: re-identificar ω (investigar viés de K_w; considerar coleta dedicada) e só então bayesopt sobre os 9 parâmetros.
+
 ## Guardrails (NUNCA)
 - Inventar referências bibliográficas — citar só de `slr/incluidos.bib`.
 - Alterar a ordem dos campos do vetor θ ou o SLDD.
