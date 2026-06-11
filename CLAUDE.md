@@ -22,6 +22,11 @@ Tese: gêmeo digital de **fidelidade observacional comportamental** do robô SSL
 ## Definition of Done (experimento)
 1. Script reproduzível commitado; 2. seed fixa; 3. resultado em `results/` com metadados (commit hash, θ, dataset); 4. entrada no CHANGELOG; 5. resumo de 3 linhas para o humano validar.
 
+## Arquitetura verificada (2026-06-11)
+- O gêmeo em `parameter_estimation_model_pid_v3.slx` é **free-run**: TransferFcn (θ do SLDD) → TransportDelay → rodas → rotação p/ global → integradores. Não há injeção de pose medida no estado; ICs dos integradores são paramétricas (`x0`, `y0`, `theta0`, via `SimulationInput`). A cadeia interna de rmse e os `From Workspace` do log antigo estão comentados no modelo.
+- **`run_one` só simula — métrica no orquestrador** (`automation/rmse_pos_rebased.m`: RMSE de posição em janelas re-ancoradas, window 2.5 s / overlap 0.5, mesmo esquema de `compute_rmse_position`).
+- Bounds do SLDD: **τ ≥ 0.01 s** (Min/Max não alteráveis). θ "ideal" com τ < 0.01 não simula; o baseline ideal oficial é **dead-reckoning analítico** (`automation/ideal_deadreckoning.m`); o ideal simulável mínimo é `models/sysid_ideal_v3.mat` (τ=0.01).
+
 ## Guardrails (NUNCA)
 - Inventar referências bibliográficas — citar só de `slr/incluidos.bib`.
 - Alterar a ordem dos campos do vetor θ ou o SLDD.

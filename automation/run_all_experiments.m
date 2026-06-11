@@ -35,12 +35,17 @@ function T = run_all_experiments(opts)
 arguments
     opts.DataRoot   (1,:) char   = fullfile('data','extracted')
     opts.ModelName  (1,:) char   = 'parameter_estimation_model_pid_v3'
-    opts.ThetaNames (1,:) cell   = {'ideal_v2','procest','bayesopt'}
+    % 'ideal_analytic' = baseline ideal OFICIAL (dead-reckoning analitico,
+    % sem Simulink — os bounds do SLDD impedem tau<0.01 no modelo)
+    opts.ThetaNames (1,:) cell   = {'ideal_analytic','procest','bayesopt'}
     % nomes de theta resolvidos por .mat (rota run_one_mat, que aplica a
     % correcao SE(2) pos-sim); os demais nomes sao delegados a run_one.
     % procest/bayesopt apontam para os MESMOS .mat que run_one usa.
+    % ideal_v2 (tau=1e-3) e insimulavel pelos bounds; ideal_v3 (tau=0.01)
+    % e o ideal simulavel minimo.
     opts.ThetaMats  (1,1) struct = struct( ...
         'ideal_v2', fullfile('models','sysid_ideal_v2.mat'), ...
+        'ideal_v3', fullfile('models','sysid_ideal_v3.mat'), ...
         'procest',  fullfile('results','sysid_initial.mat'), ...
         'bayesopt', fullfile('results','sysid_bayesopt.mat'))
     opts.Label      (1,:) char   = ''      % '' = todos os labels
@@ -113,18 +118,25 @@ for i = 1:height(S)
     for k = 1:numel(opts.ThetaNames)
         tname = opts.ThetaNames{k};
         try
-            ensure_model_ready(opts.ModelName);
-            if isfield(opts.ThetaMats, tname)
-                out = run_one_mat(opts.ModelName, canon_path, opts.ThetaMats.(tname));
+            if strcmp(tname, 'ideal_analytic')
+                % baseline ideal: dead-reckoning analitico, sem Simulink
+                s = load_split(canon_path);
+                [xs, ys] = ideal_deadreckoning(s);
+                xt = s.pos_x_truth.Data;  yt = s.pos_y_truth.Data;  tt = s.t;
             else
-                out = run_one(opts.ModelName, canon_path, tname);
+                ensure_model_ready(opts.ModelName);
+                if isfield(opts.ThetaMats, tname)
+                    out = run_one_mat(opts.ModelName, canon_path, opts.ThetaMats.(tname));
+                else
+                    out = run_one(opts.ModelName, canon_path, tname);
+                end
+                s = out.SplitInfo;
+                [tsim, px, py] = extract_sim_position(out);
+                % truth na grade do split; sim interpolada na mesma grade
+                xt = s.pos_x_truth.Data;  yt = s.pos_y_truth.Data;  tt = s.t;
+                xs = interp1(tsim, px, tt, 'linear', 'extrap');
+                ys = interp1(tsim, py, tt, 'linear', 'extrap');
             end
-            s = out.SplitInfo;
-            [tsim, px, py] = extract_sim_position(out);
-            % truth na grade do split; sim interpolada na mesma grade
-            xt = s.pos_x_truth.Data;  yt = s.pos_y_truth.Data;  tt = s.t;
-            xs = interp1(tsim, px, tt, 'linear', 'extrap');
-            ys = interp1(tsim, py, tt, 'linear', 'extrap');
             for h = opts.HorizonsSec
                 r = rmse_pos_rebased(tt, xs, ys, xt, yt, h, opts.Overlap);
                 rows(end+1,:) = {S.log{i}, S.label{i}, S.event{i}, ...
