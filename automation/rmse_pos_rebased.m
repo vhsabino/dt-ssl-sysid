@@ -1,18 +1,22 @@
 function r = rmse_pos_rebased(t, xs, ys, xt, yt, win_s, overlap)
-%RMSE_POS_REBASED RMSE de posicao (m) em janelas deslizantes RE-ANCORADAS,
-% mesmo esquema do custo real (matlab/sysid/compute_rmse_position.m):
-% rebase a zero no inicio de cada janela, media ponderada entre janelas.
-% Isto e uma metrica de pos-processamento — a simulacao em si e free-run
-% (integra do IC ate o fim sem reinjecao de pose medida).
-Ts = median(diff(t));
-win = max(2, round(win_s / Ts));
-step = max(1, round(win * (1 - overlap)));
-if numel(t) < win
-    win = numel(t); step = win;   % split mais curto que a janela: 1 janela
-end
+%RMSE_POS_REBASED RMSE de posicao (m) em janelas deslizantes RE-ANCORADAS
+% (rebase de translacao a zero no inicio de cada janela, media ponderada
+% por numero de amostras entre janelas). Esta e uma metrica de
+% pos-processamento — a simulacao em si e free-run.
+%
+% Janelas definidas POR TEMPO (fix 2026-06-11): inicios em
+% t(1):win_s*(1-overlap):t(end)-win_s, amostras com t em [t0, t0+win_s].
+% O esquema amostral anterior (win = round(win_s/median(diff(t)))) assumia
+% grade uniforme; a grade canonica e irregular em TODOS os splits
+% (results/grid_audit_20260611_2231.csv — labels de movimento logam
+% comandos em rajada, mediana dT~2 ms) e a metrica colapsava para janela
+% unica do split inteiro em 34/46 eventos.
+t0s = t(1):win_s*(1 - overlap):(t(end) - win_s);
+if isempty(t0s), t0s = t(1); end   % split mais curto que a janela: 1 janela
 e2 = []; w = [];
-for s0 = 1:step:(numel(t) - win + 1)
-    idx = s0:(s0 + win - 1);
+for t0 = t0s
+    idx = find(t >= t0 & t <= t0 + win_s);
+    if numel(idx) < 2, continue; end
     dx = (xs(idx) - xs(idx(1))) - (xt(idx) - xt(idx(1)));
     dy = (ys(idx) - ys(idx(1))) - (yt(idx) - yt(idx(1)));
     e2(end+1) = mean(dx.^2 + dy.^2); %#ok<AGROW>

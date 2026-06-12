@@ -8,15 +8,15 @@ function r = rmse_pos_rebased_se2(t, xs, ys, ths, xt, yt, tht, win_s, overlap)
 % heading: se a diferenca entre as duas metricas for grande, o erro de
 % posicao re-ancorado em translacao e dominado pelo erro de heading
 % acumulado ate t0, nao pela dinamica dentro da janela.
-Ts = median(diff(t));
-win = max(2, round(win_s / Ts));
-step = max(1, round(win * (1 - overlap)));
-if numel(t) < win
-    win = numel(t); step = win;   % split mais curto que a janela: 1 janela
-end
+%
+% Janelas definidas POR TEMPO (fix 2026-06-11), identico a rmse_pos_rebased
+% — ver comentario la e results/grid_audit_20260611_2231.csv.
+t0s = t(1):win_s*(1 - overlap):(t(end) - win_s);
+if isempty(t0s), t0s = t(1); end   % split mais curto que a janela: 1 janela
 e2 = []; w = [];
-for s0 = 1:step:(numel(t) - win + 1)
-    idx = s0:(s0 + win - 1);
+for t0 = t0s
+    idx = find(t >= t0 & t <= t0 + win_s);
+    if numel(idx) < 2, continue; end
     i0 = idx(1);
     dth = tht(i0) - ths(i0);
     c = cos(dth);  sn = sin(dth);
