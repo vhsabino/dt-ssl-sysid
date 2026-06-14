@@ -33,3 +33,7 @@ build/canonical_splits/
 
 # Saidas de smoke/debug (nao sao resultados oficiais)
 results/debug/
+
+# manter fora do versionamento
+CLAUDE.md
+apresentacao/
