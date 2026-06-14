@@ -1,5 +1,5 @@
 # Relatório Técnico de Desenvolvimento — Gêmeo Digital SSL
-*Documento vivo. Registra o que foi feito, por quê, com que resultado e o que está pendente. Atualizado a cada marco. Última atualização: 13/06/2026.*
+*Documento vivo. Registra o que foi feito, por quê, com que resultado e o que está pendente. Atualizado a cada marco. Última atualização: 14/06/2026.*
 
 ---
 
@@ -60,6 +60,16 @@
 **Medianas globais por horizonte (SE(2), m):** 0,5→{ideal 0,106; placeholder 0,096; cand 0,098} · 1→{0,179; 0,176; 0,181} · 2→{0,278; 0,302; 0,330} · 2,5→{0,316; 0,340; 0,371} · 4→{0,383; 0,441; 0,515}.
 **Leitura:** erro ~0,10 m @0,5 s e ~0,32–0,34 m @2,5 s = 8–13% da distância percorrida em malha aberta. Dinâmica identificada dá vantagem ligeira em h≤1 s e vence em shoot_to_goal sob SE(2); ideal lidera horizontes longos.
 
+### Re-identificação e validação de vx/vy v2 (2026-06-14) — PROMOVIDO
+vx/vy eram herdados do trabalho antigo: já P1D (K,τ,Td), mas **nunca validados em hold-out** (`rmse_val=NaN` no `report` do `sysid_initial`). Re-identificados por DOF, mesma estrutura P1D, com a velocidade medida **derivada da posição da visão** (Savitzky-Golay) e rotacionada ao corpo por θ; 1 experimento por evento, sem detrend; hold-out por evento (≈⅔/⅓, seed 42). Excitação (Fase 1, `check_excitation_trans.m`): vx limpo em **front_to_back** (xcorr 0,99), vy em **side_to_side** (xcorr 0,99); Td0 model-free vx≈0,15 / vy≈0,18 s, consistente com ω.
+
+| DOF | antigo (K,τ,Td) | **novo (K,τ,Td)** | fit hold-out | fonte (eventos) |
+|---|---|---|---|---|
+| vx | 0,989 · 0,128 · 0,171 | **1,119 · 0,072 · 0,069** | **86,7%** (1 ev) | front_to_back (4) |
+| vy | 0,949 · 0,242 · 0,105 | **1,052 · 0,127 · 0,057** | **87,1%** (4 ev) | side_to_side (13) |
+
+**Gate SE(2) multi-horizonte vs placeholder** (`eval_theta_se2_vs_placeholder.m`; candidato simulado no mesmo pipeline Simulink, placeholder reusado da campanha `traj_eval_campaign_20260611_2238.mat`, sem re-rodar os 138 baselines): ambos melhoram em **todos** os horizontes e **todos** os eventos — vx **20/20**, vy **65/65** (event×horizonte), inclusive nos hold-out (vx Δ=−0,193 m; vy Δ=−0,13…−0,19 m). Medianas SE(2) h=2,5: vx **0,124 vs 0,293 m**; vy **0,141 vs 0,334 m** (~55% de redução). Wilcoxon pareado: **vy per-horizonte p=2,4e‑4** (n=13); **vx** per-horizonte p=0,125 (n=4 = piso do teste) mas **multi-h pooled p=8,9e‑5** (efeito unânime). Faixa física: ambos OK. **Veredito do gate: ambos PROMOVIDOS** → `models/sysid_vxvy_v2.mat` (vx/vy novos + ω placeholder). Confirma a hipótese: o gap residual em horizonte médio/longo sob SE(2) era de **vx/vy** (placeholder lento, τ/Td grandes herdados sem validação); o modelo mais rápido (τ/Td menores) reduz a deriva de posição translacional. Artefatos: `results/check_excitation_trans_20260614_1018.csv`, `results/eval_vx_v2_*_20260614_1024.csv`, `results/eval_vy_v2_*_20260614_1028.csv`, trajetórias `results/traj_eval_v{x,y}_v2_*.mat`.
+
 ## 6. Identificação de ω — estado e plano (diretiva da orientadora: identificar ω antes de prosseguir)
 **Tentativa 1 (candidato, NÃO promovido):** θ_w={K=1,353; τ=0,0354 s; Td=0,1058 s}; fit 52,6% em hold-out (< critério antigo de 60%). Td≈106 ms consistente com latência visão→rádio (valida a estrutura). Piora a posição vs placeholder → diagnóstico: ganho identificado em eventos de alta rotação não transfere; provável viés de malha fechada + ausência de modelo de não-linearidade.
 **Observação da orientadora (decisiva):** robô vai bem em alta velocidade, mal em baixa → **não-linearidade estática (zona morta/atrito)**. A zona morta de ±0,3 hardcoded era provavelmente conhecimento empírico da equipe; volta agora como parâmetro **identificado** (estrutura Hammerstein: zona morta → dinâmica linear).
@@ -86,6 +96,8 @@
 - **(iii) custo SE(2) multi-horizonte vs placeholder: REPROVA** (`automation/eval_omega_v3_se2.m`; candidato simulado no MESMO pipeline Simulink, placeholder **reusado** da campanha `traj_eval_campaign_20260611_2238.mat`; 18 eventos; sem re-simular a campanha). Candidato **PIOR** em todos os horizontes: Δmediana(cand−plac) = +0,0065 / +0,0141 / +0,0310 / +0,0415 / +0,0489 m em h={0,5;1;2;2,5;4} s, **Wilcoxon pareado** p={2,0e-4; 3,9e-4; 3,3e-3; 9,6e-3; 4,3e-2}; pool p=3,8e-9. Penalidade **cresce com h** = super-rotação (K>1) amplificando deriva de heading no replay open-loop. `results/eval_omega_v3_se2_20260613_2340.csv`, `results/eval_omega_v3_wilcoxon_20260613_2340.csv`, `results/traj_eval_omega_v3_20260613_2340.mat`.
 
 **Veredito:** `models/sysid_omega_v3_linear_candidate.mat` salvo, **NÃO promovido** (reprova (i) e (iii)). Achado central (limite do dado, contribuição da tese): logs de malha fechada permitem estimar o **ganho** de ω (≈1,3, fisicamente plausível) mas **não validam** ω como modelo free-run — o próprio ganho >1 que os dados exibem piora a posição em replay. A **largura da zona morta d permanece por roda** (firmware 1,567 rad/s de roda) e só será calibrável com **coleta dedicada de rotação pura** (vx=vy=0, escada de amplitudes). O modelo expõe `d` como gancho (default 0; valor de firmware documentado mas **não aplicado ao corpo**, pois corromperia eventos com translação). **bayesopt segue bloqueado** até essa coleta.
+
+**Contraste com vx/vy (ver §5, 2026-06-14):** ao contrário de ω, vx/vy **passam** os mesmos gates (fit hold-out ~87%, faixa física, SE(2) Wilcoxon p<0,05 na direção certa) e foram **promovidos** (`sysid_vxvy_v2.mat`). A assimetria é informativa para a tese: a translação é observável em malha fechada (excitação limpa, xcorr 0,99) e o gêmeo melhora; a rotação não é validável como free-run (ganho >1 de malha fechada + zona morta por roda). ω permanece placeholder no θ promovido.
 
 ## 7. Calibração (decisão de método)
 - PSO sobre constantes cinemáticas → **substituído** por identificação grey-box + bayesopt (validado pela orientadora; PSO como baseline **não** será mantido).
