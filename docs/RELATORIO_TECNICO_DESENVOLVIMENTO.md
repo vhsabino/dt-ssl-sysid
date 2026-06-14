@@ -102,7 +102,18 @@ vx/vy eram herdados do trabalho antigo: já P1D (K,τ,Td), mas **nunca validados
 ## 7. Calibração (decisão de método)
 - PSO sobre constantes cinemáticas → **substituído** por identificação grey-box + bayesopt (validado pela orientadora; PSO como baseline **não** será mantido).
 - bayesopt minimiza J(θ) = RMSE SE(2) multi-horizonte; entra no pipeline **somente após** ω promovido.
-- **Pendência:** definição exata do custo (âncora/horizontes/agregação) a congelar ANTES da 1ª iteração de BO.
+- **Pendência (RESOLVIDA 14/06):** definição exata do custo congelada em `automation/bo_cost.m` (ver abaixo).
+
+### Execução — bayesopt v1 (Cenário B: fidelidade COMPORTAMENTAL, 2026-06-14)
+*Decisão deliberada (Cenário B): calibrar os 9 params otimizando custo de trajetória, não fidelidade de parâmetro. Roda com ω em placeholder (ID física de ω reprovada); o objetivo é justamente expor a tensão parâmetro-vs-comportamento.*
+
+**Custo congelado** (`bo_cost.m`): J = mediana_eventos[ wmean_h SE(2)(h) ] + λ·mediana_eventos[ wmean_h RMSE_heading(h) ], h∈{0,5;1;2;2,5;4} s, peso ∝ 1/h (norm.), âncora SE(2) com θ truth filtrado; **simula no MESMO pipeline Simulink** dos baselines. **Validação (Fase 0):** bo_cost(placeholder) reproduz as trajetórias salvas da campanha com **dif 0,0000 m**. **λ=1,171** (Fase 1: iguala contribuição heading↔posição no vx/vy v2 — J_pos=0,0592 m = λ·J_head). Custo ~50–70 s/sim (modelo lento) ⇒ 100 avaliações em **5 eventos de treino** cobrindo os 3 DOFs; validação em **10 eventos de hold-out** não vistos.
+
+**bayesopt** (`run_bayesopt_v1.m`; 9 `optimizableVariable`, faixas SLDD K[0,5;2]/τ[0,02;0,5] log/Td[0;0,15]; EI-plus; determinístico; warm-start com vx/vy v2+ω placeholder, placeholder antigo e o ω candidato reprovado — semeia o GP, não fixa nada). **J: 0,1183 → 0,1048** (−11% no treino). θ_opt: vx{K=1,091;τ=0,079;Td=0,029}, vy{K=1,097;τ=0,021;Td=0,143}, **ω{K=0,516;τ=0,459;Td=0,106}**. **K_w no PISO (0,516)** — vs físico ≈1,35 e placeholder 1,0: o ótimo comportamental **suprime ω**. **ARD:** Kvy/Kvx dominam o custo (sens. 1,00/0,81); os params de ω são os **menos** sensíveis (Kw 0,19; Td_w 0,12; τ_w 0,03) — a posição é regida pela translação.
+
+**Gate hold-out (Fase 3, `eval_bayesopt_holdout.m`):** θ_bayesopt **bate a cinemática ideal** (SE(2) pool −0,078 m, Wilcoxon p=1,4e‑4) **mas é significativamente PIOR que vx/vy v2** (pool **+0,0148 m, p=0,0052**, direção errada; pior em h≤1 s). O heading no hold-out tampouco melhora (0,215 vs 0,193 rad, p=0,23) — o K_w→0,5 **não generaliza**. **→ OVERFIT** aos 5 eventos de treino. **Veredito do gate: NÃO promovido** → `models/sysid_bayesopt_v1_candidate.mat`. O modelo robusto continua **vx/vy v2 + ω placeholder** (`sysid_vxvy_v2.mat`).
+
+**Leitura para a tese:** o K_w→0,516 quantifica a **tensão parâmetro-vs-comportamento** (o custo de treino prefere ω atenuado, longe do físico ≈1,35) — coerente com a ID física de ω reprovada (§6). Porém a calibração comportamental com poucos eventos **overfit** e o **grey-box validado em hold-out generaliza melhor**: dado de malha fechada não sustenta nem ω físico nem ω comportamental fora da amostra. Refinamento (mais eventos de treino / custo sub-amostrado mais barato) é o próximo passo; nesta iteração o bayesopt **não** é promovido. Figuras: `results/figs/F5_bayesopt_holdout_horizons_*`, `F6_bayesopt_convergence_*`, `F7_bayesopt_ard_*`.
 
 ## 8. Decisões e pendências
 **Confirmadas na reunião (12/06):** sequência B (artigo = identificação/validação; RL é o próximo passo, não removido); critérios de aceite novos (§6) adotados; bayesopt confirmado; PSO baseline descartado.
