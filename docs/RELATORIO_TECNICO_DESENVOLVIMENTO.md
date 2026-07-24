@@ -1,5 +1,5 @@
 # Relatório Técnico de Desenvolvimento — Gêmeo Digital SSL
-*Documento vivo. Registra o que foi feito, por quê, com que resultado e o que está pendente. Atualizado a cada marco. Última atualização: 14/06/2026.*
+*Documento vivo. Registra o que foi feito, por quê, com que resultado e o que está pendente. Atualizado a cada marco. Última atualização: 24/07/2026.*
 
 ---
 
@@ -98,6 +98,73 @@ vx/vy eram herdados do trabalho antigo: já P1D (K,τ,Td), mas **nunca validados
 **Veredito:** `models/sysid_omega_v3_linear_candidate.mat` salvo, **NÃO promovido** (reprova (i) e (iii)). Achado central (limite do dado, contribuição da tese): logs de malha fechada permitem estimar o **ganho** de ω (≈1,3, fisicamente plausível) mas **não validam** ω como modelo free-run — o próprio ganho >1 que os dados exibem piora a posição em replay. A **largura da zona morta d permanece por roda** (firmware 1,567 rad/s de roda) e só será calibrável com **coleta dedicada de rotação pura** (vx=vy=0, escada de amplitudes). O modelo expõe `d` como gancho (default 0; valor de firmware documentado mas **não aplicado ao corpo**, pois corromperia eventos com translação). **bayesopt segue bloqueado** até essa coleta.
 
 **Contraste com vx/vy (ver §5, 2026-06-14):** ao contrário de ω, vx/vy **passam** os mesmos gates (fit hold-out ~87%, faixa física, SE(2) Wilcoxon p<0,05 na direção certa) e foram **promovidos** (`sysid_vxvy_v2.mat`). A assimetria é informativa para a tese: a translação é observável em malha fechada (excitação limpa, xcorr 0,99) e o gêmeo melhora; a rotação não é validável como free-run (ganho >1 de malha fechada + zona morta por roda). ω permanece placeholder no θ promovido.
+
+### Atualização 2026-07-24 — D3 (experimento dedicado recebido) + D9 (constante cinemática corrigida)
+
+**D3 (correção de status):** o parágrafo "Execução 2026-06-13" acima registra que, do plano de identificação de ω, "o firmware" foi executado (Etapa B/D) mas "o experimento dedicado" (Etapa B do plano original, §6: "escada de amplitudes, degraus altos, rampas lentas, vx=vy=0") ficou **adiado (sem robô)** naquela data. Esse experimento **foi executado** (coleta de ~04–05/07/2026, robô yellow #6) e recebido nesta sessão como `data/extracted/2026-05-18_19-2-15/splits/rotate/rotate_raw.csv` (log multiplexado, armazenado sob a pasta do log mais antigo, 2026-05-18_19-2-15, reaproveitada como container — ver `results/CHANGELOG.md` 2026-07-24). Padronizado em 10 eventos (`rotate_01_01..10`, escada ±0,25/±0,5/±1/±2,5/±5 rad/s) com o mesmo contrato de `square/`; QC em `results/qc_rotate_*.md`. Este parágrafo estava desatualizado quanto a esse ponto — corrigido aqui.
+
+**D9 (constante cinemática R/r corrigida):** a constante `robot_radius/wheel_radius = 0,088/0,0265 = 3,3208` citada no parágrafo "B — Firmware" acima (usada para derivar `ω_d = 1,567·(0,0265/0,0880) = 0,472 rad/s`) **não tinha rastreabilidade documental** e foi **refutada** por três evidências independentes e convergentes, todas com o dataset `rotate` recém-recebido: (a) CAD medido em 2026-07-24 (R_contato=79,601 mm, r_roda=29,492 mm → R/r=2,6991); (b) constante implícita no firmware/telemetria — `telemetry.d_speed` (setpoint de roda pós-clamp de zona morta) escala **exatamente** como `2,61·|cmd_ω|` em todas as amplitudes ativas do dataset `rotate`, não como `3,3208·|cmd_ω|`; (c) resposta de corpo medida via visão no mesmo dataset: K_ω≈1,01 (`results/qc_rotate_20260724_021248.md` §8) — consistente com ganho ≈1 quando a constante correta é usada, ao invés do ganho ≈1,35 relatado nas sessões de 13/06 (`diag_omega_gain_amplitude.m`) sob a constante deprecated. **Consequência:** o limiar de zona morta de ω comandado não é o valor pontual 0,472 rad/s; é o **intervalo 0,58–0,60 rad/s** (`1,567/2,6991=0,5806` a `1,567/2,61=0,6004`), sempre reportado como intervalo, nunca como ponto — consistente empiricamente com o dataset `rotate` (PWM=0 em ±0,5 rad/s comandado, motor ativo em ±1,0). A conclusão metodológica original **permanece válida e não muda**: a zona morta é **por roda** (`MOTOR_MIN_SPEED_RAD_S=1,567 rad/s`, `utils.h:42`, firmware `ssl-embedded`), e uma estrutura Hammerstein com zona morta no ω de corpo **não corresponde à física** — só o número do limiar muda. Fonte única de verdade: `config/robot_geometry.json` (blocos `physical`/`firmware`/`deprecated`). Uma questão de menor porte fica **declarada em aberto**: a constante hardcoded lida em `kinematics.h` do commit `eb57531` (2026-05-06) do firmware ainda é 3,3208 (não 2,61); a hipótese mais provável é deriva de versão entre esse commit e o binário efetivamente flasheado no robô durante a coleta de 04–05/07/2026 — não confirmado nesta sessão. Detalhe completo em `results/qc_rotate_20260724_125828.md` §5 e §7 (a versão anterior, `qc_rotate_20260724_021248.md`, permanece intacta para comparação — continha as leituras equivocadas de "déficit de ganho" e "zona morta de corpo por atrito estático", ambas corrigidas).
+
+### Atualização 2026-07-24 (continuação) — Identificação FOPTD de ω, malha aberta: PROMOVIDO
+
+**Pré-registro** (`docs/PREREGISTRO_OMEGA_20260724.md`, critérios fixados ANTES de rodar):
+(i) K∈[0,5;2], τ∈[0,02;0,5], Td≤0,15; (ii) fit hold-out ≥60% (critério original do
+projeto, reinstalado dado que agora o dado é de malha aberta dedicada); (iii) gate
+SE(2) multi-horizonte vs placeholder, Wilcoxon p<0,05 em todos os horizontes;
+(iv) Ljung-Box informativo (caveat sgolay, não é gate).
+
+**Dados:** os 6 eventos do regime linear do dataset `rotate` (±1/±2,5/±5 rad/s;
+TREINO={+1,−2,5,+5,−5}, HOLD-OUT={−1,+2,5} — mesma partição do QC de D9). Espelha
+`identify_trans_dof.m` (vx/vy): P1D, `procest`, SG win=7/ordem=2 reamostrado a
+Ts=1/60 primeiro, sem detrend. **Desvio declarado**: os splits *padded* por evento
+excluem o transiente por design (pad 0,2 s) — testado empiricamente que isso faz
+Td colapsar a 0 (não-observável); a montagem do `iddata` usa por isso o log
+contínuo pré-pad (`rotate_raw.csv`, leitura apenas), janela `[t_start−0,5s, t_end]`
+de cada evento, mesma reamostragem/filtro.
+
+**Resultado:** θ_ω = {K=**1,0016** [IC95% 0,9993;1,0040]; τ=**0,0828 s**
+[0,0801;0,0855]; Td=**0,0890 s** [0,0877;0,0902]}; correlação τ-Td ρ=−0,47 (abaixo
+do limiar de alerta 0,8). Fit hold-out **71,1%** média (65,0%/77,2% por evento;
+mediana treino 83,2%) — passa (ii). Faixa física OK — passa (i). Gate SE(2)
+(`eval_omega_v3_se2.m`, MESMA metodologia da Etapa C, 18 `shoot_to_goal`): candidato
+**MELHOR** que o placeholder em **todos os 5 horizontes** (Δmediana pool=**−0,1138 m**,
+p=**1,74e-16**; por horizonte Δ=−0,051 a −0,182 m, p=1,96e-4 em todos) — passa (iii).
+Ljung-Box rejeita (p≈0, mesmo caveat de sempre) — informativo, não reprova.
+
+**Todos os 3 gates obrigatórios passaram → PROMOVIDO.** `config/twin_params.json`
+atualizado (`dof.w.placeholder:false`); `models/sysid_omega_rotate_v1.mat` salvo.
+Bins rotação/misto do gate twin-vs-baseline re-rodados (`phase0_replay.metrics_report`,
+twin vs `IdealKinematicPlant` — rSim/`robosim` segue indisponível neste ambiente):
+trans-dominado GO (gap+0,062 m, p=1,15e-8); misto/rot **SEM POPULAÇÃO** (0 e 1
+janela no hold-out de 10 eventos de competição — não é mais o gate de placeholder,
+é escassez real de dado rotação-dominado no hold-out).
+
+**Leitura central (peça do artigo):** K≈1,0016 é estatisticamente indistinguível
+de 1 — confirma a hipótese de que o ganho ≈1,3–1,35 medido em malha fechada
+(§6, `diag_omega_gain_amplitude.m`, e o candidato v3 K=1,307) era **viés de
+correlação comando↔perturbação** de dado de malha fechada, não ganho real de
+planta. Contraste direto: v3 (malha fechada) reprovava (i)-Ljung-Box (mesmo
+caveat) e (iii)-SE(2) (Δmediana pool **+0,0489 m**, PIOR, p=3,8e-9); esta
+identificação (malha aberta dedicada) passa (iii) com Δmediana pool **−0,1138 m**,
+MELHOR, p=1,74e-16 — mesma estrutura, dado diferente, veredito invertido. Essa é
+a contribuição metodológica central da tese quanto a ω: caracterizar o LIMITE de
+identificabilidade de dados de malha fechada de competição, resolvido com coleta
+dedicada.
+
+**Zona morta (Etapa 4, complementa D9):** fração de `|cmd_ω|` mascarada nos 46
+splits de competição, recalculada com o limiar corrigido (0,58–0,60 rad/s, vs o
+antigo 0,3 rad/s da IK — a claim histórica "~84%" foi REPRODUZIDA com threshold
+0,3, não 0,472 como se poderia supor): pool sobe de 84,8% (threshold antigo 0,3)
+para **94,3%** (threshold firmware corrigido 0,600); por label, `shoot_to_goal`
+(o mais rico em rotação) vai de 57,4% para 77,3%. Reforça: mesmo o label mais
+favorável mascara >3/4 dos comandos de ω — a coleta dedicada não era opcional.
+
+**Desvio/limitação declarada:** amostra de 6 eventos no regime linear (4/2),
+sem escada fina entre 0,5 e 1,0 rad/s comandado (limiar de zona morta fica como
+intervalo, não ponto). Coleta adicional não realizada por indisponibilidade do
+robô nesta janela (deadline do artigo SBR, 15/08/2026) — registrado como
+limitação explícita, não escondida. Detalhe completo, figuras e tabelas:
+`results/identificacao_omega_20260724.md`.
 
 ## 7. Calibração (decisão de método)
 - PSO sobre constantes cinemáticas → **substituído** por identificação grey-box + bayesopt (validado pela orientadora; PSO como baseline **não** será mantido).

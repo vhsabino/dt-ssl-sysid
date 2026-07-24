@@ -1,0 +1,17 @@
+{
+  "_comment": "Fonte UNICA da verdade do hold-out. IDs LITERAIS extraidos de automation/eval_bayesopt_holdout.m (linhas 16-25) e automation/eval_bayesopt_v2_holdout.m (linhas 19-28) — listas identicas. Sao exatamente os 10 eventos NAO usados no fit. NAO regenerar via rng (evita mismatch de contexto de semente).",
+  "dataset": "2026-05-18_19-2-15",
+  "team": "allies",
+  "events": [
+    { "label": "front_to_back", "event": "front_to_back_01_01" },
+    { "label": "side_to_side",  "event": "side_to_side_01_05" },
+    { "label": "side_to_side",  "event": "side_to_side_01_06" },
+    { "label": "side_to_side",  "event": "side_to_side_01_07" },
+    { "label": "side_to_side",  "event": "side_to_side_02_03" },
+    { "label": "shoot_to_goal", "event": "shoot_to_goal_05_02" },
+    { "label": "shoot_to_goal", "event": "shoot_to_goal_08_01" },
+    { "label": "shoot_to_goal", "event": "shoot_to_goal_09_01" },
+    { "label": "shoot_to_goal", "event": "shoot_to_goal_12_01" },
+    { "label": "shoot_to_goal", "event": "shoot_to_goal_14_02" }
+  ]
+}

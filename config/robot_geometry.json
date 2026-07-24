@@ -1,0 +1,72 @@
+{
+  "_comment": "Fonte unica de verdade da geometria do robo (R = raio de contato roda-chao, r = raio da roda). Substitui a constante R/r=3.3208 sem rastreabilidade usada em todo o projeto ate 2026-07-24 (ver deprecated). JSON nao suporta comentarios de linha; use este campo _comment.",
+  "physical": {
+    "provenance": "CAD SSL v2025, medido 2026-07-24 por V. Sabino",
+    "date": "2026-07-24",
+    "R_contact_m": 0.079601,
+    "wheel_radius_m": 0.029492,
+    "R_over_r": 2.6991,
+    "note": "verificar se R e ate ponto de contato e r ate superficie do rolete (nao confirmado nesta sessao)"
+  },
+  "firmware": {
+    "source": "ssl-embedded, commit eb57531 (eb575311dd2573805daaa560d4746cb3294a35a3, 2026-05-06), lib/MotionControl/PID_Controller/lib/Utils/utils.h; le-only, fora do git/DVC deste repo",
+    "R_over_r_implied": 2.61,
+    "R_over_r_implied_note": "inferido empiricamente de telemetry.d_speed_mX (setpoint desejado pos-deadzone, ver AC5 do dataset rotate) = 2.61 x |cmd_w| em TODAS as amplitudes acima da zona morta (rotate_01_05..10); CONSTANTE hardcoded no firmware (kinematics.h: wheel_radius=0.02650, robot_radius=0.0880 => R/r=3.3208, simetrico nas 4 rodas via i_kinematic_m1..m4) NAO bate com esse 2.61 -- residuo de origem nao totalmente resolvida nesta sessao (ver open_questions).",
+    "motor_min_speed_rad_s": 1.567,
+    "motor_min_speed_rad_s_source": "utils.h:42 MOTOR_MIN_SPEED_RAD_S; deadzone aplicada em PID_Controller.cpp:94 (if fabs(desired_rad_s) < MOTOR_MIN_SPEED_RAD_S && desired_rad_s != 0) desired_rad_s = 0, ANTES do PI",
+    "omega_cmd_deadzone_rad_s_range": [0.581, 0.600],
+    "omega_cmd_deadzone_rad_s_range_note": "INTERVALO, nunca valor pontual: motor_min_speed_rad_s / R_over_r com os dois R/r nao-deprecados -> 1.567/2.6991=0.5806 (CAD) .. 1.567/2.61=0.6004 (firmware implied). Confirmado empiricamente no dataset rotate: pose de corpo parada em +-0.25 (setpoint pre-deadzone 0.65..0.83 < 1.567, zerado) e em movimento a partir de +-1.0; +-0.5 fica NUMA ZONA CINZENTA equipamento-dependente (setpoint pre-deadzone 1.31..1.66 rad/s, em torno do limiar 1.567) e deve ser tratado como fronteira, nao como ponto de treino do fit linear.",
+    "open_questions": [
+      "Por que o setpoint medido (telemetry.d_speed, pos-deadzone) e ~0.786x o alvo previsto pela constante hardcoded do firmware (kinematics.h R/r=3.3208), em vez de bater exatamente? Rastreados ate agora: Kinematics::convertToWheel (kinematics.cpp:61-68) usa i_kinematic_m1..m4[2]=robot_radius/wheel_radius=3.3208 SIMETRICO nas 4 rodas (bate com d_speed identico nas 4 rodas, medido); d_speed=setpoint 'desired' (confirmado via error_mX = d_speed_mX - c_speed_mX, consistente com PID_Controller::pi(desired,measured) em TODOS os 6 eventos acima da zona morta). NAO localizado nesta sessao: o passo entre convertToWheel(...) e o valor que efetivamente vira 'desired_rad_s' no telemetry (possivel escala/limite em MotionControl.cpp alem da janela lida, linhas ~1-250 nao inspecionadas). Pendencia declarada."
+    ]
+  },
+  "deprecated": {
+    "R_over_r": 3.3208,
+    "R_over_r_source": "identico a kinematics.h (ssl-embedded, commit eb57531): wheel_radius=0.02650, robot_radius=0.0880 -> 0.0880/0.02650=3.3208 (usado simetricamente nas 4 rodas na cinematica de COMANDO ao vivo do firmware -- NAO e so um numero morto, e o que o robo de fato usa para gerar o setpoint por roda; a refutacao e da PREMISSA fisica R=0.088 m, nao do uso no codigo).",
+    "omega_cmd_deadzone_rad_s": 0.472,
+    "reason": "R/r=3.3208 e omega_cmd_deadzone=0.472 sem rastreabilidade documental ate 2026-07-24; refutados por 3 evidencias convergentes e independentes: (a) CAD medido 2026-07-24 (R/r=2.6991, ver physical); (b) firmware/telemetria do dataset rotate (R/r implicito=2.61, d_speed=2.61x|cmd_w| exato em todas as amplitudes acima da zona morta, ver firmware.R_over_r_implied); (c) resposta de corpo medida via visao (K_omega~=1.01 no dataset rotate, results/qc_rotate_20260724_021248.md secao 8 -- consistente com ganho ~1 quando a constante correta e usada, ao inves do ganho ~1.35 relatado sob a constante deprecated em sessoes anteriores)."
+  },
+  "matlab_inverse_kinematics_solver": {
+    "source": "matlab/analytical/inverse_kinematics_solver.m (odometria: rodas medidas -> vx,vy,omega de corpo; pseudo-inversa K_inv 3x4)",
+    "matrix_K_inv": {
+      "row_vx": [-0.008573651497466, -0.007000357133747, 0.007000357133747, 0.008573651497466],
+      "row_vy": [0.010251785668734, -0.010251785668734, -0.010251785668734, 0.010251785668734],
+      "row_omega": [0.088100765229306, 0.062296648521366, 0.062296648521366, 0.088100765229306]
+    },
+    "status_2026-07-24": "OBSOLETO -- registrado aqui so como referencia historica (era o conteudo lido na auditoria D9 original). Ver bloco scan_2026-07-24.matlab_analytical_files abaixo para o estado ATUAL (matlab/analytical/*.m ja tem edicao manual local nao commitada, com magnitude corrigida mas assimetria cos45 AINDA presente).",
+    "asymmetry": "rodas 1&4 vs 2&3 tem coeficientes DIFERENTES nas 3 linhas (nao e um layout de 4 rodas identicas); razao exata roda(2,3)/roda(1,4) = 0.70710678 = cos(45 graus) na linha omega, 0.81649658 na linha vx, e a linha vy tem magnitude IGUAL nas 4 rodas (so o sinal alterna). Contraste empirico: no dataset rotate, telemetry.d_speed e IDENTICO nas 4 rodas p/ toda rotacao pura comandada (razao 1&4 vs 2&3 = 1.0000 exato em todos os 10 eventos) -- ou seja, essa assimetria do K_inv NAO se manifesta no lado de COMANDO do firmware ao vivo (que usa R/r=3.3208 simetrico, ver deprecated.R_over_r_source); K_inv parece ser um modelo MATLAB separado (odometria/analise offline), nao o que esta compilado no robo.",
+    "R_efetivo_uniform_excitation": 3.3245,
+    "R_efetivo_note": "R/r implicito de K_inv sob excitacao uniforme (as 4 rodas a 1 rad/s, o caso empirico da rotacao pura medida): soma da linha omega = 0.300795 rad/s de corpo por rad/s de roda -> R_eff/r = 1/0.300795 = 3.3245. Isso fica 0.11% do R/r DEPRECATED (3.3208) e 23-27% longe do CAD (2.6991) ou do firmware implicito (2.61) -- ou seja, a assimetria do K_inv NAO explica o residuo de ~4.5% entre CAD e firmware; K_inv parece construido sobre a MESMA geometria deprecated (R~0.088), nao uma fonte independente mais precisa."
+  },
+  "scan_2026-07-24": {
+    "_comment": "Varredura de consistencia (continuacao do D9): procurou as constantes deprecated em formatos que grep de texto simples ('0.088'/'0.0265'/'robot_radius'/'wheel_radius') nao cobre -- .slx (zip/OOXML), .sldd (zip/OOXML, limpo), .mat (binario). Achado central: a MESMA familia de constante (K4/R_over_r ~3.32) vive DUPLICADA em varios lugares, alguns dos quais o grep anterior nao alcancaria porque o numero aparece como razao ja calculada (3.324525253), nao como o par bruto 0.088/0.0265.",
+    "slx_stateflow_charts": {
+      "method": "unzip (todo .slx/.sldd e um container OOXML/zip) + grep no XML extraido",
+      "files_contaminados": [
+        "simulink/parameter_estimation_model_pid.slx (chart_15 'inverse_kinematics_solver' = copia literal do K_inv velho; chart_27 'kinematic_solver' = K1-4_base com K4=3.324525253)",
+        "simulink/parameter_estimation_model_pid_v2.slx (chart_14 'forward_kinematics' + chart_27 'inverse_kinematics', ambos K1-4_base K4=3.324525253)",
+        "simulink/parameter_estimation_model_pid_v3.slx -- MODELO ATIVO DO GEMEO (chart_14 'forward_kinematics' + chart_27 'inverse_kinematics', ambos K1-4_base K4=3.324525253)",
+        "simulink/parameter_estimation_model_with_ros.slx (chart_14 'inverse_kinematics_solver' K_inv velho; chart_26 'kinematic_solver' K1-4_base K4=3.324525253)",
+        "simulink/parameter_estimation_model_with_ros_v2.slx (chart_14 + chart_27, ambos K1-4_base K4=3.324525253)",
+        "simulink/simulink_tests.slx (chart_13 'inverse_kinematics_solver' K_inv velho; chart_25 'kinematic_solver' K matriz literal K4=3.324525253 + zonas mortas hardcoded 0.1/0.1/0.3 -- essas zonas mortas foram removidas do modelo pid_v3 em 2026-06-11 mas SOBREVIVEM aqui)",
+        "archive/rl/rl_model.slx (chart_13 + chart_25, mesmo padrao de simulink_tests.slx)",
+        "archive/rl/rl_model_with_ros.slx (chart_13 + chart_25, mesmo padrao)"
+      ],
+      "veredito_impacto": "Nenhuma re-simulacao necessaria para pid_v3 (ver mathematical_self_cancellation abaixo) -- mas os 8 arquivos .slx continuam com a constante deprecated embutida, agora DESSINCRONIZADOS dos .m standalone que ja foram parcialmente corrigidos manualmente (ver matlab_analytical_files). Nao editados nesta sessao: Stateflow embutido em .slx e binario Simulink, edicao segura exige API do Simulink (nao patch de XML + re-zip), fora do escopo de uma varredura.",
+      "mathematical_self_cancellation": "Em pid.slx/pid_v2/pid_v3/with_ros/with_ros_v2, o chart de IK (corpo->roda, usa K) e o de odometria (roda->corpo, usa pinv(K)) SEMPRE reconstroem a MESMA matriz K a partir dos MESMOS K1-K4_base -- logo pinv(K)*(K*x)=x e uma IDENTIDADE MATEMATICA para qualquer x, independente do valor de K1-K4 (confirmado por automation/test_wheel_chain.m::chain_static, que replica exatamente esse round-trip e corresponde ao 'ganho de regime = 1 por DOF (teste unitario)' ja documentado em CLAUDE.md/RELATORIO_TECNICO §1). K_Matrix (a 'Action' do PSO) e sempre zeros(1,12) no InitFcn minimo atual (automation/ensure_model_ready.m, confirmado via grep), entao K1-4=K1-4_base sempre, em toda simulacao. CONCLUSAO: a contaminacao NAO viesa a fidelidade de posicao/heading do gemeo free-run (a cadeia de rodas e efetivamente transparente/identidade); ela SO importaria se inverse_kinematics_solver.m fosse usado sozinho para converter encoders REAIS (fora do round-trip simulado)."
+    },
+    "matlab_analytical_files": {
+      "achado": "matlab/analytical/inverse_kinematics_solver.m e matlab/analytical/kinematicSolver.m JA TEM EDICAO LOCAL NAO COMMITADA (presente desde o inicio desta sessao, nao feita por mim) que troca os K1-4_base antigos (34.99/20.20/28.57/3.324525253) por NOVOS valores (29.36475667/16.95375017/23.97622342/2.699070934). Verificado nesta varredura: R_efetivo do NOVO K_inv sob excitacao uniforme = 2.699070934000005 -- bate EXATAMENTE com physical.R_over_r (CAD); pinv(K_novo) confere com o K_inv literal novo a 4.9e-16 (precisao de ponto flutuante) -- os dois arquivos continuam sendo um par pinv EXATO um do outro, a edicao manual preservou essa propriedade.",
+      "PROBLEMA_item5": "A linha omega do K_inv NOVO CONTINUA ASSIMETRICA: razao roda(2,3)/roda(1,4) = 0.70710678 = cos(45 graus), IDENTICA a assimetria antiga (so a magnitude mudou, a FORMA nao). Isso contradiz: (a) a telemetria do dataset rotate (d_speed identico nas 4 rodas, razao 1.0000 exata, TODOS os 10 eventos); (b) o firmware (kinematics.h usa i_kinematic_m1..m4[2]=robot_radius/wheel_radius, UM UNICO escalar para as 4 rodas, sem dependencia do angulo de montagem); (c) a fisica de corpo rigido em rotacao pura (velocidade tangencial = omega*R independe da posicao angular do ponto, so depende da distancia radial R -- SE as 4 rodas estao a mesma distancia R do centro, o coeficiente de omega DEVE ser igual nas 4, mesmo com angulos de montagem de vx/vy diferentes, que e exatamente o caso do firmware: angle_m1=angle_m4=60 graus, angle_m2=angle_m3=45 graus, mas robot_radius e o MESMO escalar p/ todas). Diagnostico: a formula original usada p/ construir K parece ter aplicado (erroneamente) uma dependencia angular tambem na coluna omega (copiando o padrao das colunas vx/vy), quando fisicamente essa coluna deveria ser CONSTANTE. A correcao feita ate agora (rescale de magnitude p/ bater com o CAD) NAO resolve isso -- resolve por coincidencia apenas o caso de excitacao uniforme (rotacao pura com as 4 rodas iguais), que e o caso do dataset rotate, mas erraria em qualquer cenario com rodas desbalanceadas.",
+      "nao_editado": "Os dois arquivos .m tem edicao MANUAL do usuario em andamento (working tree, nao commitada); esta sessao NAO sobrescreveu essa edicao -- so a auditou e reportou o achado da assimetria remanescente. Correcao completa (tornar a coluna omega literalmente constante, K4 igual nas 4 linhas, sem dependencia angular) fica como pendencia p/ o usuario decidir (pode requerer re-derivar a matriz K do zero a partir da geometria correta, nao so trocar constantes)."
+    },
+    "python_kinematics_py": {
+      "arquivo": "python/kinematics.py",
+      "achado": "Mesma familia de contaminacao (K1..K4 hardcoded, k1_3=k2_3=k3_3=k4_3=3.324525253, identico ao K4_base antigo do padrao Stateflow) -- SO detectavel porque a varredura desta sessao procurou o valor JA CALCULADO 3.324525253, nao o par bruto 0.088/0.0265 (que o grep textual do D9 original teria pego, mas este arquivo nao guarda 0.088/0.0265 em lugar nenhum, so o produto). Nao editado (fora do escopo desta sessao; nenhum consumidor direto identificado no grep de item 4)."
+    },
+    "stale_cache": {
+      "build/sysid_omega_v3_linear_tmp.mat": "campo R.deadzone_firmware.d_body_purerot_rad_s = 0.4719 (valor deprecated pontual, cache de uma execucao ANTES da correcao de automation/identify_omega_v3_linear.m:138 desta sessao). Sera corrigido automaticamente (para d_body_purerot_rad_s_range, intervalo) na proxima vez que o script rodar; nao regenerado nesta sessao (requer System Identification Toolbox + dados reais, fora do escopo de uma varredura de arquivos)."
+    },
+    "sldd_files": "config/ssl_robot.sldd e archive/ssl_robot_stale_scripts_copy_2026-05-23.sldd: LIMPOS -- nenhuma constante de geometria encontrada (armazenam so os parametros dinamicos K/tau/Td por DOF, nao a cinematica de rodas)."
+  }
+}
