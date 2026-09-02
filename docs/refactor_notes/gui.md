@@ -47,7 +47,7 @@ python -m dtssl.gui ...
 
 ## Como rodar
 
-Instalação: `pip install -e .[gui]` (PySide6 ≥ 6.6, pyqtgraph ≥ 0.13.4, pygame ≥ 2.5). Testado aqui com PySide6 6.11.2,
+Instalação: `pip install -e .[gui]` (PySide6 ≥ 6.6, pyqtgraph ≥ 0.13.4, pygame-ce ≥ 2.5 — `import pygame` continua igual; o pygame clássico 2.6 não tem wheel para Python 3.14 no Windows). Testado aqui com PySide6 6.11.2,
 pyqtgraph 0.14.0, pygame 2.6.1 (Linux, `QT_QPA_PLATFORM=offscreen`).
 
 ### Windows nativo (recomendado para o DualSense)

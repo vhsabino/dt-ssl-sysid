@@ -25,10 +25,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-gui = ["PySide6>=6.6", "pyqtgraph>=0.13.4", "pygame>=2.5"]
+gui = ["PySide6>=6.6", "pyqtgraph>=0.13.4", "pygame-ce>=2.5"]  # pygame-ce: drop-in `import pygame`, ships cp314 wheels (pygame 2.6 does not)
 mujoco = ["mujoco>=3.1"]
 rsim = ["robosim==1.0"]
-etl = ["betterproto>=1.2.5"]
+etl = []  # ETL usa os _pb2 gerados (grpcio-tools em dev); betterproto nao e mais necessario
 mat = ["h5py>=3.10"]
 dev = ["pytest>=8", "pytest-timeout>=2.3", "ruff>=0.5", "grpcio-tools>=1.60"]
 all = ["dtssl[gui,mujoco,etl,mat,dev]"]

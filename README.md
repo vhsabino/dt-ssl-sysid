@@ -43,7 +43,7 @@ Histórico completo de cada número: `results/CHANGELOG.md`.
 ```bash
 git clone <este repo> digitaltwin && cd digitaltwin
 python -m venv .venv && . .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install -e ".[gui,mujoco,dev]"                    # extras: gui (PySide6/pyqtgraph/pygame), mujoco, rsim, etl, mat, dev
+pip install -e ".[gui,mujoco,dev]"                    # extras: gui (PySide6/pyqtgraph/pygame-ce), mujoco, rsim, etl, mat, dev
 dtssl info                                            # versão, raiz, dataset, backends e extras disponíveis
 pytest -q                                             # sem dataset: pytest -m "not requires_data"
 ```
