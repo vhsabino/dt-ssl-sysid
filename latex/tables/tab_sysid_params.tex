@@ -1,0 +1,34 @@
+%==============================================================================
+% TABLE: identified per-DOF FOPDT parameters + hold-out fit.
+% Source: config/twin_params.json ; models/sysid_vxvy_v2.mat ;
+%         models/sysid_omega_rotate_v1.mat ; results/identificacao_omega_20260724.md ;
+%         docs/RELATORIO_TECNICO_DESENVOLVIMENTO.md sec.5 ; CHANGELOG 2026-06-14 / 2026-07-24.
+%==============================================================================
+\begin{table}[t]
+  \caption{Identified per-DOF FOPDT parameters and hold-out fit. All three
+  channels are identified (no placeholder); $\omega$ uses a dedicated
+  open-loop rotation-only collection (see Sec.~\ref{sec:results:omega}), not
+  the closed-loop competition logs used for $v_x,v_y$.}
+  \label{tab:sysid}
+  \centering
+  \begin{tabular}{lcccc}
+    \toprule
+    DOF & $K$ & $\tau$ (s) & $\Td$ (s) & hold-out fit \\
+    \midrule
+    $v_x$     & 1.119 & 0.072 & 0.069 & 86.7\,\% \\
+    $v_y$     & 1.052 & 0.127 & 0.056 & 87.1\,\% \\
+    $\omega$  & 1.002 & 0.083 & 0.089 & 71.1\,\% \\
+    \bottomrule
+  \end{tabular}
+  \\[2pt]
+  \raggedright\footnotesize Fit is Eq.~\ref{eq:fit}, averaged over hold-out
+  events. Because $v_x$ has a single hold-out event, we also ran
+  leave-one-event-out over all events of each translational label: $v_x$ gives
+  $84.3\pm2.0$~p.p.\ over 4 folds and $v_y$ $82.8\pm2.7$~p.p.\ over 13, with the
+  refitted gain within $0.015$ of the promoted value in both cases. No parameter
+  intervals are reported: see Sec.~\ref{sec:results:omega}.
+  % source: results/loo_translational_20260810_1743.md — refit completo por
+  %   dobra, sem alterar o modelo promovido. ATENCAO: o artefato _1742 e a
+  %   execucao QUEBRADA (posicao em mm tratada como m, K~1073, tau negativo);
+  %   foi descartado. Citar sempre _1743.
+\end{table}

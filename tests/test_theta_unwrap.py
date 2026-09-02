@@ -1,9 +1,11 @@
 """theta reamostrado SEM saltos de fase (interpolacao apos unwrap)."""
 import numpy as np
+import pytest
 
-from phase0_replay import load_segment, interp_linear_nan
+from dtssl import load_segment, interp_linear_nan
 
 
+@pytest.mark.requires_data
 def test_real_event_theta_has_no_2pi_jumps():
     # evento com bastante rotacao
     seg = load_segment("shoot_to_goal", "shoot_to_goal_12_01")

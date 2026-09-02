@@ -1,0 +1,43 @@
+%==============================================================================
+% CONCLUSION — resumida 2026-08-10 (pedido do autor, corte 9->6 páginas).
+% De ~3 blocos para 2 parágrafos curtos. Availability preservada (fecha C10);
+% Future work reduzido a uma frase por direção.
+%==============================================================================
+\section{Conclusion}
+\label{sec:conclusion}
+
+A per-DOF FOPDT model of an omnidirectional SSL robot, identified mostly from
+closed-loop competition logs, attains validated translational fidelity: over
+$\SI{73.5}{s}$ of scored hold-out motion it lowers the median position error of
+a zero-parameter baseline in all ten hold-out events, halving it at the
+reference horizon, with the improvement attributable in comparable parts to the
+time constant and the dead time, and only in combination with the measured
+initial velocity.
+% FIX 2026-08-10 (revisao V2, objecao 5c): "halves in all ten events" afirmava
+% mais do que o medido, que e "vence em 10/10" e "reduz a metade em h_ref".
+% FIX 2026-08-10 (revisao V3, objecao 2): o comentario acima estava numa unica
+% linha e ENGOLIU o inicio desta frase no PDF ("Yaw needed a short dedicated
+% open-loop campaign, after"), fazendo a Conclusao nunca afirmar que o yaw
+% exigiu a coleta dedicada. Quebrado em duas linhas.
+Yaw needed a short dedicated open-loop campaign, after characterizing why the
+logs cannot support it: during play the yaw command carries a median $1\%$ of
+the per-wheel actuation and explains only $56\%$ of the variance of the
+measured rotation. That dilution, not an
+idle actuator, is what inflates the closed-loop gain estimate where a dedicated
+collection recovers unity. The lesson travels: a claim that a DOF is not
+identifiable from operational logs is a claim about the available excitation,
+and the share of the actuation each command carries is computable from the logs
+before any model is fitted.
+% source: results/clustered_stats_20260809_2309.md ;
+%         results/gap_decomposition_20260809_2308.md ;
+%         results/omega_excitation_analysis_20260807_133917.json
+
+Code, configurations, the frozen hold-out list, both datasets and the
+pre-registration document with its commit timestamp are released at
+\url{https://github.com/anon-ssl-dt/behavioral-twin-ssl}, with instructions to
+reproduce every number above. Future work embeds this plant in a full digital
+twin inside a robot-learning environment such as Isaac Sim or MuJoCo
+\cite{machado2025planning}, and adds a rotation-rich validation distribution, an
+open-loop arm with translation superimposed, and cross-robot replication.
+% ACAO DO AUTOR: URL É PLACEHOLDER. Trocar pelo repositorio anonimizado real.
+% Conteudo pronto em open-source/ (ver open-source/README.md).

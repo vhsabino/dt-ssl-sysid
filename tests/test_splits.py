@@ -1,6 +1,8 @@
 """Hold-out: a fonte unica devolve exatamente os 10 eventos esperados."""
-from phase0_replay import load_holdout_list, load_holdout_segments
-from phase0_replay.io import event_dir
+import pytest
+
+from dtssl import load_holdout_list, load_holdout_segments
+from dtssl.data.loader import event_dir
 
 EXPECTED = [
     ("front_to_back", "front_to_back_01_01"),
@@ -23,6 +25,7 @@ def test_holdout_list_is_the_ten():
     assert len(got) == 10
 
 
+@pytest.mark.requires_data
 def test_holdout_event_dirs_exist():
     for label, event in EXPECTED:
         d = event_dir(label, event)
@@ -30,6 +33,7 @@ def test_holdout_event_dirs_exist():
         assert (d / "processed_robots.parquet").exists(), d
 
 
+@pytest.mark.requires_data
 def test_holdout_segments_load_and_move():
     segs, dropped = load_holdout_segments(min_displacement_m=0.1)
     # todos os eventos do hold-out sao tarefas de movimento -> nenhum idle

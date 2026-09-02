@@ -1,0 +1,33 @@
+%==============================================================================
+% TABELA: e_pos e e_ang das TRES plantas por horizonte (bin translacional).
+% Criada 2026-08-10 em resposta a B3 da revisao V2 ("o resultado principal do
+% artigo nao tem figura nem tabela") e a C6 (o artigo afirmava que o e_ang do
+% twin excede o do rSim em horizontes longos sem nunca dar o numero do rSim).
+% Fonte: results/epos_eang_three_models_20260810_1022.md, gerada por
+% scripts/epos_eang_three_models.py sobre as mesmas janelas do gate.
+% NOTA: os numeros de e_ang REFUTAM a afirmacao anterior do artigo -- o modelo
+% tem heading MENOR que o rSim em TODOS os horizontes. Texto corrigido.
+%==============================================================================
+\begin{table}[t]
+  \caption{Median free-run error on translation-dominated hold-out windows.
+  Position error in meters, heading error in radians. The model is lowest in
+  both quantities at every horizon; the two baselines cross in position near
+  $\SI{1}{s}$.}
+  \label{tab:three}
+  \centering
+  \setlength{\tabcolsep}{4pt}
+  \begin{tabular}{ccccccc}
+    \toprule
+    & \multicolumn{3}{c}{$\epos$ (m)} & \multicolumn{3}{c}{$\eang$ (rad)} \\
+    \cmidrule(lr){2-4}\cmidrule(lr){5-7}
+    $h$ (s) & model & ideal & rSim & model & ideal & rSim \\
+    \midrule
+    0.10 & \textbf{0.008} & 0.026 & 0.057 & \textbf{0.013} & 0.023 & 0.026 \\
+    0.20 & \textbf{0.018} & 0.050 & 0.092 & \textbf{0.031} & 0.044 & 0.046 \\
+    0.40 & \textbf{0.039} & 0.101 & 0.129 & \textbf{0.044} & 0.067 & 0.064 \\
+    0.70 & \textbf{0.062} & 0.152 & 0.174 & \textbf{0.063} & 0.076 & 0.079 \\
+    1.00 & \textbf{0.092} & 0.217 & 0.213 & \textbf{0.073} & 0.092 & 0.086 \\
+    1.50 & \textbf{0.119} & 0.291 & 0.289 & \textbf{0.090} & 0.095 & 0.094 \\
+    \bottomrule
+  \end{tabular}
+\end{table}

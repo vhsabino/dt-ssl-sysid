@@ -1,7 +1,9 @@
 """PORTAO DE CORRECAO: AnalyticFOPDTPlant reproduz deadreckoning_p1d (MATLAB).
 
-O golden vem de automation/export_plant_golden.m (deadreckoning_p1d na grade 1/60,
-theta do modelo promovido). O plant e dirigido pelos MESMOS comandos (do loader,
+O golden vem de matlab/dtssl/export_plant_golden.m (deadreckoning_p1d na grade 1/60)
+com o theta gravado em tests/fixtures/plant_golden_theta.json (vx/vy v2 + omega placeholder,
+2026-06-16). O teste usa ESSE theta, nao o config/twin_params.json corrente, para que a
+promocao de novos parametros nao invalide o portao de correcao do porte. O plant e dirigido pelos MESMOS comandos (do loader,
 identicos ao golden) a partir da MESMA pose0, com estado inicial nulo (velb0=0,
 como deadreckoning) e SEM prime_delay (buffer 0, como o fill 0 do interp1).
 """
@@ -10,7 +12,10 @@ import pandas as pd
 import pytest
 
 from conftest import FIXTURES
-from phase0_replay import load_segment, AnalyticFOPDTPlant
+from dtssl import load_segment, AnalyticFOPDTPlant, load_twin_params
+
+pytestmark = pytest.mark.requires_data
+GOLDEN_THETA = FIXTURES / "plant_golden_theta.json"   # theta that generated the fixtures
 
 CASES = [
     ("shoot_to_goal", "shoot_to_goal_12_01"),   # rotacao + translacao (exercita w, vx, vy)
@@ -41,7 +46,7 @@ def test_analytic_plant_matches_deadreckoning_golden(label, event):
     seg = load_segment(label, event)
     assert seg.n == len(ref), f"N Python={seg.n} vs MATLAB={len(ref)}"
 
-    plant = AnalyticFOPDTPlant.from_config()
+    plant = AnalyticFOPDTPlant(load_twin_params(GOLDEN_THETA))
     xs, ys, ths = _rollout(plant, seg)
 
     for name, got in (("xs", xs), ("ys", ys), ("ths", ths)):
@@ -58,7 +63,7 @@ def test_report_achieved_atol(capsys):
             pytest.skip("fixtures ausentes")
         ref = pd.read_parquet(ref_path)
         seg = load_segment(label, event)
-        plant = AnalyticFOPDTPlant.from_config()
+        plant = AnalyticFOPDTPlant(load_twin_params(GOLDEN_THETA))
         xs, ys, ths = _rollout(plant, seg)
         e = max(np.max(np.abs(xs - ref["xs"].to_numpy(float))),
                 np.max(np.abs(ys - ref["ys"].to_numpy(float))),

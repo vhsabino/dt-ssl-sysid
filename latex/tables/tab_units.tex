@@ -1,0 +1,31 @@
+%==============================================================================
+% TABLE: explicit unit contract. Added 2026-08-07 (revisão maior, T5.3) to
+% remove any order-of-magnitude ambiguity in the geometric constants.
+% Source: config/robot_geometry.json (physical, firmware) ;
+%         config/twin_params.json (ts, robot_radius, wheel_radius) ;
+%         config/metrics.json (horizons) ; results/qc_rotate_20260724_125828.md.
+% NOTE: 1.567 rad/s is the per-WHEEL motor minimum speed (firmware utils.h:42,
+% clamp at PID_Controller.cpp:94); the body-level dead-zone interval is that
+% value divided by the two non-deprecated R/r constants.
+%==============================================================================
+\begin{table}[t]
+  \caption{Unit contract. All quantities are SI; lengths in meters, angles in
+  radians. Values are the ones actually used by the pipeline, not nominal
+  datasheet figures.}
+  \label{tab:units}
+  \centering
+  \begin{tabular}{llll}
+    \toprule
+    Quantity & Symbol & Value & Unit \\
+    \midrule
+    Wheel-contact radius (CAD)   & $R$          & $0.079601$        & \si{m} \\
+    Wheel radius (CAD)           & $r$          & $0.029492$        & \si{m} \\
+    Radius ratio (CAD)           & $R/r$        & $2.6991$          & --- \\
+    Radius ratio (firmware)      & $R/r$        & $2.61$            & --- \\
+    Radius ratio (deprecated)    & $R/r$        & $3.3208$          & --- \\
+    Sample period                & $\Delta t$   & $1/60$            & \si{s} \\
+    Motor minimum speed (wheel)  & ---          & $1.567$           & \si{rad/s} \\
+    Body yaw dead-zone           & ---          & $0.581$--$0.600$  & \si{rad/s} \\
+    \bottomrule
+  \end{tabular}
+\end{table}

@@ -9,7 +9,9 @@ import pandas as pd
 import pytest
 
 from conftest import FIXTURES
-from phase0_replay import load_segment
+from dtssl import load_segment
+
+pytestmark = pytest.mark.requires_data   # every test here loads a real event
 
 CASES = [
     ("side_to_side", "side_to_side_01_05"),

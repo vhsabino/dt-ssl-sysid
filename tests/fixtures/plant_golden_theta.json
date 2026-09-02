@@ -1,0 +1,35 @@
+{
+  "source": "models/sysid_vxvy_v2.mat (default of automation/export_plant_golden.m, 2026-06-16)",
+  "note": "theta that generated tests/fixtures/plant_golden_*.parquet: vx/vy promoted v2 + omega PLACEHOLDER (K=1, tau=0.1, Td=0). Regenerate with matlab/dtssl/export_plant_golden.m('theta', <mat>) to obtain plant_golden_v2_* with the promoted omega.",
+  "dof": {
+    "vx": {
+      "K": 1.119213868963045,
+      "tau": 0.0717837030217346,
+      "Td": 0.06905,
+      "placeholder": false
+    },
+    "vy": {
+      "K": 1.052408218237609,
+      "tau": 0.12733127726773819,
+      "Td": 0.05648333333333334,
+      "placeholder": false
+    },
+    "w": {
+      "K": 1.0,
+      "tau": 0.1,
+      "Td": 0.0,
+      "placeholder": true
+    }
+  },
+  "order": [
+    "K_vx",
+    "tau_vx",
+    "Td_vx",
+    "K_vy",
+    "tau_vy",
+    "Td_vy",
+    "K_w",
+    "tau_w",
+    "Td_w"
+  ]
+}

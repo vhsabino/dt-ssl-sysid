@@ -1,3 +1,14 @@
 # Add patterns of files dvc should ignore, which could improve
 # the performance. Learn more at
 # https://dvc.org/doc/user-guide/dvcignore
+# Caches e artefatos que nunca entram em data/ (DVC nao precisa varre-los)
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.asv
+*.slxc
+slprj/
+build/
+_to_delete/
+*.tmp

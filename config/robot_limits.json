@@ -1,0 +1,34 @@
+{
+  "_doc": "Body geometry and actuation limits shared by all backends (SI). Sources: robot radius/dribbler/ball from ssl-unification src/Env/Env.h (ROBOT_RADIUS 90 mm, ROBOT_CENTER_TO_DRIBBLER 75 mm, BALL_RADIUS 22 mm, MAX_ANGLE_DIFF_WITH_BALL_ATTACHED_IN_DRIBBLER 0.31 rad, MAX_FLAT_KICK_SPEED 6.5, MAX_CHIP_KICK_SPEED 6.0); v_max/w_max from config/ssl_robot.sldd (sat_v, sat_w). The published behavioral plant has NO saturation/acceleration limit; a_max=null keeps it that way.",
+  "robot": {
+    "radius": 0.09,
+    "height": 0.15,
+    "mass": 2.4,
+    "dribbler_offset": 0.075,
+    "dribbler_half_angle": 0.31,
+    "ball_contact_dist": 0.11,
+    "v_max": 3.0,
+    "w_max": 10.0,
+    "a_max": null,
+    "kick_flat_max": 6.5,
+    "kick_chip_max": 6.0,
+    "chip_angle_deg": 45.0,
+    "dribbler_rpm_max": 6000.0,
+    "watchdog_s": 0.3
+  },
+  "ball": {
+    "radius": 0.0215,
+    "mass": 0.046,
+    "sliding_decel": 1.82135,
+    "rolling_decel": 0.3025,
+    "sliding_to_rolling_speed_ratio": 0.6,
+    "restitution_floor": 0.5,
+    "restitution_wall": 0.6,
+    "restitution_robot": 0.5
+  },
+  "deadzone": {
+    "_doc": "Firmware per-wheel deadzone (config/robot_geometry.json firmware.motor_min_speed_rad_s). OFF by default: the published twin is linear.",
+    "enabled": false,
+    "wheel_min_speed_rad_s": 1.567
+  }
+}

@@ -6,11 +6,14 @@ import pandas as pd
 import pytest
 
 from conftest import FIXTURES
-from phase0_replay import (load_segment, load_holdout_segments, AnalyticFOPDTPlant,
+
+GOLDEN_THETA = FIXTURES / "plant_golden_theta.json"
+from dtssl import (load_segment, load_holdout_segments, AnalyticFOPDTPlant,
                            IdealKinematicPlant, rollout_segment, free_run,
                            max_command_delay, load_twin_params)
 
 TS = 1.0 / 60.0
+pytestmark = pytest.mark.requires_data
 
 
 def _cmd_matrix(seg):
@@ -31,7 +34,7 @@ def test_transparency_matches_golden(label, event, capsys):
     N = seg.n
     # free-run do segmento INTEIRO a partir da CI do deadreckoning: velb0=0, sem prime
     win_cmds = _cmd_matrix(seg)[0:N - 1]
-    plant = AnalyticFOPDTPlant.from_config()
+    plant = AnalyticFOPDTPlant(load_twin_params(GOLDEN_THETA))
     pose_sim = free_run(plant, win_cmds, pose0=seg.pose0, velb0=(0.0, 0.0, 0.0),
                         dt=seg.ts, prev_cmds=None)
     err = max(np.max(np.abs(pose_sim[:, 0] - ref["xs"].to_numpy(float))),
