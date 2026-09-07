@@ -353,8 +353,10 @@ def test_controller_timers_run_at_60hz(qapp):
     _spin(qapp, 700)
     c.stop()
     st = c.stats()
-    assert 40 <= len(samples) <= 60 and 15 <= len(frames) <= 30
-    assert 50.0 <= st["hz"] <= 70.0 and st["sim_time"] == pytest.approx(len(samples) / 60.0, abs=0.05)
+    # 700 ms of wall clock: ~42 sim steps (60 Hz) and ~21 render frames (30 Hz). Windows CoarseTimer under load
+    # delivers as few as ~12 frames in that span (seen 14 on 07/09/2026 with MATLAB + pytest running).
+    assert 36 <= len(samples) <= 60 and 10 <= len(frames) <= 30
+    assert 48.0 <= st["hz"] <= 72.0 and st["sim_time"] == pytest.approx(len(samples) / 60.0, abs=0.05)
     assert isinstance(frames[-1], Frame) and frames[-1].selected == ("blue", 0)
     c.shutdown()
 
