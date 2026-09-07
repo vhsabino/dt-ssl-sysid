@@ -28,6 +28,7 @@ claim" table, results/CHANGELOG.md, docs/PLANO_V2_EXECUTADO.md, docs/PLANO_V3_EX
 | metrics_report | twin vs ideal SE(2) gate on the hold-out (trans GO) | phase0_replay/metrics_report.py |
 | window_errors_eang | e_ang per window/horizon, twin vs ideal | scripts/window_errors_eang.py |
 | backends_holdout | twin vs MuJoCo routes a/b vs ideal on the hold-out (2026-09) | new |
+| identifiability_insilico | C1: in-silico identifiability, regime x noise x deadzone, known theta (2026-09) | new |
 | regenerate_bin_distribution | bin distribution with the CAD radius (D9) | scripts/regenerate_bin_distribution.py |
 | holdout_report | honest hold-out report, twin vs rSim (needs robosim) | phase0_replay/holdout_report.py |
 | loader_report | loader sanity + duration distribution (H_max) | phase0_replay/report.py |
@@ -74,6 +75,7 @@ _ALL: dict[str, str] = {
     "window_errors_eang": "dtssl.analysis.window_errors_eang",
     "regenerate_bin_distribution": "dtssl.analysis.regenerate_bin_distribution",
     "backends_holdout": "dtssl.analysis.backends_holdout",
+    "identifiability_insilico": "dtssl.analysis.identifiability_insilico",
     # reports
     "metrics_report": "dtssl.analysis.metrics_report",
     "holdout_report": "dtssl.analysis.holdout_report",

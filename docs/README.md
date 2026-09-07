@@ -32,6 +32,7 @@ Proveniência de cada número do projeto: `results/CHANGELOG.md`.
 | `../DESIGN.md` | exploração/contrato de dados (15/06/2026) que originou o harness `phase0_replay` (hoje `dtssl`); a §2 (contrato dos logs) continua válida; banner HISTÓRICO. |
 | `PLANO_PAPER_SBR2026.md` | planejamento de escrita do paper SBR/LARS 2026 (23/06, atualizado 24/07 com V10 = ω promovido). |
 | `PREREGISTRO_OMEGA_20260724.md` | **pré-registro** dos critérios de promoção de ω (gravado antes da estimação; ainda válido como defesa metodológica). |
+| `PREREGISTRO_IDENTIFICABILIDADE_INSILICO_20260907.md` | **pré-registro** do experimento C1 (identificabilidade in-silico com θ conhecido: regime × ruído × zona morta, hipóteses H1–H4, estimador e regra de decisão) — executado por `dtssl analysis run identifiability_insilico` (VIGENTE). |
 | `INVENTARIO_RL_2026-07-24.md` | inventário do repo `planning-rl-greybox` (WSL2): experimento de gap de dinâmica com SAC+FSCAPS — fora de escopo nesta rodada. |
 | `RSIM_EXPLORATION.md` | viabilidade do `RSimReplay` (rSoccer/rSim) — bloqueios encontrados (16/06). |
 | `TASKS_CLAUDE_CODE.md` | pendências que exigiam execução para o paper (07/08); parte executada em 09–10/08 (ver CHANGELOG). |
