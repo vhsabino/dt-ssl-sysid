@@ -32,6 +32,7 @@ claim" table, results/CHANGELOG.md, docs/PLANO_V2_EXECUTADO.md, docs/PLANO_V3_EX
 | regenerate_bin_distribution | bin distribution with the CAD radius (D9) | scripts/regenerate_bin_distribution.py |
 | holdout_report | honest hold-out report, twin vs rSim (needs robosim) | phase0_replay/holdout_report.py |
 | loader_report | loader sanity + duration distribution (H_max) | phase0_replay/report.py |
+| session_report | recorded twin session: contract, command stats vs competition, harness round trip (2026-09) | new |
 | fig_main_result | Fig. 2 (main figure) | scripts/fig_main_result.py |
 | fig_omega_stepresponse_en | Fig. 1 (yaw step response) | scripts/fig_omega_stepresponse_en.py |
 | fig_fit_holdout_vxvy | hold-out fit figure of vx/vy (+ CSV vs MATLAB) | scripts/fig_fit_holdout_vxvy.py |
@@ -75,6 +76,7 @@ _ALL: dict[str, str] = {
     "window_errors_eang": "dtssl.analysis.window_errors_eang",
     "regenerate_bin_distribution": "dtssl.analysis.regenerate_bin_distribution",
     "backends_holdout": "dtssl.analysis.backends_holdout",
+    "session_report": "dtssl.analysis.session_report",
     "identifiability_insilico": "dtssl.analysis.identifiability_insilico",
     # reports
     "metrics_report": "dtssl.analysis.metrics_report",
@@ -97,7 +99,7 @@ REGISTRY: dict[str, str] = {n: m for n, m in _ALL.items() if importlib.util.find
 
 #: names by kind (``dtssl analysis`` runs analyses + reports; ``dtssl fig`` the figures).
 _FIG_EXTRA = ("meeting_overlay", "percurso_completo", "percurso_square")
-_REPORT = ("metrics_report", "holdout_report", "loader_report")
+_REPORT = ("metrics_report", "holdout_report", "loader_report", "session_report")
 FIGURES: tuple[str, ...] = tuple(n for n in REGISTRY if n.startswith("fig_") or n in _FIG_EXTRA)
 REPORTS: tuple[str, ...] = tuple(n for n in REGISTRY if n in _REPORT)
 ANALYSES: tuple[str, ...] = tuple(n for n in REGISTRY if n not in FIGURES and n not in REPORTS)
