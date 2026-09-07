@@ -12,7 +12,8 @@
 #   --team blue|yellow       cor do time; se config/local/config.json não existir, gera com make_local_config.py
 #   --backend NAME           fopdt (default) | ideal | mujoco-velocity | mujoco-rollers   (dtssl serve --backend)
 #   --unicast IP:PORT        repassa `--unicast` ao dtssl serve (visão por unicast, p/ atravessar o NAT do WSL2); repetível
-#   --record DIR             dtssl serve --record DIR (grava commands/processed_robots.parquet no contrato dos logs)
+#   --record DIR             dtssl serve --record DIR --record-team <--team> (grava commands/processed_robots.parquet do
+#                            time da estrategia no contrato dos logs; os arquivos sao escritos ao ENCERRAR o gemeo)
 #   --serve-args "..."       argumentos extras para dtssl serve (ex.: "--n-blue 6 --n-yellow 6 --speed 1.0")
 #   --no-serve               não sobe o gêmeo (já está rodando em outro lugar, ex.: no Windows)
 #   --no-running             não passa -running (a estratégia abre pausada)
@@ -98,7 +99,7 @@ if [[ $NO_SERVE -eq 0 ]]; then
     die "dtssl não encontrado (pip install -e '$REPO_ROOT[gui,mujoco,dev]' no mesmo ambiente)"
   fi
   CMD=("${DTSSL[@]}" serve --backend "$BACKEND" --config "$REPO_ROOT/config/bridge.json" "${UNICAST[@]}")
-  [[ -n "$RECORD" ]] && CMD+=(--record "$RECORD")
+  [[ -n "$RECORD" ]] && CMD+=(--record "$RECORD" --record-team "$TEAM")   # grava o time da estrategia (default do serve seria blue)
   # shellcheck disable=SC2206
   [[ -n "$SERVE_ARGS" ]] && CMD+=($SERVE_ARGS)
   log "iniciando: ${CMD[*]}  (log: $LOG)"

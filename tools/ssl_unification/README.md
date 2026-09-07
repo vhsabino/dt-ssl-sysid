@@ -84,8 +84,10 @@ tools/ssl_unification/run_against_twin.sh --team blue --backend mujoco-velocity 
 Conferências: o log do `dtssl serve` mostra `pkts yellow=…` crescendo e `watchdog=0`; na GUI do
 ssl-unification o campo é desenhado a partir do pacote de **geometria** (enviado no frame 0 e a cada
 60 frames — até 1 s para aparecer). Sem o C++: `dtssl fake-strategy --team yellow --target 1 0.5`.
-Sessões gravadas com `--record` saem no mesmo contrato dos logs (`commands.parquet`,
-`processed_robots.parquet`) e podem ser avaliadas pelo harness (`dtssl replay`).
+Sessões gravadas com `--record DIR` saem no mesmo contrato dos logs (`commands.parquet`,
+`processed_robots.parquet`, só o time de `--team`) e podem ser avaliadas pelo harness (`dtssl replay`).
+Os dois arquivos são escritos **ao encerrar** o gêmeo (feche a estratégia ou `Ctrl+C`; o script manda `SIGINT`
+ao `dtssl serve`, que grava e imprime `recorded N rows (...) -> ...` no log). Nunca mate o gêmeo com `kill -9`.
 
 ## 4. Rede no WSL2
 
