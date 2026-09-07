@@ -48,6 +48,9 @@ dtssl info                                            # versão, raiz, dataset, 
 pytest -q                                             # sem dataset: pytest -m "not requires_data"
 ```
 
+Sem venv (`pip install --user -e .`), o executável `dtssl` fica fora do PATH no Windows
+(`%APPDATA%\Python\Python3xx\Scripts`): use `py -3 -m dtssl.cli …` e `py -3 -m dtssl.gui …`, que são equivalentes.
+
 Dados (`data/extracted/<dataset>/splits/<label>/<evento>/*.parquet`) são gerenciados por **DVC**
 (`dvc pull`); sem eles os testes marcados `requires_data` são pulados. Python ≥ 3.10.
 

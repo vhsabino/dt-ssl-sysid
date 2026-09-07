@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import sys
+import time
 from collections.abc import Sequence
 
 from PySide6 import QtCore, QtGui, QtWidgets
@@ -38,6 +39,49 @@ _TEXT_WIDGETS = (QtWidgets.QAbstractSpinBox, QtWidgets.QLineEdit, QtWidgets.QTex
                  QtWidgets.QPlainTextEdit, QtWidgets.QComboBox)
 
 
+class _GuiLogHandler(logging.Handler):
+    """``logging`` -> the GUI Log dock (WARNING and above), at most one line per second per message."""
+
+    def __init__(self, sink, level=logging.WARNING):
+        super().__init__(level)
+        self._sink = sink
+        self._last: dict[str, float] = {}
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            msg = self.format(record)
+            key = msg[:120]
+            now = time.monotonic()
+            if now - self._last.get(key, -1e9) < 1.0:
+                return
+            self._last[key] = now
+            self._sink(msg)
+        except Exception:  # noqa: BLE001 - never let logging break the GUI
+            pass
+
+
+def install_excepthook(logger: logging.Logger) -> None:
+    """Route uncaught Python exceptions, ``warnings`` and pyqtgraph's "Ignored exception" reports to ``logger``.
+
+    Limits: exceptions raised inside Qt virtual overrides (``paint``, ``boundingRect`` ...) are printed by
+    PySide itself on the C-level stderr and cannot be intercepted from Python; pyqtgraph's
+    ``warnOnException`` wrappers (``PlotCurveItem.paint`` ...) go through ``printExc`` -> ``warnings`` and
+    do reach the logger (``py.warnings``), i.e. the GUI Log dock.
+    """
+    import pyqtgraph.debug as pgdebug
+
+    def hook(exc_type, exc, tb):
+        logger.error("uncaught: %s: %s", exc_type.__name__, exc, exc_info=(exc_type, exc, tb))
+
+    sys.excepthook = hook
+    logging.captureWarnings(True)
+
+    def print_exc(msg="", indent=4, prefix="|", msgType="error"):  # noqa: N803 - pyqtgraph API
+        logger.warning("pyqtgraph: %s", msg or "ignored exception", exc_info=True)
+
+    pgdebug.printExc = print_exc
+
+
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, backend: str = "fopdt", mode: str = "debug", team: str = "yellow", *,
                  bridge_config=None, joy_map=None, n_blue: int = 6, n_yellow: int = 6, publish: bool = False,
@@ -58,6 +102,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.log_view = QtWidgets.QPlainTextEdit()
         self.log_view.setReadOnly(True)
         self.log_view.setMaximumBlockCount(500)
+        self._log_handler = _GuiLogHandler(self.log_view.appendPlainText)
+        self._log_handler.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
+        for name in ("dtssl", "py.warnings"):
+            logging.getLogger(name).addHandler(self._log_handler)
         self._build_docks()
         self._build_toolbar()
         self._build_replay_toolbar()
@@ -229,6 +277,8 @@ class MainWindow(QtWidgets.QMainWindow):
     def closeEvent(self, ev: QtGui.QCloseEvent) -> None:
         self.stop()
         self.controller.shutdown()
+        for name in ("dtssl", "py.warnings"):
+            logging.getLogger(name).removeHandler(self._log_handler)
         try:
             QtWidgets.QApplication.instance().removeEventFilter(self)
         except Exception:  # noqa: BLE001
@@ -475,6 +525,7 @@ def run(args) -> int:
     logging.basicConfig(level=logging.DEBUG if getattr(args, "verbose", False) else logging.INFO,
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv[:1])
+    install_excepthook(logging.getLogger("dtssl.gui"))
     world_opts = {}
     if getattr(args, "saturate", False):
         world_opts["saturate"] = True
@@ -503,4 +554,4 @@ def main(argv: Sequence[str] | None = None) -> int:
     return run(args)
 
 
-__all__ = ["MainWindow", "run", "main", "QT_KEY_NAMES"]
+__all__ = ["MainWindow", "run", "main", "install_excepthook", "QT_KEY_NAMES"]

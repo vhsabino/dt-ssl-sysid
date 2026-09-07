@@ -11,6 +11,8 @@ Rows ``vx``, ``vy``, ``w`` share the x axis. Two operating modes:
 """
 from __future__ import annotations
 
+import math
+
 import numpy as np
 import pyqtgraph as pg
 from PySide6 import QtCore, QtWidgets
@@ -18,6 +20,45 @@ from PySide6 import QtCore, QtWidgets
 pg.setConfigOptions(antialias=False, background="k", foreground="w")
 
 DOF_LABELS = (("vx", "m/s"), ("vy", "m/s"), ("w", "rad/s"))
+# Smallest view spans the ViewBox may show (pyqtgraph enforces them in updateViewRange). Below ~1e-320 of
+# span, pyqtgraph 0.14's tickSpacing() underflows to a 0 spacing and AxisItem.tickValues() divides by zero.
+MIN_X_RANGE_S = 0.25
+MIN_Y_RANGE = 1e-3
+# Velocities below this (m/s, rad/s) are shown as exactly 0: a FOPDT state decays as v*exp(-Ts/tau) forever
+# and reaches the subnormal range (~1e-308 .. 5e-324) a few minutes after the last command, which is
+# physically meaningless and is what produced the subnormal-width y range (see MIN_Y_RANGE).
+DISPLAY_FLUSH = 1e-9
+
+
+class SafeAxisItem(pg.AxisItem):
+    """``AxisItem`` whose tick levels never carry a zero/non-finite spacing (pyqtgraph 0.14 underflow)."""
+
+    def tickSpacing(self, minVal, maxVal, size):  # noqa: N802 - pyqtgraph API
+        try:
+            levels = super().tickSpacing(minVal, maxVal, size)
+        except (ZeroDivisionError, ValueError, OverflowError):
+            return []
+        return [(s, o) for s, o in levels if math.isfinite(s) and s > 0.0 and math.isfinite(o)]
+
+    def tickValues(self, minVal, maxVal, size):  # noqa: N802 - pyqtgraph API
+        if not (math.isfinite(minVal) and math.isfinite(maxVal)) or maxVal == minVal:
+            return []
+        try:
+            return super().tickValues(minVal, maxVal, size)
+        except (ZeroDivisionError, ValueError, OverflowError):
+            return []
+
+
+def _safe_axes() -> dict[str, pg.AxisItem]:
+    return {"left": SafeAxisItem("left"), "bottom": SafeAxisItem("bottom")}
+
+
+def _flush(v: float) -> float:
+    """Display-only: |v| < DISPLAY_FLUSH -> 0.0 (NaN passes through)."""
+    v = float(v)
+    return 0.0 if abs(v) < DISPLAY_FLUSH else v
+
+
 CMD_PEN = pg.mkPen((180, 180, 180), width=1, style=QtCore.Qt.DashLine)
 SIM_PEN = pg.mkPen((0, 229, 255), width=2)
 TRUTH_PEN = pg.mkPen((255, 64, 129), width=2)
@@ -78,7 +119,8 @@ class VelocityPlots(QtWidgets.QWidget):
         self.truth_curves: list[pg.PlotDataItem] = []
         self.playheads: list[pg.InfiniteLine] = []
         for i, (name, unit) in enumerate(DOF_LABELS):
-            p = self.glw.addPlot(row=i, col=0)
+            p = self.glw.addPlot(row=i, col=0, axisItems=_safe_axes())
+            p.getViewBox().setLimits(minXRange=MIN_X_RANGE_S, minYRange=MIN_Y_RANGE)
             p.setLabel("left", name, units=unit)
             p.getAxis("left").enableAutoSIPrefix(False)
             p.showGrid(x=True, y=True, alpha=0.25)
@@ -103,7 +145,8 @@ class VelocityPlots(QtWidgets.QWidget):
             self.plots.append(p)
         self.plots[-1].setLabel("bottom", "t", units="s")
 
-        self.epos_plot = self.glw.addPlot(row=len(DOF_LABELS), col=0)
+        self.epos_plot = self.glw.addPlot(row=len(DOF_LABELS), col=0, axisItems=_safe_axes())
+        self.epos_plot.getViewBox().setLimits(minXRange=MIN_X_RANGE_S, minYRange=MIN_Y_RANGE)
         self.epos_plot.setLabel("left", "e_pos", units="m")
         self.epos_plot.getAxis("left").enableAutoSIPrefix(False)
         self.epos_plot.setLabel("bottom", "t", units="s")
@@ -140,6 +183,9 @@ class VelocityPlots(QtWidgets.QWidget):
             c.setData([], [])
         self.epos_markers.setData([], [])
         self._clear_horizons()
+        for p in (*self.plots, self.epos_plot):
+            p.setYRange(-1.0, 1.0, padding=0.0)
+            p.enableAutoRange(axis="y", enable=True)
         self._dirty = True
 
     def set_mode(self, mode: str) -> None:
@@ -166,7 +212,8 @@ class VelocityPlots(QtWidgets.QWidget):
     def append(self, t: float, cmd, sim, truth=None) -> None:
         """One 60 Hz sample: ``cmd``/``sim``/``truth`` are ``(vx, vy, w)`` in the body frame."""
         tr = truth if truth is not None else (np.nan, np.nan, np.nan)
-        self._buf.append((t, cmd[0], cmd[1], cmd[2], sim[0], sim[1], sim[2], tr[0], tr[1], tr[2]))
+        self._buf.append((t, _flush(cmd[0]), _flush(cmd[1]), _flush(cmd[2]),
+                          _flush(sim[0]), _flush(sim[1]), _flush(sim[2]), _flush(tr[0]), _flush(tr[1]), _flush(tr[2])))
         self.samples += 1
         self._dirty = True
 
@@ -242,10 +289,13 @@ class VelocityPlots(QtWidgets.QWidget):
             self.sim_curves[i].setData(t[m], d[m, 4 + i])
             if self.truth_curves[i].isVisible():
                 self.truth_curves[i].setData(t[m], d[m, 7 + i])
-        self.plots[0].setXRange(max(t0, float(t[0]) if t.size else t0), max(t_end, t0 + 1e-3), padding=0.0)
+        # fixed-width window: [t_first, t_first + W] while the buffer is short (start-up / after clear()),
+        # [t_end - W, t_end] once it covers more than W seconds -- never a degenerate span
+        x0 = max(float(t[0]), t0)
+        self.plots[0].setXRange(x0, x0 + self.window_s, padding=0.0)
 
     def sample_count(self) -> int:
         return self.samples
 
 
-__all__ = ["VelocityPlots", "RingBuffer"]
+__all__ = ["VelocityPlots", "RingBuffer", "SafeAxisItem", "MIN_X_RANGE_S", "MIN_Y_RANGE", "DISPLAY_FLUSH"]

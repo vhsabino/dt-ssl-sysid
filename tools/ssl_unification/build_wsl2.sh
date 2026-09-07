@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# build_wsl2.sh — clone + dependências + build do ssl-unification (RobôCIn) no WSL2 Ubuntu 22.04/24.04.
+# build_wsl2.sh — clone + dependências + build do ssl-unification (RobôCIn) no WSL2 Ubuntu 22.04/24.04/26.04.
 # Idempotente: pode ser executado várias vezes; cada etapa é pulada se já estiver feita.
 #
 #   tools/ssl_unification/build_wsl2.sh                       # clona em ~/ssl-unification e compila
@@ -18,7 +18,7 @@
 #   --qt-version V      versão para o modo 'script' (default 6.4.0)
 #   --jobs N            paralelismo do build (default: nproc)
 #   --clean             apaga build/ antes de configurar
-#   --force-os          prossegue mesmo fora de Ubuntu 22.04/24.04
+#   --force-os          prossegue mesmo fora de Ubuntu 22.04/24.04/26.04
 #   --config-team blue|yellow   ao final, gera config/local com make_local_config.py (demais flags via --config-args "...")
 #   --config-args "..." argumentos extras para make_local_config.py (ex.: "--n-robots 6 --behavior Debug --inet eth0")
 #
@@ -67,9 +67,9 @@ if [[ -r /etc/os-release ]]; then
   # shellcheck disable=SC1091
   . /etc/os-release
   case "${ID:-}-${VERSION_ID:-}" in
-    ubuntu-22.04|ubuntu-24.04) log "Ubuntu ${VERSION_ID} detectado" ;;
+    ubuntu-22.04|ubuntu-24.04|ubuntu-26.04) log "Ubuntu ${VERSION_ID} detectado" ;;
     *) if [[ $FORCE_OS -eq 1 ]]; then warn "SO ${ID:-?} ${VERSION_ID:-?} não testado (prosseguindo por --force-os)";
-       else die "esperado Ubuntu 22.04 ou 24.04 (WSL2); use --force-os para tentar mesmo assim"; fi ;;
+       else die "esperado Ubuntu 22.04, 24.04 ou 26.04 (WSL2); use --force-os para tentar mesmo assim"; fi ;;
   esac
 else
   [[ $FORCE_OS -eq 1 ]] || die "/etc/os-release ausente; use --force-os"

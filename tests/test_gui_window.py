@@ -17,7 +17,7 @@ from PySide6.QtCore import QPointF  # noqa: E402
 from dtssl.gui.controller import Controller, Frame, commanded  # noqa: E402
 from dtssl.gui.field_view import MM, FieldView, RobotItem  # noqa: E402
 from dtssl.gui.params_panel import BOUNDS, ORDER, ParamsPanel, params_from_dict, params_to_dict  # noqa: E402
-from dtssl.gui.plots import RingBuffer, VelocityPlots  # noqa: E402
+from dtssl.gui.plots import MIN_X_RANGE_S, MIN_Y_RANGE, RingBuffer, SafeAxisItem, VelocityPlots  # noqa: E402
 from dtssl.models import DofParam, load_twin_params  # noqa: E402
 from dtssl.sim.entities import RobotCmd  # noqa: E402
 from dtssl.sim.twin_world import TwinWorld  # noqa: E402
@@ -151,6 +151,107 @@ def test_ring_buffer_and_plots_modes(qapp):
     p.set_mode("sliding")
     assert p.samples == 0 and not p.epos_plot.isVisible()
     p.close()
+
+
+def _paint(app, widget) -> str:
+    """Paint ``widget`` offscreen and return whatever pyqtgraph/PySide wrote to sys.stderr meanwhile."""
+    import contextlib
+    import io
+
+    err = io.StringIO()
+    with contextlib.redirect_stderr(err):
+        app.processEvents()
+        widget.grab()
+        app.processEvents()
+    return err.getvalue()
+
+
+def test_safe_axis_item_survives_subnormal_ranges(qapp):
+    """pyqtgraph 0.14: AxisItem.tickValues divides by zero for spans of ~1e-323..1e-321 (bug seen on 03/09/2026
+    when selecting a robot whose FOPDT velocity had decayed into the subnormal range)."""
+    import pyqtgraph as pg
+
+    bad = [(0.0, 1e-322), (-1e-323, 1e-323)]
+    raised = 0
+    for lo, hi in bad:
+        try:
+            pg.AxisItem("bottom").tickValues(lo, hi, 300.0)
+        except ZeroDivisionError:
+            raised += 1
+    assert raised == len(bad), "pyqtgraph fixed upstream? keep SafeAxisItem anyway"
+    ax = SafeAxisItem("bottom")
+    for lo, hi in bad + [(0.0, 3e-321), (0.0, 0.0), (float("nan"), 1.0), (0.0, float("inf")), (1.0, 1.0 + 2.2e-16)]:
+        assert isinstance(ax.tickValues(lo, hi, 300.0), list)
+    assert len(ax.tickValues(0.0, 10.0, 300.0)) >= 2
+    for spacing, _values in ax.tickValues(0.0, 10.0, 300.0):
+        assert math.isfinite(spacing) and spacing > 0
+
+
+def test_plots_paint_with_subnormal_and_zero_velocities(qapp):
+    """Regression for the ZeroDivisionError on robot switch: feed velocities in the subnormal range (what a
+    robot left idle for minutes reports), redraw and PAINT; the view span must stay bounded below."""
+    p = VelocityPlots(window_s=10.0)
+    p.resize(800, 600)
+    p.show()
+    for vals in ([1.0, 0.5], [1e-322, 5e-322], [1e-320, 3e-320], [0.0], [1e-300]):
+        p.clear()
+        for k in range(30):
+            v = vals[k % len(vals)]
+            p.append(100.0 + k / 60.0, (0.0, 0.0, 0.0), (v, 0.5 * v, 0.1 * v))
+        p.redraw()
+        out = _paint(qapp, p.glw)
+        assert "division by zero" not in out and "Error calling Python override" not in out, out[:500]
+        for plot in p.plots:
+            (x0, x1), (y0, y1) = plot.viewRange()
+            assert all(math.isfinite(v) for v in (x0, x1, y0, y1))
+            assert x1 - x0 >= MIN_X_RANGE_S - 1e-9 and y1 - y0 >= MIN_Y_RANGE - 1e-12
+            for spacing, _ in plot.getAxis("left").tickValues(y0, y1, 300.0):
+                assert spacing > 0
+    # display flush: tiny values are shown as exactly 0 (the world state itself is untouched)
+    assert p.sim_curves[0].yData is not None and float(abs(p.sim_curves[0].yData).max()) == 0.0
+    # fixed-width sliding window, also right after clear() with a single sample
+    p.clear()
+    p.append(500.0, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0))
+    p.redraw()
+    x0, x1 = p.plots[0].viewRange()[0]
+    assert x1 - x0 == pytest.approx(p.window_s) and x0 == pytest.approx(500.0)
+    p.close()
+
+
+def test_window_robot_switch_paints_after_long_idle_decay(qapp):
+    """End-to-end: drive a robot, leave it idle, select another and come back -- paint at every step."""
+    from dtssl.gui.app import MainWindow
+
+    win = MainWindow(backend="fopdt", mode="debug", team="yellow", n_blue=2, n_yellow=2, use_pygame=False,
+                     autostart=False)
+    win.resize(1000, 700)
+    win.show()
+    c = win.controller
+    c.kb.press("w")
+    c._on_joy_tick()
+    c.tick(30)
+    c.kb.release_all()
+    c._on_joy_tick()
+    # make the idle robot's velocity states subnormal without simulating minutes of decay
+    import numpy as np
+
+    touched = 0
+    for plant in c.world.plants.values():
+        for name in ("_vlag", "_vbody"):
+            arr = getattr(plant, name, None)
+            if isinstance(arr, np.ndarray):
+                arr[:] = np.where(np.abs(arr) > 0, 1e-322, 0.0)
+                touched += 1
+    assert touched >= 2
+    for _ in range(4):
+        c.select_next()
+        for _k in range(3):
+            c.tick(1)
+            c._on_render()
+            win.plots.redraw()
+            out = _paint(qapp, win.plots.glw)
+            assert "division by zero" not in out and "Error calling Python override" not in out, out[:500]
+    win.close()
 
 
 # --------------------------------------------------------------------------- params panel

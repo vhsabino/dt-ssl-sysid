@@ -11,7 +11,7 @@ compilar o ssl-unification no WSL2 e gerar um `config/local/config.json` apontan
 | `make_local_config.py` | gera `config/local/config.json` (+ copia `config.ini`) a partir de um perfil de `config/shared/` com os parâmetros de rede/time/árbitro/comportamento do gêmeo. Só biblioteca padrão do Python. `--dry-run` mostra o diff. |
 | `run_against_twin.sh` | sobe `dtssl serve` em background e o `ssl-unification -running` em primeiro plano; encerra o gêmeo ao fechar a estratégia. |
 
-## 1. Build (WSL2 Ubuntu 22.04/24.04)
+## 1. Build (WSL2 Ubuntu 22.04/24.04/26.04)
 
 ```bash
 # no WSL2 (Ubuntu), dentro do repo digitaltwin
@@ -22,7 +22,7 @@ tools/ssl_unification/build_wsl2.sh --no-deps --qt skip   # rebuild rápido
 
 O que o script faz (cada etapa é pulada se já estiver feita):
 
-1. checa Ubuntu 22.04/24.04 (`--force-os` para outros) e se está no WSL2;
+1. checa Ubuntu 22.04/24.04/26.04 (`--force-os` para outros) e se está no WSL2;
 2. `git clone --recursive https://github.com/robocin/ssl-unification.git` (submódulos `cmake/`,
    `libs/soccer-common`, `scripts/ubuntu`) ou usa o checkout existente (`--update` faz `pull --ff-only`);
 3. `sudo ./scripts/setup.py --install boost cmake clang-format doxygen g++ open-gl protobuf zlib`
@@ -116,5 +116,7 @@ não é visível para o Linux por padrão — mais um motivo para o `dtssl gui` 
   chaves conferidas em `CommunicationSim.cpp::buildParameters`, `DataWorld.cpp::buildParameters`,
   `GeneralEnvironment.cpp` (`INET` = `MappedComboBox` pelo **nome** da interface), `main.cpp`
   (`MAX_ROBOTS=16`, flag `-running`), `MainWindow.cpp::loadEvent`.
-- `build_wsl2.sh`/`run_against_twin.sh`: `bash -n` apenas — **não** foram executados aqui (sem WSL2,
-  sem Qt, sem o binário). Primeira execução real no PC: rodar com `--jobs 4` e conferir o passo do Qt.
+- `build_wsl2.sh --config-team yellow --jobs 4` executado por Victor em 03/09/2026 no WSL2 **Ubuntu 26.04**
+  (Python 3.14.4, Qt 6.4.0 via `qt.sh` em `/opt/qt`): `[100%] Built target ssl-unification`, `config/local`
+  gerado. `run_against_twin.sh --team yellow` (gêmeo em `~/.venvs/dtssl`, tudo dentro do WSL): 185 s a
+  `hz=60.0/60 late=0`, `yellow≈4 pacotes/frame`, `watchdog=0`, `kicks=45` — drop-in confirmado.

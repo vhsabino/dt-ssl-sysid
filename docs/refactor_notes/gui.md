@@ -170,3 +170,23 @@ numérico/combobox tem o foco (clique no campo para devolver o foco).
   backend `mujoco-velocity` (60 Hz com 2×2 robôs).
 - **Não verificado aqui**: pad físico (DualSense) — só provedores falsos e `PygameBackend` sem dispositivos; janela real
   no Windows/WSLg (só `offscreen`).
+
+## Correção 03/09/2026 — `ZeroDivisionError` do pyqtgraph ao trocar de robô
+
+Sintoma (Windows, pyqtgraph 0.14.0, modo Debug): ao selecionar um robô, o console repete
+`ZeroDivisionError ... AxisItem.tickValues` (e um `UnboundLocalError: painter` derivado) a cada repintura; a GUI
+continua viva porque o pyqtgraph engole a exceção. Causa raiz, reproduzida no sandbox: um robô comandado e depois
+deixado parado tem os estados da planta FOPDT decaindo como `v·exp(−Ts/τ)` sem nunca chegar a zero; após alguns
+minutos os valores entram na faixa **subnormal** do IEEE-754 (~1e-308 … 5e-324). Ao selecionar esse robô, o
+auto-range dos plots produz um intervalo de y com largura subnormal e o `tickSpacing()` do pyqtgraph 0.14
+(`p10unit = 10**(floor((exp2−1)/3.32)−1)`) subfluxa para 0. Correção em `gui/plots.py`, em três camadas:
+`ViewBox.setLimits(minXRange=0,25 s, minYRange=1e-3)`; valores `|v| < 1e-9` exibidos como 0 (`DISPLAY_FLUSH`,
+só na exibição — a planta e o mundo não mudam, os goldens continuam bit-a-bit); janela deslizante sempre de
+largura fixa (`[t_first, t_first+W]` → `[t_end−W, t_end]`) e `setYRange(−1, 1)` neutro no `clear()`;
+`SafeAxisItem` que descarta espaçamentos nulos/não finitos. `gui/app.py`: `install_excepthook` (exceções
+não tratadas, `warnings` e o `printExc` do pyqtgraph → `logging`) e um handler que espelha WARNING+ de
+`dtssl`/`py.warnings` no dock *Log* (limitado a 1 linha/s por mensagem). Limite conhecido: erros dentro de
+overrides virtuais do Qt (`paint`, `boundingRect`) são impressos pelo PySide no stderr de C e não podem ser
+interceptados de Python. Testes: `test_safe_axis_item_survives_subnormal_ranges`,
+`test_plots_paint_with_subnormal_and_zero_velocities`, `test_window_robot_switch_paints_after_long_idle_decay`
+(os dois últimos falham com o `plots.py` anterior).
