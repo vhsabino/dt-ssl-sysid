@@ -124,9 +124,16 @@ class World(ABC):
     def teleport_robot(self, team, rid, x, y, theta, present=True) -> None
     def teleport_ball(self, x, y, vx=0, vy=0, z=0, vz=0) -> None
     @property field -> FieldGeometry
+    # ganchos opcionais do harness (TwinWorld e MuJoCoWorld os implementam; ver dtssl.sim.world_plant):
+    def set_robot_state(self, team, rid, x, y, theta, vx_b=0, vy_b=0, w=0) -> None   # CI: pose + velocidade de CORPO
+    def prime_robot_delay(self, team, rid, prev_cmds) -> None                       # buffer de atraso (rota a / fopdt)
+    def robot_pose(self, team, rid) -> tuple[float, float, float]                    # pose direto do backend (θ contínuo quando possível)
 class TwinWorld(World)            # backend "fopdt"/"ideal": um Plant por robô + ball.py + colisões círculo-círculo/paredes + kick/dribbler + watchdog
+class WorldPlant(Plant)           # dtssl.sim.world_plant: um World de 1 robô visto como Plant do harness (reset/prime_delay/step);
+                                  #   make_harness_plant("fopdt"|"ideal"|"mujoco-velocity"|"mujoco-rollers"|"mujoco-rollers-delay"|"world:<backend>")
 ```
 Backends registrados em `dtssl.sim.backends`: `"fopdt"` (default, θ oficial), `"ideal"`, `"mujoco-velocity"` (rota a), `"mujoco-rollers"` (rota b). `make_world(name, **opts) -> World`.
+Qualquer backend pode ser avaliado no harness do artigo (mesmas janelas re-ancoradas, mesma métrica) via `WorldPlant`; `mujoco-rollers-delay` = rota b + atraso de transporte `Td` por DOF do θ oficial aplicado ao comando (análogo da ablação de atraso do rSim).
 
 ### 4.3 `dtssl.sim.rollout` e `dtssl.eval` — mantêm as assinaturas atuais de `phase0_replay.rollout/metrics` (`free_run`, `rollout_segment`, `Window`, `WindowRollout`, `build_error_table`, `evaluate`, `make_figures`, `markdown_report`), com dois consertos: `rollout_segment` deriva `idx_min` da planta passada (não do JSON) e `build_error_table` recebe `robot_radius`/`params` explicitamente. Cache de rollouts serializado em `.npz` (não pickle).
 
@@ -151,7 +158,7 @@ Backends registrados em `dtssl.sim.backends`: `"fopdt"` (default, θ oficial), `
 - `mujoco_world.py`: `MuJoCoWorld(World)` para ambas as rotas; `step(dt)` faz `n_sub = round(dt/model.opt.timestep)` substeps; expõe `mj_model/mj_data` para viewer; `render_offscreen()` opcional. Testes: bola desacelera, robô rota-a segue FOPDT com erro < 1 mm/passo sem contato, rota-b anda em linha reta ±2 % com comando vx.
 
 ### 4.7 CLI (`dtssl` = `dtssl.cli:main`)
-`dtssl serve [--backend fopdt] [--config config/bridge.json] [--teams blue,yellow] [--n 6]` · `dtssl gui` · `dtssl replay <label> <event> [--theta config/twin_params.json] [--out results/]` · `dtssl gate twin-vs-ideal|twin-vs-rsim [--mode A|B]` · `dtssl analysis <name>` · `dtssl fig <name>` · `dtssl etl extract <log.gz> <out>` / `split` / `rotate` · `dtssl mjcf --route a|b --out models/mjcf/` · `dtssl proto-build` · `dtssl release`.
+`dtssl serve [--backend fopdt] [--config config/bridge.json] [--teams blue,yellow] [--n 6]` · `dtssl gui` · `dtssl replay <label> <event> [--theta config/twin_params.json] [--plant fopdt|ideal|mujoco-velocity|mujoco-rollers|mujoco-rollers-delay|world:<backend>] [--out results/]` · `dtssl gate twin-vs-ideal|twin-vs-rsim [--mode A|B]` · `dtssl analysis <name>` · `dtssl fig <name>` · `dtssl etl extract <log.gz> <out>` / `split` / `rotate` · `dtssl mjcf --route a|b --out models/mjcf/` · `dtssl proto-build` · `dtssl release`.
 
 ## 5. Testes e reprodutibilidade
 - `pytest -m "not requires_data and not requires_mujoco and not requires_gui"` deve passar em CI sem dataset. `conftest.py` registra marcadores e `skip` automático.

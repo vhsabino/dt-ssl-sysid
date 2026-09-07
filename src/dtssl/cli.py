@@ -3,7 +3,7 @@
 Built-in subcommands (core dependencies only):
 
     dtssl info                                   version, repo root, dataset, backends, extras
-    dtssl replay <label> <event> [--theta P] [--plant fopdt|ideal] [--out DIR]
+    dtssl replay <label> <event> [--theta P] [--plant fopdt|ideal|mujoco-velocity|mujoco-rollers[-delay]] [--out DIR]
     dtssl gate twin-vs-ideal [--stride S] [--h-max H]      hold-out gate (SE(2) multi-horizon)
     dtssl gate twin-vs-rsim  [--mode A|B] ...              (needs robosim)
     dtssl cache-convert <pkl> <npz>              legacy pickle rollout cache -> .npz
@@ -82,7 +82,8 @@ def build_parser(with_optional: bool = True) -> tuple[argparse.ArgumentParser, d
     p.add_argument("label", help="split label, e.g. side_to_side")
     p.add_argument("event", help="event id, e.g. side_to_side_01_05")
     p.add_argument("--theta", type=Path, default=None, help="theta JSON (default config/twin_params.json)")
-    p.add_argument("--plant", choices=("fopdt", "ideal"), default="fopdt")
+    p.add_argument("--plant", default="fopdt",
+                   help="fopdt | ideal | mujoco-velocity | mujoco-rollers | mujoco-rollers-delay | world:<backend>")
     p.add_argument("--dataset", default=None, help="dataset id under data/extracted (default: canonical)")
     p.add_argument("--h-max", type=int, default=None, help="rollout horizon in samples (default 90)")
     p.add_argument("--stride", type=int, default=None, help="window stride in samples (default 15)")
@@ -170,8 +171,14 @@ def cmd_replay(args) -> int:
         theta = load_twin_params(args.theta)
         plant = AnalyticFOPDTPlant(theta)
         theta_src = str(args.theta) if args.theta else "config/twin_params.json"
-    else:
+    elif args.plant == "ideal":
         plant, theta_src = IdealKinematicPlant(), "-"
+    else:
+        from dtssl.sim.world_plant import make_harness_plant
+
+        theta = load_twin_params(args.theta)
+        plant = make_harness_plant(args.plant, theta)
+        theta_src = str(args.theta) if args.theta else "config/twin_params.json"
     mcfg = load_metrics_config()
     h_max = args.h_max or DEFAULT_HMAX
     stride = args.stride or DEFAULT_STRIDE

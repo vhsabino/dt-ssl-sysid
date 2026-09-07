@@ -433,6 +433,50 @@ class MuJoCoWorld(World):
             rob.dribbling = False
             self._mj.mj_forward(self.model, self.data)
 
+    def set_robot_state(self, team: Team, rid: int, x: float, y: float, theta: float,
+                        vx_b: float = 0.0, vy_b: float = 0.0, w: float = 0.0) -> None:
+        """Place a robot at ``(x, y, theta)`` with **body** velocity ``(vx_b, vy_b, w)`` -- the harness
+        initial condition (:meth:`dtssl.models.Plant.reset`). Route a: plant re-created with
+        ``velb0``; route b: chassis velocity plus wheel speeds from the inverse kinematics (no
+        start-up slip), rollers at rest."""
+        key = (team, int(rid))
+        with self._lock:
+            rob = self.robots.get(key)
+            if rob is None:
+                raise KeyError(key)
+            c, s = math.cos(theta), math.sin(theta)
+            vx, vy = c * vx_b - s * vy_b, s * vx_b + c * vy_b
+            rob.present = True
+            self._write_robot_pose(rob, x, y, theta, vx, vy, w)
+            if self.route == "a":
+                rob.plant = self._new_plant(x, y, theta, (vx_b, vy_b, w))
+                self.data.ctrl[rob.act] = (vx, vy, w)
+            else:
+                wheels = self._ik @ np.array([vx_b, vy_b, w], dtype=float)
+                self.data.qvel[rob.wheel_dofadr] = wheels
+                rob.wheel_target[:] = wheels
+                rob.pi_integ[:] = 0.0
+                self.data.ctrl[rob.wheel_act] = wheels if self.route_b.wheel_control != "pi" else 0.0
+            rob.dribbling = False
+            self._mj.mj_forward(self.model, self.data)
+
+    def prime_robot_delay(self, team: Team, rid: int, prev_cmds) -> None:
+        """Route a: fill the plant's command-delay buffer with the commands BEFORE t0 (oldest first),
+        without advancing it (:meth:`dtssl.models.Plant.prime_delay`). Route b: no-op (the physical
+        model has no transport delay; see :class:`dtssl.sim.world_plant.WorldPlant` for the option)."""
+        key = (team, int(rid))
+        with self._lock:
+            rob = self.robots.get(key)
+            if rob is None:
+                raise KeyError(key)
+            if self.route == "a" and rob.plant is not None and hasattr(rob.plant, "prime_delay"):
+                rob.plant.prime_delay(prev_cmds)
+
+    def robot_pose(self, team: Team, rid: int) -> tuple[float, float, float]:
+        """``(x, y, theta)`` straight from MuJoCo (route a: unwrapped hinge angle; route b: yaw in (-pi, pi])."""
+        with self._lock:
+            return self._robot_pose(self.robots[(team, int(rid))])
+
     def set_present(self, team: Team, rid: int, present: bool) -> None:
         key = (team, int(rid))
         with self._lock:

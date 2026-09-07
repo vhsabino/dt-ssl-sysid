@@ -165,3 +165,27 @@ w.close()
 `w.model` / `w.data` são o `MjModel`/`MjData` vivos (ex.: `mujoco.viewer.launch(w.model, w.data)` para o viewer interativo
 com pausa). Os XML de `models/mjcf/` abrem direto em `python -m mujoco.viewer --mjcf models/mjcf/ssl_route_b.xml`
 (sem controle: os robôs ficam parados).
+
+## Backends no harness do artigo (07/09/2026)
+
+`dtssl.sim.world_plant.WorldPlant` embrulha um `World` de um robô na interface `Plant` do harness
+(`reset` → `set_robot_state` com pose + velocidade de corpo; `prime_delay` → `prime_robot_delay`; `step` →
+`set_command` + `World.step`; bola estacionada a 40 m, paredes desligadas, watchdog em relógio de simulação).
+`MuJoCoWorld.set_robot_state` na rota b também impõe as velocidades das rodas pela cinemática inversa (sem
+escorregamento inicial). `dtssl replay --plant mujoco-velocity|mujoco-rollers|mujoco-rollers-delay` e
+`dtssl analysis run backends_holdout` (10 eventos de hold-out, 265 janelas, 33 s no sandbox):
+
+| h_ref = 0,4 s, bin translacional, mediana das janelas | e_pos (m) |
+|---|---|
+| `fopdt` (gêmeo do artigo) | 0,0388 |
+| `mujoco-velocity` (rota a) | 0,0388 — \|Δ\| máx. 1,6 mm vs a planta analítica em 265 janelas |
+| `mujoco-rollers` (rota b, sem sintonia, sem atraso) | 0,0726 |
+| `mujoco-rollers-delay` (rota b + Td do θ oficial) | 0,0477 |
+| `ideal` | 0,1005 |
+
+Por evento (n = 10): o gêmeo vence a rota b em 10/10 (Wilcoxon p = 0,001, rank-biserial +1,00), a rota b com atraso
+em 9/10 (p = 0,010, +0,82) e a ideal em 10/10; contra a rota a a diferença é ruído numérico (|Δ| mediano 0,0000 m).
+Leitura: (i) o gêmeo embutido no MuJoCo é o gêmeo — contatos passam a existir sem custo de fidelidade; (ii) a
+física "como sai da caixa" fica entre a ideal e o gêmeo (melhor que o rSim de 0,129 m do artigo, pior que o
+gêmeo por 1,9×); (iii) só o atraso identificado fecha a maior parte desse gap (0,073 → 0,048 m), coerente com a
+ablação do artigo (Td 43 % do ganho). Artefato: `results/backends_holdout_<stamp>.md/.csv`.

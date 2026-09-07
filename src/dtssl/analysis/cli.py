@@ -35,6 +35,8 @@ def requirements_missing(requires: Sequence[str]) -> list[str]:
             missing.append("rsim (pip install dtssl[rsim])")
         elif r == "mat" and importlib.util.find_spec("h5py") is None:
             missing.append("mat (pip install dtssl[mat])")
+        elif r == "mujoco" and importlib.util.find_spec("mujoco") is None:
+            missing.append("mujoco (pip install dtssl[mujoco])")
         elif r == "rsim_cache":
             try:
                 res = repo_root() / "results"

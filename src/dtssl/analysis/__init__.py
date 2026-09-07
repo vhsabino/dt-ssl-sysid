@@ -3,7 +3,7 @@
 Every module exposes ``run(root: Path | None = None, out: Path | None = None, **kwargs)
 -> dict`` (``dict["path"]`` = main artefact) and an argparse ``main(argv=None)``;
 ``NAME``, ``KIND`` (``analysis`` | ``fig`` | ``report``), ``CLAIM`` (the paper
-claim it supports) and ``REQUIRES`` (``data``, ``rsim_cache``, ``rsim``, ``mat``).
+claim it supports) and ``REQUIRES`` (``data``, ``rsim_cache``, ``rsim``, ``mat``, ``mujoco``).
 Modules that need ``robosim`` import it lazily inside ``run`` so that the whole
 registry imports on any machine. Shared helpers live in ``dtssl.analysis.common``.
 
@@ -27,6 +27,7 @@ claim" table, results/CHANGELOG.md, docs/PLANO_V2_EXECUTADO.md, docs/PLANO_V3_EX
 | eval_twin_vs_rsim | twin vs rSim gate, modes A/B (Sec. V; needs robosim) | phase0_replay/eval_twin_vs_rsim.py |
 | metrics_report | twin vs ideal SE(2) gate on the hold-out (trans GO) | phase0_replay/metrics_report.py |
 | window_errors_eang | e_ang per window/horizon, twin vs ideal | scripts/window_errors_eang.py |
+| backends_holdout | twin vs MuJoCo routes a/b vs ideal on the hold-out (2026-09) | new |
 | regenerate_bin_distribution | bin distribution with the CAD radius (D9) | scripts/regenerate_bin_distribution.py |
 | holdout_report | honest hold-out report, twin vs rSim (needs robosim) | phase0_replay/holdout_report.py |
 | loader_report | loader sanity + duration distribution (H_max) | phase0_replay/report.py |
@@ -72,6 +73,7 @@ _ALL: dict[str, str] = {
     "eval_twin_vs_rsim": "dtssl.analysis.eval_twin_vs_rsim",
     "window_errors_eang": "dtssl.analysis.window_errors_eang",
     "regenerate_bin_distribution": "dtssl.analysis.regenerate_bin_distribution",
+    "backends_holdout": "dtssl.analysis.backends_holdout",
     # reports
     "metrics_report": "dtssl.analysis.metrics_report",
     "holdout_report": "dtssl.analysis.holdout_report",

@@ -362,6 +362,29 @@ class TwinWorld(World):
             if self.ball_obj.captured_by == key:
                 self.ball_obj.captured_by = None
 
+    def set_robot_state(self, team: Team, rid: int, x: float, y: float, theta: float,
+                        vx_b: float = 0.0, vy_b: float = 0.0, w: float = 0.0) -> None:
+        """Harness initial condition: pose + **body** velocity (see ``WorldPlant``)."""
+        key = (team, int(rid))
+        with self._lock:
+            self.plants[key] = self._new_plant(x, y, theta, (float(vx_b), float(vy_b), float(w)))
+            self._present[key] = True
+            self.commands.setdefault(key, RobotCmd())
+            if self.ball_obj.captured_by == key:
+                self.ball_obj.captured_by = None
+
+    def prime_robot_delay(self, team: Team, rid: int, prev_cmds) -> None:
+        """Fill the plant's delay buffer with the commands before t0 (harness ``prime_delay``)."""
+        key = (team, int(rid))
+        with self._lock:
+            plant = self.plants.get(key)
+            if plant is not None and hasattr(plant, "prime_delay"):
+                plant.prime_delay(prev_cmds)
+
+    def robot_pose(self, team: Team, rid: int) -> tuple[float, float, float]:
+        with self._lock:
+            return tuple(float(v) for v in self.plants[(team, int(rid))].pose)
+
     def set_present(self, team: Team, rid: int, present: bool) -> None:
         key = (team, int(rid))
         with self._lock:

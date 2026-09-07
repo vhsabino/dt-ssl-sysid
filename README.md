@@ -63,7 +63,7 @@ dtssl serve [--backend fopdt|ideal|mujoco-velocity|mujoco-rollers] [--n-blue 6 -
                                             # servidor ssl-simulation-protocol: visão 224.5.23.2:10006, controle
                                             #   10301 (blue) / 10302 (yellow), SimulatorCommand 10300 (config/bridge.json)
 dtssl fake-strategy --team yellow --target 1 0.5        # cliente de fumaça que emula a estratégia
-dtssl replay shoot_to_goal shoot_to_goal_12_01 [--theta config/twin_params.json] [--plant fopdt|ideal]
+dtssl replay shoot_to_goal shoot_to_goal_12_01 [--theta config/twin_params.json] [--plant fopdt|ideal|mujoco-velocity|mujoco-rollers[-delay]]
 dtssl gate twin-vs-ideal | twin-vs-rsim [--mode A|B]    # gate estatístico do hold-out (config/metrics.json)
 dtssl analysis list | run <nome> | info <nome>          # cada número do artigo = um módulo de dtssl.analysis
 dtssl fig <nome>                                        # figuras do artigo

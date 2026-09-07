@@ -25,7 +25,7 @@ def test_registered_module_contract(name):
     assert getattr(m, "NAME", None) == name
     assert getattr(m, "KIND", None) in ("analysis", "fig", "report")
     assert isinstance(getattr(m, "CLAIM", ""), str) and m.CLAIM
-    assert set(getattr(m, "REQUIRES", ())) <= {"data", "rsim", "rsim_cache", "mat"}
+    assert set(getattr(m, "REQUIRES", ())) <= {"data", "rsim", "rsim_cache", "mat", "mujoco"}
     assert (m.__doc__ or "").strip(), f"{name}: docstring required (claim mapping)"
 
 
