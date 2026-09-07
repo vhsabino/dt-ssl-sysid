@@ -118,7 +118,7 @@ def render(ctx: C.Ctx, r: dict) -> list[str]:
         L.append("| " + " | ".join(cells) + " |")
     L += ["", f"## Por evento em h_ref = {r['h_ref_s']:.2f} s (medianas por evento, n = {r['n_events']})", "",
           "| modelo | e_pos mediano (eventos) | gemeo vence | Wilcoxon p (gemeo < modelo) | rank-biserial | "
-          "|Δe_pos| vs gemeo (mediana / max, todas as janelas) |",
+          "|delta e_pos| vs gemeo (mediana / max, todas as janelas) |",
           "|---|---|---|---|---|---|"]
     kref = r["horizons"].index(r["h_ref"])
     for n in r["order"]:
@@ -134,10 +134,10 @@ def render(ctx: C.Ctx, r: dict) -> list[str]:
     for n, s in r["cost_s"].items():
         L.append(f"| {n} | {s:.1f} |")
     L += ["", "## Leitura", "",
-          "- `mujoco-velocity` x `fopdt`: |Δe_pos| e a fidelidade do *embedding* — o quanto o chassi MuJoCo "
+          "- `mujoco-velocity` x `fopdt`: |delta e_pos| e a fidelidade do *embedding* - o quanto o chassi MuJoCo "
           "(servo dead-beat + limites de forca) reproduz a planta comportamental nas mesmas janelas.",
           "- `mujoco-rollers` e a rota fisica **como sai da caixa** (geometria nominal, contato da receita de Wan "
-          "et al. 2026): nao foi calibrada contra dados — e a baseline 'simulador fisico nao sintonizado', "
+          "et al. 2026): nao foi calibrada contra dados - e a baseline 'simulador fisico nao sintonizado', "
           "comparavel ao rSim do artigo; `-delay` isola o efeito do atraso identificado.",
           "- Estatistica por evento (n pequeno): Wilcoxon unilateral pareado e rank-biserial, como em "
           "`clustered_stats`; nao ha bootstrap por blocos aqui."]
