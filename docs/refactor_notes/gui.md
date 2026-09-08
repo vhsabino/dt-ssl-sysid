@@ -171,6 +171,39 @@ numérico/combobox tem o foco (clique no campo para devolver o foco).
 - **Não verificado aqui**: pad físico (DualSense) — só provedores falsos e `PygameBackend` sem dispositivos; janela real
   no Windows/WSLg (só `offscreen`).
 
+## Aba 3D com o CAD (C6, 08/09/2026)
+
+`src/dtssl/gui/view3d.py` (`View3D`, `pyqtgraph.opengl.GLViewWidget`) + `src/dtssl/gui/scene3d.py` (geometria pura,
+sem Qt): o centro da janela virou um `QTabWidget` com **Field (2D)** (a `FieldView` de sempre, interativa) e
+**3D (CAD)**. A aba 3D desenha campo (chão em dois tons, linhas, gols), bola e robôs com as **malhas OBJ do C5**
+(`dtssl.physics.assets`, por default o par LOD: chassi 10,8 k faces = só o exterior da malha completa, roda 1,2 k;
+`RobotMeshes.build(cad=True, lod=True)`; o botão **HQ** troca pelas malhas completas de 37 k + 4×8 k faces), placa SSL na tampa
+(cor do time + 4 pontos do padrão do rulebook, `ID_PATTERN` do `mjcf`), anel branco no robô selecionado. Tudo é
+construído do `WorldState` → funciona com qualquer backend (`fopdt`, `ideal`, `mujoco-*`) e no Replay.
+
+- **Rodas giram** em todos os backends: `WheelSpin` integra `omega_i = (-sin phi_i vx + cos phi_i vy + R w)/r` da
+  velocidade de corpo do estado (cinemática inversa; o `WorldState` não expõe os ângulos das rodas da rota b) e
+  `wheel_transform` aplica `rot_z(phi_i) · rot_x(-psi_i)` (eixo da malha em +x → direção radial; giro em torno de
+  −u_r como a dobradiça do MJCF). Teste de rolamento sem escorregamento: a componente tangencial da velocidade do
+  ponto de contato de cada roda é nula (`test_wheel_spin_rolls_without_slip`).
+- Câmera: presets `iso`/`top`/`side`/`goal` (`CAMERA_PRESETS`, elevação/azimute/distância), **Follow** (centro da
+  câmera segue o robô selecionado), **CAD** (malhas ↔ prisma em D + cilindros), **Wheels** (liga/desliga o giro),
+  **Fit (F)**; mouse = órbita/pan/zoom do `GLViewWidget`. O preset `top` tem x para a direita e y para cima, como a
+  aba 2D. Teleporte e seleção por clique continuam só na aba 2D.
+- Custo: `GLMeshItem` do pyqtgraph 0.14 usa VBOs (upload uma vez; por quadro só `setTransform` de 12×6 itens e um
+  `update()`), e a aba só é atualizada quando visível (`showEvent` reaplica o último estado). O custo é dominado
+  pelo número de triângulos: 12 robôs com as malhas completas (830 k triângulos) = 27 ms/quadro na Intel Iris Xe
+  do PC do Victor (medido em 08/09, 1440×924) e ~140 ms em software (llvmpipe); com o par LOD (185 k triângulos)
+  cai para ~1/3 (47 ms em software). Por isso o LOD é o default e **HQ** é opcional. Sem GPU use `--no-cad`
+  (primitivas) ou `--no-3d` (não cria a aba).
+- Dependência nova: `PyOpenGL` (extra `dtssl[gui]`); sem ele (ou sem contexto GL, p.ex. `QT_QPA_PLATFORM=offscreen`)
+  a aba mostra um rótulo com o motivo e o resto da GUI segue normal. `app.run` liga
+  `AA_ShareOpenGLContexts` antes do `QApplication` porque o pyqtgraph guarda os *shaders* por processo.
+- Testes `tests/test_gui_view3d.py` (15; 15 passam também no Windows com GL real, `QT_QPA_PLATFORM=windows`): geometria (OBJ, fechamento de malhas, placa, transformações, rolamento,
+  campo), widget sem contexto (offscreen: constrói, aceita quadros, esconde/mostra, troca CAD/campo), presets/follow,
+  renderização real (`grab_image` ≠ quadro vazio, `top` muda a imagem — roda sob `xvfb-run` ou num desktop; é
+  *skip* no offscreen), `MainWindow` com/sem a aba. Captura: `docs/img/gui_3d_tab.png`.
+
 ## Correção 03/09/2026 — `ZeroDivisionError` do pyqtgraph ao trocar de robô
 
 Sintoma (Windows, pyqtgraph 0.14.0, modo Debug): ao selecionar um robô, o console repete

@@ -154,6 +154,10 @@ contadores `kicks`/`contacts`/`watchdog_hits`, `watchdog_clock="wall"|"sim"|call
 
 Decimação por sólido (`fast_simplification`, colapso de arestas quádrico) depois de soldar vértices duplicados (o
 export CAD separa os vértices por face). OBJ de um único objeto, só triângulos (o MuJoCo lê a primeira *shape*).
+A ferramenta escreve também o par leve para a aba 3D da GUI (C6): `ssl_chassis_lod.obj` (10 771 faces = só os
+componentes conexos **exteriores** da malha completa, ≥ 60 mm — casca, base, tampa; parafusos, pinos e eletrônica
+interna são descartados — e decimados de novo) e `ssl_wheel_lod.obj` (1 180 faces, decimação mais agressiva);
+`meshes.json` ganha as chaves `chassis_lod`/`wheel_lod`. O MuJoCo continua usando as malhas completas.
 
 No builder: `robot_fragment(..., visual="cad")` / `build_world_xml(..., visual="cad")` / `MuJoCoWorld(visual="cad")` /
 `dtssl mjcf --visual cad [--view]`. As malhas entram como geoms **só visuais** (`contype=conaffinity=0`, `mass=0`,

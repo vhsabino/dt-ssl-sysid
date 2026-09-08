@@ -48,7 +48,7 @@ digitaltwin/
 │   ├── eval/      metrics.py stats.py verdict.py report.py
 │   ├── analysis/  common.py + um módulo por script do artigo (run(root, out) + main())
 │   ├── bridge/    proto/ (pb2 gerados + .proto fonte + build_proto.py) vision.py control.py simcontrol.py server.py fake_strategy.py recorder.py
-│   ├── gui/       app.py field_view.py plots.py params_panel.py joystick.py controller.py
+│   ├── gui/       app.py field_view.py view3d.py scene3d.py plots.py params_panel.py joystick.py controller.py
 │   └── physics/   mjcf.py mujoco_world.py assets/ (meshes opcionais) 
 ├── phase0_replay/            # SHIM de compatibilidade (reexporta dtssl; permite unpickle do cache antigo); remover em v2
 ├── matlab/
@@ -147,7 +147,7 @@ Qualquer backend pode ser avaliado no harness do artigo (mesmas janelas re-ancor
 - Protos: copiar de `ssl-unification/libs/protobufs/include/protobufs/pb/proto/` os `ssl_vision_*.proto`, `ssl_simulation_*.proto`, `ssl_gc_*.proto` (dependências), gerar `*_pb2.py` com `grpcio-tools`/`protoc` via `bridge/proto/build_proto.py`; **versionar os `_pb2.py` gerados** (usuário não precisa de protoc).
 
 ### 4.5 `dtssl.gui` (PySide6 + pyqtgraph)
-- `dtssl gui` abre `MainWindow` com: **FieldView** (campo Div B em escala, robôs por cor/id com heading e dribbler, bola, rastro sim (e verdade, no Replay), clique = teleporte), **Plots** (por DOF: cmd vs velocidade de corpo; e_pos(t) no Replay), **ParamsPanel** (K, τ, Td por DOF editáveis com bounds do SLDD; presets `oficial`, `placeholder ω`, `ideal`; carregar/salvar JSON; aplica sem reiniciar), **BackendSelector** (`fopdt`, `ideal`, `mujoco-velocity`, `mujoco-rollers`), **Status** (Hz real, pacotes/s por porta, watchdog, joystick conectado).
+- `dtssl gui` abre `MainWindow` com: **FieldView** (campo Div B em escala, robôs por cor/id com heading e dribbler, bola, rastro sim (e verdade, no Replay), clique = teleporte), **Plots** (por DOF: cmd vs velocidade de corpo; e_pos(t) no Replay), **ParamsPanel** (K, τ, Td por DOF editáveis com bounds do SLDD; presets `oficial`, `placeholder ω`, `ideal`; carregar/salvar JSON; aplica sem reiniciar), **BackendSelector** (`fopdt`, `ideal`, `mujoco-velocity`, `mujoco-rollers`), **Status** (Hz real, pacotes/s por porta, watchdog, joystick conectado); **View3D** (aba 3D, `pyqtgraph.opengl`: campo, bola e robôs com as malhas do CAD de `physics/assets`, rodas girando pela cinemática inversa, placa SSL, presets de câmera/follow; construída do `WorldState`, logo válida para todo backend; `--no-3d`/`--no-cad`).
 - **Modos**: `Debug` (joystick → `RobotCmd` do robô selecionado; servidor de protocolo pode ficar ligado ou não), `Bridge` (servidor ligado; ssl-unification manda; GUI só observa e permite teleporte/params), `Replay` (carrega evento do dataset, roda free-run com a planta atual vs verdade; mostra e_pos por horizonte).
 - **Joystick** (`gui/joystick.py`, `pygame`): DualSense via SDL GameController (`pygame.joystick`; mapear por nome "DualSense"/"PS5"); eixos: `LY → vx = −LY·v_max`, `LX → vy = −LX·v_max`, `RX → w = −RX·w_max`; deadzone radial 0.08 + curva expo 0.3; `R2` turbo (escala 1.0 vs 0.5), `✕` chute reto (`kick_flat_max`), `○` chip, `R1` liga/desliga dribbler, D-pad ←/→ troca robô, `Options` teleporta ao centro, `PS`/`Share` para/zera. Loop de leitura a 120 Hz em `QTimer`; sem joystick, fallback WASD/QE no teclado. Publicar também (opcional) o comando por `RobotControl` UDP para permitir teleoperar um simulador externo (grSim) com a mesma mão.
 

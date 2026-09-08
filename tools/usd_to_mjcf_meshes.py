@@ -23,13 +23,19 @@ Frame conventions applied (see ``dtssl.physics.mjcf`` and ``docs/SPEC_DTSSL.md``
   direction ``u_r`` of wheel ``i`` (the hinge axis is ``-u_r``).
 
 Decimation: ``fast_simplification`` (quadric edge collapse) per solid, keeping small parts intact;
-the face budget is the ``--chassis-faces`` / ``--wheel-faces`` targets.  The exported OBJ files are
-single-object, triangles only (MuJoCo reads the first shape of an OBJ), 6-decimal metres.
+the face budget is the ``--chassis-faces`` / ``--wheel-faces`` targets.  A second, lighter pair
+(``ssl_chassis_lod.obj`` / ``ssl_wheel_lod.obj``, ``--lod-chassis-faces`` / ``--lod-wheel-faces``) is written for
+the GUI 3D tab (12 robots drawn every frame on integrated GPUs): the chassis LOD keeps only the exterior
+components of the full-resolution mesh (connected components at least ``--lod-min-diag`` mm across: shell,
+base, cover; screws, headers and the electronics inside are dropped) and decimates them further; the wheel
+LOD is a more aggressive decimation of the same assembly.  The exported OBJ files are single-object,
+triangles only (MuJoCo reads the first shape of an OBJ), 6-decimal metres.
 
 Requires ``usd-core`` (``pxr``), ``trimesh`` and ``fast_simplification`` (dev-only; not package
 dependencies).  Run from the repo root::
 
     python tools/usd_to_mjcf_meshes.py [--chassis-faces 30000] [--wheel-faces 8000]
+                                       [--lod-chassis-faces 10000] [--lod-wheel-faces 1200] [--lod-min-diag 60]
 
 Writes the OBJ files plus ``meshes.json`` (provenance: sources + md5, transform, face counts, bounding
 boxes and the derived constants used by ``dtssl.physics.mjcf``: top of the cover, wheel outer radius).
@@ -102,24 +108,36 @@ def _weld(points: np.ndarray, faces: np.ndarray) -> tuple[np.ndarray, np.ndarray
     return np.asarray(m.vertices, dtype=float), np.asarray(m.faces, dtype=np.int64)
 
 
-def _decimate(points: np.ndarray, faces: np.ndarray, target_faces: int) -> tuple[np.ndarray, np.ndarray]:
+def _decimate(points: np.ndarray, faces: np.ndarray, target_faces: int, agg: int = 5,
+              passes: int = 1) -> tuple[np.ndarray, np.ndarray]:
+    """Quadric decimation to about ``target_faces``. CAD tessellations have many open seams, where the
+    collapses are reluctant: ``agg`` (aggressiveness, 5 = quality, 8 = LOD) and a second pass when the
+    first one stalls above 1.3x the target."""
     import fast_simplification as fs
 
     points, faces = _weld(points, faces)
-    if len(faces) <= target_faces:
-        return points, faces
-    red = 1.0 - target_faces / len(faces)
-    p, f = fs.simplify(points.astype(np.float32), faces.astype(np.int32), target_reduction=float(red), agg=5)
-    return np.asarray(p, dtype=float), np.asarray(f, dtype=np.int64)
+    for _ in range(max(passes, 1)):
+        if len(faces) <= 1.3 * target_faces:
+            break
+        red = 1.0 - target_faces / len(faces)
+        p, f = fs.simplify(points.astype(np.float32), faces.astype(np.int32), target_reduction=float(red), agg=agg)
+        points, faces = np.asarray(p, dtype=float), np.asarray(f, dtype=np.int64)
+    return points, faces
 
 
-def _clean(points: np.ndarray, faces: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Drop degenerate triangles and unreferenced vertices (trimesh does the bookkeeping)."""
+def _clean(points: np.ndarray, faces: np.ndarray, min_diag: float = 0.0) -> tuple[np.ndarray, np.ndarray]:
+    """Drop degenerate triangles and unreferenced vertices (trimesh does the bookkeeping); with ``min_diag``
+    (mm) also drop connected components smaller than that (screws, pin headers: invisible at GUI scale)."""
     import trimesh
 
     m = trimesh.Trimesh(points, faces, process=False)
     m.update_faces(m.nondegenerate_faces())
     m.remove_unreferenced_vertices()
+    if min_diag > 0.0 and len(m.faces):
+        keep = [c for c in m.split(only_watertight=False)
+                if np.linalg.norm(c.bounds[1] - c.bounds[0]) >= min_diag]
+        if keep:
+            m = trimesh.util.concatenate(keep)
     return np.asarray(m.vertices, dtype=float), np.asarray(m.faces, dtype=np.int64)
 
 
@@ -132,20 +150,27 @@ def _merge(parts: list[tuple[np.ndarray, np.ndarray]]) -> tuple[np.ndarray, np.n
     return np.vstack(pts), np.vstack(fcs)
 
 
-def _budget(sizes: list[int], total: int, keep_below: int = 600) -> list[int]:
+def _budget(sizes: list[int], total: int, keep_below: int = 600, floor: int = 200) -> list[int]:
     """Face budget per part: parts below ``keep_below`` faces are kept, the rest share ``total``
     proportionally to their size (large parts are decimated the most in absolute terms)."""
     small = sum(s for s in sizes if s <= keep_below)
     big = sum(s for s in sizes if s > keep_below)
     rest = max(total - small, 1)
-    return [s if s <= keep_below else max(int(rest * s / big), 200) for s in sizes]
+    return [s if s <= keep_below else max(int(rest * s / big), floor) for s in sizes]
 
 
-def _write_obj(path: Path, points: np.ndarray, faces: np.ndarray, header: list[str]) -> None:
-    lines = [f"# {h}" for h in header]
-    lines += [f"v {x:.6f} {y:.6f} {z:.6f}" for x, y, z in points]
-    lines += [f"f {a + 1} {b + 1} {c + 1}" for a, b, c in faces]
+def _write_obj(path: Path, points: np.ndarray, faces: np.ndarray, header: list[str]) -> bool:
+    """Write the OBJ; an existing file with the same geometry is left untouched (the header carries a
+    timestamp, which would otherwise churn the git/LFS object). Returns True when written."""
+    body = [f"v {x:.6f} {y:.6f} {z:.6f}" for x, y, z in points]
+    body += [f"f {a + 1} {b + 1} {c + 1}" for a, b, c in faces]
+    if path.exists():
+        old = [ln for ln in path.read_text(encoding="utf-8").splitlines() if not ln.startswith("#")]
+        if old == body:
+            return False
+    lines = [f"# {h}" for h in header] + body
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return True
 
 
 def export_chassis(target_faces: int) -> dict:
@@ -168,7 +193,32 @@ def export_chassis(target_faces: int) -> dict:
                 bbox=dict(lo=lo.round(6).tolist(), hi=hi.round(6).tolist()))
 
 
-def export_wheel(target_faces: int) -> dict:
+def chassis_lod(full: dict, target_faces: int, min_diag_mm: float) -> dict:
+    """Exterior-only LOD of the full-resolution chassis: connected components at least ``min_diag_mm``
+    across (shell, base plate, cover) decimated (quality mode) to about ``target_faces`` in total."""
+    import fast_simplification as fs
+    import trimesh
+
+    m = trimesh.Trimesh(full["points"], full["faces"], process=False)
+    comps = [c for c in m.split(only_watertight=False)
+             if np.linalg.norm(c.bounds[1] - c.bounds[0]) * 1000.0 >= min_diag_mm]
+    total = sum(len(c.faces) for c in comps)
+    red = max(0.0, 1.0 - target_faces / max(total, 1))
+    out = []
+    for c in comps:
+        if red > 0.0 and len(c.faces) > 1500:
+            p, f = fs.simplify(np.asarray(c.vertices, np.float32), np.asarray(c.faces, np.int32),
+                               target_reduction=float(red), agg=5)
+            out.append((np.asarray(p, dtype=float), np.asarray(f, dtype=np.int64)))
+        else:
+            out.append((np.asarray(c.vertices, dtype=float), np.asarray(c.faces, dtype=np.int64)))
+    pts, faces = _clean(*_merge(out))
+    lo, hi = pts.min(0), pts.max(0)
+    return dict(points=pts, faces=faces, n_parts=len(comps), faces_source=int(len(full["faces"])),
+                names=[], bbox=dict(lo=lo.round(6).tolist(), hi=hi.round(6).tolist()))
+
+
+def export_wheel(target_faces: int, lod: bool = False) -> dict:
     parts = [(pts, faces) for _, pts, faces in _usd_meshes(USD_WHEEL)]
     sizes = [len(f) for _, f in parts]
     # hub ~ 1/3 of the budget, rollers share the rest
@@ -176,10 +226,13 @@ def export_wheel(target_faces: int) -> dict:
     budgets = []
     for i in range(len(sizes)):
         if hub_i is not None and i == hub_i:
-            budgets.append(max(int(target_faces * 0.35), 500))
+            budgets.append(max(int(target_faces * 0.35), 120 if lod else 500))
         else:
-            budgets.append(max(int(target_faces * 0.65 / max(len(parts) - 1, 1)), 60))
-    dec = [_clean(*_decimate(p, f, b)) for (p, f), b in zip(parts, budgets, strict=True)]
+            budgets.append(max(int(target_faces * 0.65 / max(len(parts) - 1, 1)), 24 if lod else 60))
+    if lod:
+        dec = [_clean(*_decimate(p, f, b, agg=8, passes=2)) for (p, f), b in zip(parts, budgets, strict=True)]
+    else:
+        dec = [_clean(*_decimate(p, f, b)) for (p, f), b in zip(parts, budgets, strict=True)]
     pts, faces = _merge(dec)               # hub.usd resolves to metres already (see _usd_meshes)
     pts, faces = _clean(pts, faces)
     lo, hi = pts.min(0), pts.max(0)
@@ -192,37 +245,48 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--chassis-faces", type=int, default=30000)
     ap.add_argument("--wheel-faces", type=int, default=8000)
+    ap.add_argument("--lod-chassis-faces", type=int, default=10000)
+    ap.add_argument("--lod-wheel-faces", type=int, default=1200)
+    ap.add_argument("--lod-min-diag", type=float, default=60.0, help="mm; smaller chassis parts are dropped in the LOD")
     ap.add_argument("--out", type=Path, default=ASSETS)
     a = ap.parse_args(argv)
     a.out.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    ch = export_chassis(a.chassis_faces)
-    wh = export_wheel(a.wheel_faces)
     hdr = [f"generated by tools/usd_to_mjcf_meshes.py on {stamp}; do not edit (regenerate from usd/)",
            "units m; frame = dtssl MJCF body frame (dribbler at +x, wheels at 60/135/225/300 deg)"]
-    _write_obj(a.out / "ssl_chassis.obj", ch["points"], ch["faces"],
-               hdr + [f"source usd/wheel/robot_chasis.usd (md5 {_md5(USD_CHASSIS)}), {ch['n_parts']} solids, "
-                      f"{ch['faces_source']} -> {len(ch['faces'])} faces; z origin at the wheel-axle plane "
-                      f"(USD z = {AXLE_Z_MM} mm); place at pos = (0, 0, wheel.r)"])
-    _write_obj(a.out / "ssl_wheel.obj", wh["points"], wh["faces"],
-               hdr + [f"source usd/wheel/hub.usd (md5 {_md5(USD_WHEEL)}), hub + {wh['n_parts'] - 1} rollers, "
-                      f"{wh['faces_source']} -> {len(wh['faces'])} faces; axle along +x, centred on the axle"])
     meta = dict(
         generated=stamp, generator="tools/usd_to_mjcf_meshes.py", units="m",
         frame="dtssl MJCF body frame: dribbler at +x, wheels at 60/135/225/300 deg; USD -> MJCF = R_z(+90 deg)",
         sources={"usd/wheel/robot_chasis.usd": _md5(USD_CHASSIS), "usd/wheel/hub.usd": _md5(USD_WHEEL),
                  "usd/ssl-robot.usd": _md5(USD_ROBOT)},
         axle_z_usd_mm=AXLE_Z_MM,
-        chassis=dict(file="ssl_chassis.obj", n_parts=ch["n_parts"], faces_source=ch["faces_source"],
-                     faces=int(len(ch["faces"])), vertices=int(len(ch["points"])), bbox=ch["bbox"],
-                     z_top_above_axle=float(ch["bbox"]["hi"][2]), z_bottom_above_axle=float(ch["bbox"]["lo"][2]),
-                     skipped=list(CHASSIS_SKIP)),
-        wheel=dict(file="ssl_wheel.obj", n_parts=wh["n_parts"], faces_source=wh["faces_source"],
-                   faces=int(len(wh["faces"])), vertices=int(len(wh["points"])), bbox=wh["bbox"],
-                   outer_radius=round(wh["outer_radius"], 6), axle="+x"),
     )
+    full = export_chassis(a.chassis_faces)
+    for key, lod, n_wh in (("", False, a.wheel_faces), ("_lod", True, a.lod_wheel_faces)):
+        ch = chassis_lod(full, a.lod_chassis_faces, a.lod_min_diag) if lod else full
+        wh = export_wheel(n_wh, lod=lod)
+        tag = (f" (LOD for the GUI 3D tab: exterior components >= {a.lod_min_diag:g} mm of the full mesh)"
+               if lod else "")
+        _write_obj(a.out / f"ssl_chassis{key}.obj", ch["points"], ch["faces"],
+                   hdr + [f"source usd/wheel/robot_chasis.usd (md5 {_md5(USD_CHASSIS)}), {ch['n_parts']} "
+                          f"{'components' if lod else 'solids'}, {ch['faces_source']} -> {len(ch['faces'])} "
+                          f"faces{tag}; z origin at the wheel-axle plane (USD z = {AXLE_Z_MM} mm); place at "
+                          "pos = (0, 0, wheel.r)"])
+        _write_obj(a.out / f"ssl_wheel{key}.obj", wh["points"], wh["faces"],
+                   hdr + [f"source usd/wheel/hub.usd (md5 {_md5(USD_WHEEL)}), hub + {wh['n_parts'] - 1} rollers, "
+                          f"{wh['faces_source']} -> {len(wh['faces'])} faces{tag}; axle along +x, centred on the "
+                          "axle"])
+        meta[f"chassis{key}"] = dict(
+            file=f"ssl_chassis{key}.obj", n_parts=ch["n_parts"], faces_source=ch["faces_source"],
+            faces=int(len(ch["faces"])), vertices=int(len(ch["points"])), bbox=ch["bbox"],
+            z_top_above_axle=float(ch["bbox"]["hi"][2]), z_bottom_above_axle=float(ch["bbox"]["lo"][2]),
+            skipped=list(CHASSIS_SKIP))
+        meta[f"wheel{key}"] = dict(
+            file=f"ssl_wheel{key}.obj", n_parts=wh["n_parts"], faces_source=wh["faces_source"],
+            faces=int(len(wh["faces"])), vertices=int(len(wh["points"])), bbox=wh["bbox"],
+            outer_radius=round(wh["outer_radius"], 6), axle="+x")
     (a.out / "meshes.json").write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
-    for k in ("chassis", "wheel"):
+    for k in ("chassis", "wheel", "chassis_lod", "wheel_lod"):
         m = meta[k]
         print(f"{m['file']}: {m['faces_source']} -> {m['faces']} faces, {m['vertices']} vertices, "
               f"bbox lo {m['bbox']['lo']} hi {m['bbox']['hi']}")

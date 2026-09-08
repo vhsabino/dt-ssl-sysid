@@ -32,12 +32,14 @@ def _obj_stats(path):
 # ---------------------------------------------------------------- assets (no mujoco)
 def test_assets_present_and_meta_consistent():
     meta = mjcf.cad_meta()
-    for key in ("chassis", "wheel"):
+    for key in ("chassis", "wheel", "chassis_lod", "wheel_lod"):
         p = mjcf.ASSET_DIR / meta[key]["file"]
         assert p.is_file(), p
         nv, nf, _ = _obj_stats(p)
         assert nv == meta[key]["vertices"] and nf == meta[key]["faces"]
         assert nf < meta[key]["faces_source"]                   # decimated
+    assert meta["chassis_lod"]["faces"] < 0.4 * meta["chassis"]["faces"]     # GUI LOD: exterior only
+    assert meta["wheel_lod"]["faces"] < 0.25 * meta["wheel"]["faces"]
     assert set(mjcf.mesh_assets()) == set(OBJ_FILES)
     for f in OBJ_FILES:
         assert mjcf.mesh_assets()[f] == (mjcf.ASSET_DIR / f).read_bytes()
@@ -73,15 +75,25 @@ def test_chassis_mesh_is_in_the_body_frame():
     assert r + lo[2] > 0.0                                   # nothing below the floor
 
 
-def test_wheel_mesh_is_centred_on_its_axle():
+@pytest.mark.parametrize("key", ["wheel", "wheel_lod"])
+def test_wheel_mesh_is_centred_on_its_axle(key):
     meta = mjcf.cad_meta()
-    _, _, pts = _obj_stats(mjcf.ASSET_DIR / meta["wheel"]["file"])
+    _, _, pts = _obj_stats(mjcf.ASSET_DIR / meta[key]["file"])
     lo, hi = pts.min(0), pts.max(0)
     assert hi[0] - lo[0] < 0.015                             # thin along the axle (+x)
     radial = np.hypot(pts[:, 1], pts[:, 2])
-    assert radial.max() == pytest.approx(meta["wheel"]["outer_radius"], abs=1e-6)
+    assert radial.max() == pytest.approx(meta[key]["outer_radius"], abs=1e-6)
     assert abs(radial.max() - mjcf.WheelGeometry().r) < 0.002   # CAD rollers vs physics wheel radius
     assert abs(lo[1] + hi[1]) < 1e-3 and abs(lo[2] + hi[2]) < 1e-3
+
+
+def test_chassis_lod_is_the_exterior_of_the_full_mesh():
+    meta = mjcf.cad_meta()
+    _, _, full = _obj_stats(mjcf.ASSET_DIR / meta["chassis"]["file"])
+    _, _, lod = _obj_stats(mjcf.ASSET_DIR / meta["chassis_lod"]["file"])
+    np.testing.assert_allclose(lod.max(0), full.max(0), atol=0.002)    # same envelope (shell, cover)
+    np.testing.assert_allclose(lod.min(0)[:2], full.min(0)[:2], atol=0.002)
+    assert lod.min(0)[2] >= full.min(0)[2] - 0.005
 
 
 @pytest.mark.parametrize("route", ["a", "b"])

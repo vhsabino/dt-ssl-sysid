@@ -35,6 +35,8 @@ def add_gui_arguments(p: argparse.ArgumentParser) -> None:
     p.add_argument("--dataset", default=None, help="Replay: dataset id under data/extracted")
     p.add_argument("--label", default=None, help="Replay: split label to load at start-up")
     p.add_argument("--event", default=None, help="Replay: event id to load at start-up")
+    p.add_argument("--no-3d", action="store_true", help="do not create the 3D tab (pyqtgraph.opengl)")
+    p.add_argument("--no-cad", action="store_true", help="3D tab: primitive shapes instead of the CAD meshes")
     p.add_argument("-v", "--verbose", action="store_true")
 
 

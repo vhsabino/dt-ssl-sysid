@@ -2,7 +2,8 @@
 
 Layout: toolbar (mode Debug/Bridge/Replay, backend, team/robot, publish, real-time, speed,
 reset, fit), a second toolbar for Replay (dataset/label/event, load, play/pause, scrub),
-the :class:`~dtssl.gui.field_view.FieldView` in the centre, docks with the
+a tab widget in the centre with the :class:`~dtssl.gui.field_view.FieldView` (2D, interactive) and the
+:class:`~dtssl.gui.view3d.View3D` (CAD meshes, ``pyqtgraph.opengl``), docks with the
 :class:`~dtssl.gui.plots.VelocityPlots`, the :class:`~dtssl.gui.params_panel.ParamsPanel` and a
 message log, and a status bar (actual Hz, backend, joystick, packets/s per port, watchdog).
 
@@ -25,6 +26,7 @@ from dtssl.gui.field_view import FieldView
 from dtssl.gui.params_panel import ParamsPanel
 from dtssl.gui.plots import VelocityPlots
 from dtssl.gui.replay import SPEEDS, ReplaySession, list_datasets, list_events, list_labels
+from dtssl.gui.view3d import View3D
 
 log = logging.getLogger(__name__)
 
@@ -86,7 +88,8 @@ class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, backend: str = "fopdt", mode: str = "debug", team: str = "yellow", *,
                  bridge_config=None, joy_map=None, n_blue: int = 6, n_yellow: int = 6, publish: bool = False,
                  realtime: bool | None = None, params=None, world_opts: dict | None = None,
-                 use_pygame: bool | None = None, autostart: bool = True, parent=None):
+                 use_pygame: bool | None = None, autostart: bool = True, view3d: bool = True,
+                 cad: bool = True, parent=None):
         super().__init__(parent)
         self.setWindowTitle("dtssl gui — SSL digital twin")
         self.controller = Controller(backend=backend, mode=mode, team=team, bridge_config=bridge_config,
@@ -96,7 +99,15 @@ class MainWindow(QtWidgets.QMainWindow):
         c = self.controller
         w = c.world
         self.field_view = FieldView(w.field, robot_radius_m=w.spec.radius, dribbler_offset_m=w.spec.dribbler_offset)
-        self.setCentralWidget(self.field_view)
+        self.tabs = QtWidgets.QTabWidget()
+        self.tabs.setDocumentMode(True)
+        self.tabs.addTab(self.field_view, "Field (2D)")
+        self.view3d: View3D | None = None
+        if view3d:
+            self.view3d = View3D(w.field, spec=w.spec, cad=cad)
+            self.view3d.set_selected(c.selected)
+            self.tabs.addTab(self.view3d, "3D (CAD)")
+        self.setCentralWidget(self.tabs)
         self.plots = VelocityPlots()
         self.params_panel = ParamsPanel(c.params)
         self.log_view = QtWidgets.QPlainTextEdit()
@@ -193,7 +204,7 @@ class MainWindow(QtWidgets.QMainWindow):
         a = tb.addAction("Reset scene")
         a.triggered.connect(self.controller.reset_scene)
         a = tb.addAction("Fit (F)")
-        a.triggered.connect(self.field_view.fit_field)
+        a.triggered.connect(self.fit_current_view)
         self.act_run = tb.addAction("Pause")
         self.act_run.setCheckable(True)
         self.act_run.setChecked(False)
@@ -264,6 +275,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.field_view.ball_teleport_requested.connect(self._on_teleport_ball)
         self.field_view.robot_selected.connect(lambda team, rid: c.select((team, rid)))
         self.params_panel.apply_requested.connect(c.apply_params)
+        if self.view3d is not None and self.view3d.available:
+            self.view3d.preset_changed.connect(lambda n: self.statusBar().showMessage(f"3D camera: {n}", 2000))
 
     # ------------------------------------------------------------------ lifecycle
     def start(self) -> None:
@@ -290,6 +303,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.statusBar().showMessage(msg, 4000)
         log.info(msg)
 
+    def fit_current_view(self) -> None:
+        if self.view3d is not None and self.tabs.currentWidget() is self.view3d:
+            self.view3d.fit()
+        else:
+            self.field_view.fit_field()
+
     # ------------------------------------------------------------------ modes
     def set_mode(self, mode: str) -> None:
         try:
@@ -307,6 +326,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.plots.set_mode("fixed" if replay else "sliding")
         self.field_view.clear_trails()
         self.field_view.set_ball_visible(not replay)
+        if self.view3d is not None:
+            self.view3d.set_ball_visible(not replay)
         if replay and self.controller.replay is not None:
             self._on_replay_loaded(self.controller.replay)
         self.log(f"mode: {mode}")
@@ -319,6 +340,8 @@ class MainWindow(QtWidgets.QMainWindow):
     def _on_backend_changed(self, name: str) -> None:
         w = self.controller.world
         self.field_view.set_field(w.field)
+        if self.view3d is not None:
+            self.view3d.set_field(w.field)
         self.plots.clear()
         self._refresh_robot_combo()
         self.log(f"backend: {name} ({getattr(w, 'name', type(w).__name__)})")
@@ -346,6 +369,8 @@ class MainWindow(QtWidgets.QMainWindow):
     def _on_selection_changed(self, key) -> None:
         self._refresh_robot_combo()
         self.field_view.set_selected(tuple(key) if key is not None else None)
+        if self.view3d is not None:
+            self.view3d.set_selected(tuple(key) if key is not None else None)
         if self.plots.mode == "sliding":
             self.plots.clear()
 
@@ -455,6 +480,8 @@ class MainWindow(QtWidgets.QMainWindow):
     # ------------------------------------------------------------------ data in
     def _on_frame(self, fr: Frame) -> None:
         self.field_view.update_state(fr.ws, fr.selected, fr.truth_pose, fr.t)
+        if self.view3d is not None:
+            self.view3d.update_state(fr.ws, fr.selected, fr.t)
         if fr.mode == "replay" and fr.replay_index is not None:
             rp = self.controller.replay
             if rp is not None:
@@ -524,6 +551,10 @@ def run(args) -> int:
     """Run the GUI from parsed ``dtssl gui`` arguments (see :mod:`dtssl.gui.cli`)."""
     logging.basicConfig(level=logging.DEBUG if getattr(args, "verbose", False) else logging.INFO,
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    if QtWidgets.QApplication.instance() is None:
+        # pyqtgraph.opengl caches shader programs per process: share GL resources between contexts so a
+        # rebuilt 3D view (backend change, second window) keeps drawing
+        QtCore.QCoreApplication.setAttribute(Qt.AA_ShareOpenGLContexts, True)
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv[:1])
     install_excepthook(logging.getLogger("dtssl.gui"))
     world_opts = {}
@@ -539,7 +570,8 @@ def run(args) -> int:
     win = MainWindow(backend=args.backend, mode=args.mode, team=args.team, bridge_config=args.config,
                      joy_map=args.joy_map, n_blue=args.n_blue, n_yellow=args.n_yellow, publish=args.publish,
                      realtime=(False if getattr(args, "no_realtime", False) else None), params=params,
-                     world_opts=world_opts, use_pygame=(False if getattr(args, "no_joystick", False) else None))
+                     world_opts=world_opts, use_pygame=(False if getattr(args, "no_joystick", False) else None),
+                     view3d=not getattr(args, "no_3d", False), cad=not getattr(args, "no_cad", False))
     if getattr(args, "event", None) and getattr(args, "label", None):
         win.select_replay(getattr(args, "dataset", None), args.label, args.event)
         win.load_replay(args.label, args.event, getattr(args, "dataset", None))
