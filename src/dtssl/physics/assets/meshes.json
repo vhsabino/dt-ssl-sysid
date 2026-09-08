@@ -1,0 +1,57 @@
+{
+  "generated": "2026-09-08 03:55 UTC",
+  "generator": "tools/usd_to_mjcf_meshes.py",
+  "units": "m",
+  "frame": "dtssl MJCF body frame: dribbler at +x, wheels at 60/135/225/300 deg; USD -> MJCF = R_z(+90 deg)",
+  "sources": {
+    "usd/wheel/robot_chasis.usd": "a2a0acc8e65bd423df8b0f77f11ce984",
+    "usd/wheel/hub.usd": "519baee62b501fd4725a33ec86af811c",
+    "usd/ssl-robot.usd": "343db997a2000d8539296d98ef661d89"
+  },
+  "axle_z_usd_mm": 24.15,
+  "chassis": {
+    "file": "ssl_chassis.obj",
+    "n_parts": 46,
+    "faces_source": 141969,
+    "faces": 37330,
+    "vertices": 17507,
+    "bbox": {
+      "lo": [
+        -0.088415,
+        -0.088195,
+        -0.025152
+      ],
+      "hi": [
+        0.0765,
+        0.088255,
+        0.125036
+      ]
+    },
+    "z_top_above_axle": 0.125036,
+    "z_bottom_above_axle": -0.025152,
+    "skipped": [
+      "Cylinder"
+    ]
+  },
+  "wheel": {
+    "file": "ssl_wheel.obj",
+    "n_parts": 21,
+    "faces_source": 164621,
+    "faces": 7999,
+    "vertices": 3901,
+    "bbox": {
+      "lo": [
+        -0.00675,
+        -0.030083,
+        -0.030083
+      ],
+      "hi": [
+        0.006472,
+        0.030083,
+        0.030083
+      ]
+    },
+    "outer_radius": 0.030124,
+    "axle": "+x"
+  }
+}

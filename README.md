@@ -68,7 +68,7 @@ dtssl gate twin-vs-ideal | twin-vs-rsim [--mode A|B]    # gate estatístico do h
 dtssl analysis list | run <nome> | info <nome>          # cada número do artigo = um módulo de dtssl.analysis
 dtssl fig <nome>                                        # figuras do artigo
 dtssl etl extract|split|rotate|inspect                  # .log.gz (protobuf) -> parquet no contrato dos logs
-dtssl mjcf --route a|b [--view --demo]                  # gera/visualiza os modelos MuJoCo
+dtssl mjcf --route a|b [--view --demo] [--visual cad]   # gera/visualiza os modelos MuJoCo (--visual cad: malhas do CAD)
 dtssl cache-convert <pkl> <npz>  ·  dtssl proto-build   ·  dtssl release
 ```
 

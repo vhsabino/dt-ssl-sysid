@@ -138,8 +138,35 @@ contadores `kicks`/`contacts`/`watchdog_hits`, `watchdog_clock="wall"|"sim"|call
   saltar (z até 44 mm num degrau de 2 m/s); usar rampas. Comandos com `vy` deixam deriva de heading (−0,02 rad em 2 s a
   0,5 m/s). Modo PI sem escala de unidades do firmware (ver acima). 12 robôs com roletes rodam a 1,8× tempo real.
 - Quique da bola (chip) não calibrado a e=0,5; a bola em contato é "dura" (`solimp` da bola 0,9–0,95).
-- Sem malhas visuais dos USD (`usd/`): primitivas (prisma em D, cilindros, elipsoides). `physics/assets/` fica reservado.
+- Malhas do CAD só como **visual** (`visual="cad"`, ver seção abaixo): a colisão continua nas primitivas (prisma em D,
+  cilindros, elipsoides); a física é bit-a-bit igual com e sem as malhas (teste).
 - O viewer (`mujoco.viewer.launch_passive`) precisa de display/GL; não é testado no CI.
+
+## Malhas do CAD (C5, 08/09/2026)
+
+`tools/usd_to_mjcf_meshes.py` exporta o CAD RobôCIn v2025 de `usd/` para `src/dtssl/physics/assets/`
+(`ssl_chassis.obj`, `ssl_wheel.obj`, `meshes.json` com proveniência: md5 dos USD, contagem de faces, bbox):
+
+| Malha | Fonte | Faces (fonte → exportada) | Frame |
+|---|---|---|---|
+| `ssl_chassis.obj` | `usd/wheel/robot_chasis.usd` (46 sólidos; o `Cylinder` de colisão é descartado) | 141 969 → 37 330 | frame de corpo MJCF: USD tem o dribbler em −y e rodas em −30/45/135/210°; aplicada R_z(+90°) (x' = −y, y' = x) → dribbler em +x, rodas em 60/135/225/300°; mm → m; **origem z no plano dos eixos das rodas** (USD z = 24,15 mm), por isso o geom fica em `pos = (0, 0, wheel.r)`: as rodas do CAD tocam o chão onde as rodas físicas tocam, qualquer que seja `r` no `robot_geometry.json` |
+| `ssl_wheel.obj` | `usd/wheel/hub.usd` (cubo `hub_v2` + 20 roletes) | 164 621 → 7 999 | eixo em +x, centrado no eixo; no MJCF `euler = (0, 0, φ_i)` põe o eixo na direção radial u_r (a dobradiça é −u_r); raio externo 30,1 mm (CAD) vs 29,5 mm (física) |
+
+Decimação por sólido (`fast_simplification`, colapso de arestas quádrico) depois de soldar vértices duplicados (o
+export CAD separa os vértices por face). OBJ de um único objeto, só triângulos (o MuJoCo lê a primeira *shape*).
+
+No builder: `robot_fragment(..., visual="cad")` / `build_world_xml(..., visual="cad")` / `MuJoCoWorld(visual="cad")` /
+`dtssl mjcf --visual cad [--view]`. As malhas entram como geoms **só visuais** (`contype=conaffinity=0`, `mass=0`,
+`group=1`); as primitivas (chassi de colisão, cubos e roletes) vão para o `group=3` (oculto no viewer por default) e
+a placa de identificação SSL sobe para a tampa do CAD (`wheel.r + z_top_above_axle` = 154,5 mm — o CAD fica 4,5 mm
+acima do limite de 150 mm da regra, medido no modelo). Rota a: 4 rodas estáticas no corpo do chassi; rota b: a malha
+da roda vai no corpo da roda e gira com ela. O modelo com malhas exige os bytes dos OBJ na compilação:
+`mjcf.load_model(xml)` (`MjModel.from_xml_string(xml, assets)`) — usado por `MuJoCoWorld.reset` e `describe_xml`;
+`dtssl mjcf --out DIR --visual cad` copia os OBJ para `DIR` para que `ssl_route_<r>_cad.xml` carregue sozinho.
+Testes (`tests/test_physics_cad.py`, 13): assets ↔ `meshes.json` ↔ md5 dos USD, frame das malhas, XML (geoms,
+grupos, placa), tamanhos compilados iguais (`nbody/njnt/nq/nv/nu`, massas e inércias), **trajetórias idênticas
+bit-a-bit** com e sem as malhas (90 passos, com contato com a bola, rotas a e b), CLI escreve modelo autônomo.
+Prévia: `docs/img/mjcf_cad_preview.png` (renderização offscreen `MUJOCO_GL=osmesa`).
 
 ## Como abrir o viewer
 
@@ -147,6 +174,7 @@ contadores `kicks`/`contacts`/`watchdog_hits`, `watchdog_clock="wall"|"sim"|call
 pip install -e ".[mujoco]"            # ou pip install mujoco
 dtssl mjcf --route a --view --demo    # 6x6, robôs em círculos com dribbler ligado/desligado
 dtssl mjcf --route b --n-blue 1 --n-yellow 0 --view --demo --seconds 20
+dtssl mjcf --route b --view --demo --visual cad   # malhas do CAD (RobôCIn v2025) em vez das primitivas
 ```
 
 Em código:

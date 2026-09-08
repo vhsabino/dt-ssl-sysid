@@ -153,7 +153,7 @@ class MuJoCoWorld(World):
                  kick_cooldown_s: float = 0.1, dribbler_force_max: float = 1.0,
                  dribbler_stiffness: float = 40.0, dribbler_damping: float = 1.5,
                  dribbler_capture_dist: float = 0.16, dribbler_capture_half_angle: float = 0.6,
-                 boundary: bool = True, chassis: str = "mesh",
+                 boundary: bool = True, chassis: str = "mesh", visual: str = "primitive",
                  limits_path: str | Path | None = None, twin_params_path: str | Path | None = None,
                  **unknown):
         if unknown:
@@ -196,6 +196,7 @@ class MuJoCoWorld(World):
         self.pi = pi_gains or PIGains()
         self.boundary = bool(boundary)
         self.chassis = chassis
+        self.visual = mjcf.normalize_visual(visual)      # 'primitive' | 'cad' (drawing only, SPEC §4.6)
         # --- command processing ----------------------------------------------------------
         self.saturate = bool(saturate)
         dz_enabled, dz_value = mjcf.load_deadzone(limits_path)
@@ -266,7 +267,8 @@ class MuJoCoWorld(World):
         """MJCF of ``scene`` with the current options (what ``reset`` compiles)."""
         return mjcf.build_world_xml(scene, self.route, fld=self._field, spec=self._spec, wheel=self.wheel,
                                     ball=self.ball_spec, solver=self.solver, route_a=self.route_a,
-                                    route_b=self.route_b, boundary=self.boundary, chassis=self.chassis)
+                                    route_b=self.route_b, boundary=self.boundary, chassis=self.chassis,
+                                    visual=self.visual)
 
     # ------------------------------------------------------------------ World API
     @property
@@ -300,7 +302,7 @@ class MuJoCoWorld(World):
                 spawns.append(sp)
             scene = Scene(robots=spawns, ball=scene.ball)
             self.xml = self.build_xml(scene)
-            self.model = mj.MjModel.from_xml_string(self.xml)
+            self.model = mjcf.load_model(self.xml)       # attaches the CAD meshes when visual='cad'
             self.data = mj.MjData(self.model)
             m = self.model
             self.robots.clear()

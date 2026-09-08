@@ -19,6 +19,15 @@ Two robot routes share the same field and ball:
 Conventions (SPEC §3): SI units, world frame = ssl-vision frame, body x forward (dribbler),
 wheel angles ``phi = (60, 135, 225, 300)`` deg CCW from body +x, positive wheel speed =
 CCW tangent so that ``omega_i * r = -sin(phi_i) vx + cos(phi_i) vy + R w``.
+
+Visuals (``visual=``): ``"primitive"`` (default) draws the D-shaped collision shell, the hubs and
+the roller geoms themselves; ``"cad"`` adds the RobôCIn v2025 CAD meshes (``assets/ssl_chassis.obj``,
+``assets/ssl_wheel.obj``, exported from ``usd/`` by ``tools/usd_to_mjcf_meshes.py``) as visual-only
+geoms (``contype = conaffinity = 0``, ``mass = 0``) and moves the primitives to geom group 3 (hidden
+in the viewer by default). The physics is identical in both modes (same bodies, joints, collision
+geoms, inertias and actuators): the meshes only change what is drawn. Models with CAD meshes must be
+compiled with the OBJ bytes attached (``load_model``) or from a directory holding the files
+(``dtssl mjcf --out`` copies them next to the XML).
 """
 from __future__ import annotations
 
@@ -27,6 +36,7 @@ import math
 import xml.etree.ElementTree as ET
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
+from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
@@ -61,6 +71,61 @@ ID_PATTERN = [
     "gggg", "pppp", "ppgg", "ggpp", "pggg", "pgpp", "gpgg", "gppp",
 ]
 ID_DOT_POS = ((0.035, 0.054772), (0.035, -0.054772), (-0.054772, -0.035), (-0.054772, 0.035))
+
+# --------------------------------------------------------------------------------------
+# Visual modes and CAD mesh assets (src/dtssl/physics/assets, see tools/usd_to_mjcf_meshes.py)
+# --------------------------------------------------------------------------------------
+VISUAL_MODES = ("primitive", "cad")
+ASSET_DIR = Path(__file__).resolve().parent / "assets"
+CAD_CHASSIS_MESH, CAD_WHEEL_MESH = "ssl_cad_chassis", "ssl_cad_wheel"
+CAD_FILES = ("ssl_chassis.obj", "ssl_wheel.obj", "meshes.json")
+HIDDEN_GROUP = "3"        # geom group not drawn by the viewer by default (groups 0-2 are)
+CAD_CHASSIS_RGBA = (0.16, 0.16, 0.18, 1.0)
+CAD_WHEEL_RGBA = (0.62, 0.62, 0.66, 1.0)
+
+
+def normalize_visual(visual: str | None) -> str:
+    v = (visual or "primitive").lower()
+    if v not in VISUAL_MODES:
+        raise ValueError(f"unknown visual mode {visual!r}; expected one of {VISUAL_MODES}")
+    return v
+
+
+@lru_cache(maxsize=1)
+def cad_meta() -> dict:
+    """``assets/meshes.json``: provenance + derived constants of the CAD meshes (top of the cover
+    above the wheel axle, wheel outer radius, face counts, source md5)."""
+    return json.loads((ASSET_DIR / "meshes.json").read_text(encoding="utf-8"))
+
+
+@lru_cache(maxsize=1)
+def mesh_assets() -> dict[str, bytes]:
+    """``{file name: bytes}`` of the CAD meshes, in the form ``mujoco.MjModel.from_xml_string`` takes.
+    The OBJ files are tracked with git LFS: a checkout without LFS holds pointer files, which is
+    reported here instead of failing inside the MuJoCo OBJ parser."""
+    out = {}
+    for f in CAD_FILES:
+        if not f.endswith(".obj"):
+            continue
+        data = (ASSET_DIR / f).read_bytes()
+        if data.startswith(b"version https://git-lfs"):
+            raise RuntimeError(f"{ASSET_DIR / f} is a git LFS pointer, not the mesh: run `git lfs pull` "
+                               "(or regenerate with tools/usd_to_mjcf_meshes.py)")
+        out[f] = data
+    return out
+
+
+def uses_cad(xml: str) -> bool:
+    return f'name="{CAD_CHASSIS_MESH}"' in xml or f'name="{CAD_WHEEL_MESH}"' in xml
+
+
+def load_model(xml: str):
+    """``mujoco.MjModel`` from an XML string, attaching the CAD mesh files when it references them."""
+    import mujoco  # noqa: WPS433 (optional dependency)
+
+    if uses_cad(xml):
+        return mujoco.MjModel.from_xml_string(xml, mesh_assets())
+    return mujoco.MjModel.from_xml_string(xml)
 
 
 def normalize_route(route: str) -> str:
@@ -577,8 +642,10 @@ def _chassis_mesh_vertices(radius: float, front: float, z0: float, z1: float, n_
     return " ".join(_v(*p) for p in pts)
 
 
-def _robot_visuals(body: ET.Element, name: str, team: Team, rid: int, spec: RobotSpec, z_top: float) -> None:
-    """Top plate (team colour) + SSL id pattern dots + front marker (all visual only)."""
+def _robot_visuals(body: ET.Element, name: str, team: Team, rid: int, spec: RobotSpec, z_top: float,
+                   cad: bool = False) -> None:
+    """Top plate (team colour) + SSL id pattern dots + front marker (all visual only). With the CAD
+    meshes the plate sits on the CAD cover and the front marker is hidden (the mesh has the dribbler)."""
     col = TEAM_RGBA.get(team, (0.6, 0.6, 0.6, 1.0))
     _sub(body, "geom", name=f"{name}_top", type="cylinder", pos=(0, 0, z_top + 0.0015), size=(0.025, 0.0015),
          rgba=col, contype="0", conaffinity="0", mass="0", group="1")
@@ -587,18 +654,42 @@ def _robot_visuals(body: ET.Element, name: str, team: Team, rid: int, spec: Robo
         _sub(body, "geom", type="cylinder", pos=(x, y, z_top + 0.0015), size=(0.02, 0.0015),
              rgba=PINK_RGBA if c == "p" else GREEN_RGBA, contype="0", conaffinity="0", mass="0", group="1")
     _sub(body, "geom", name=f"{name}_front_mark", type="box", pos=(spec.dribbler_offset - 0.004, 0, z_top + 0.001),
-         size=(0.003, 0.03, 0.001), rgba=(0.1, 0.1, 0.1, 1), contype="0", conaffinity="0", mass="0", group="1")
+         size=(0.003, 0.03, 0.001), rgba=(0.1, 0.1, 0.1, 1), contype="0", conaffinity="0", mass="0",
+         group=HIDDEN_GROUP if cad else "1")
+
+
+def cad_assets() -> list[ET.Element]:
+    """``<mesh>`` assets of the CAD chassis and wheel (file references resolved by ``load_model`` or
+    by the OBJ files copied next to the written XML)."""
+    meta = cad_meta()
+    return [_el("mesh", name=CAD_CHASSIS_MESH, file=meta["chassis"]["file"]),
+            _el("mesh", name=CAD_WHEEL_MESH, file=meta["wheel"]["file"])]
+
+
+def _cad_chassis(body: ET.Element, name: str, wheel: WheelGeometry, rgba: Sequence[float]) -> None:
+    """Visual-only CAD chassis: the OBJ has its z origin on the wheel-axle plane, so it sits at
+    ``z = wheel.r`` and the CAD wheels touch the floor where the physics wheels do."""
+    _sub(body, "geom", name=f"{name}_cad_chassis", type="mesh", mesh=CAD_CHASSIS_MESH, pos=(0, 0, wheel.r),
+         rgba=tuple(rgba), contype="0", conaffinity="0", mass="0", group="1")
+
+
+def _cad_wheel(parent: ET.Element, name: str, i: int, phi: float, pos: Sequence[float]) -> None:
+    """Visual-only CAD wheel ``i`` (hub + rollers, axle along the mesh +x): rotated by ``phi`` about z
+    so its axle is the outward radial direction ``u_r`` of the wheel (hinge axis ``-u_r``)."""
+    _sub(parent, "geom", name=f"{name}_cad_wheel{i}", type="mesh", mesh=CAD_WHEEL_MESH, pos=tuple(pos),
+         euler=(0.0, 0.0, phi), rgba=CAD_WHEEL_RGBA, contype="0", conaffinity="0", mass="0", group="1")
 
 
 def robot_fragment(team: Team, rid: int, route: str, spec: RobotSpec | None = None,
                    wheel: WheelGeometry | None = None, color: Sequence[float] | None = None,
                    pose: Sequence[float] = (0.0, 0.0, 0.0), route_a: RouteAOptions | None = None,
                    route_b: RouteBOptions | None = None, chassis: str = "mesh",
-                   timestep: float = SolverOptions.timestep) -> MjcfFragment:
+                   timestep: float = SolverOptions.timestep, visual: str = "primitive") -> MjcfFragment:
     """One robot. ``pose`` only sets the body's reference position (route b free joint start);
     MuJoCoWorld overwrites qpos at reset anyway. ``timestep`` (physics substep) sizes the
-    dead-beat servo gains of route a."""
+    dead-beat servo gains of route a. ``visual``: 'primitive' | 'cad' (module docstring)."""
     route = normalize_route(route)
+    cad = normalize_visual(visual) == "cad"
     spec = spec or RobotSpec()
     wheel = wheel or WheelGeometry()
     route_a = route_a or RouteAOptions()
@@ -613,9 +704,12 @@ def robot_fragment(team: Team, rid: int, route: str, spec: RobotSpec | None = No
     if chassis == "mesh":
         fr.asset.append(_el("mesh", name=CHASSIS_MESH,
                             vertex=_chassis_mesh_vertices(spec.radius, spec.dribbler_offset, z_bottom, z_top)))
+    if cad:
+        fr.asset.extend(cad_assets())
     d_ch = _el("default", class_="chassis")
     _sub(d_ch, "geom", contype=str(ROBOT_CONTYPE), conaffinity=str(ROBOT_CONAFF), condim="3",
-         friction=(0.4, 0.005, 0.0001), solref=(0.004, 1.0), solimp=(0.95, 0.99, 0.001))
+         friction=(0.4, 0.005, 0.0001), solref=(0.004, 1.0), solimp=(0.95, 0.99, 0.001),
+         group=HIDDEN_GROUP if cad else "0")
     fr.default.append(d_ch)
 
     x0, y0, th0 = (float(v) for v in pose)
@@ -643,10 +737,14 @@ def robot_fragment(team: Team, rid: int, route: str, spec: RobotSpec | None = No
         _sub(body, "geom", name=f"{name}_chassis", class_="chassis", type="cylinder",
              pos=(0, 0, (z_bottom + z_top) / 2), size=(spec.radius, (z_top - z_bottom) / 2), mass=spec.mass,
              rgba=col)
-    _robot_visuals(body, name, team, rid, spec, z_top)
+    if cad:
+        _cad_chassis(body, name, wheel, CAD_CHASSIS_RGBA if color is None else col)
+        z_top = wheel.r + float(cad_meta()["chassis"]["z_top_above_axle"])   # plate on the CAD cover
+    _robot_visuals(body, name, team, rid, spec, z_top, cad=cad)
     # dribbler face (visual bar) + sites used by the world for kick / dribbler logic
     _sub(body, "geom", name=f"{name}_dribbler_bar", type="box", pos=(spec.dribbler_offset - 0.005, 0, 0.045),
-         size=(0.005, 0.045, 0.006), rgba=(0.05, 0.05, 0.05, 1), contype="0", conaffinity="0", mass="0", group="1")
+         size=(0.005, 0.045, 0.006), rgba=(0.05, 0.05, 0.05, 1), contype="0", conaffinity="0", mass="0",
+         group=HIDDEN_GROUP if cad else "1")
     _sub(body, "site", name=f"{name}_dribbler", pos=(spec.dribbler_offset, 0, 0.0215), size=0.006,
          rgba=(1, 0.2, 0.2, 0.6), group="2")
     _sub(body, "site", name=f"{name}_kicker", pos=(spec.dribbler_offset - 0.01, 0, 0.0215), size=0.006,
@@ -661,13 +759,17 @@ def robot_fragment(team: Team, rid: int, route: str, spec: RobotSpec | None = No
         fr.actuator.append(_el("velocity", name=f"{name}_act_y", joint=f"{name}_y", kv=kv_s, forcerange=f_lim))
         fr.actuator.append(_el("velocity", name=f"{name}_act_yaw", joint=f"{name}_yaw", kv=kv_h,
                                forcerange=t_lim))
+        if cad:   # route a has no wheel bodies: static CAD wheels on the chassis
+            for i, phi in enumerate(wheel.angles):
+                _cad_wheel(body, name, i, float(phi), (wheel.R * math.cos(phi), wheel.R * math.sin(phi), wheel.r))
     else:
-        _wheels(body, fr, name, wheel, route_b)
+        _wheels(body, fr, name, wheel, route_b, cad=cad)
     fr.worldbody.append(body)
     return fr
 
 
-def _wheels(body: ET.Element, fr: MjcfFragment, name: str, wheel: WheelGeometry, opt: RouteBOptions) -> None:
+def _wheels(body: ET.Element, fr: MjcfFragment, name: str, wheel: WheelGeometry, opt: RouteBOptions,
+            cad: bool = False) -> None:
     """4 omni wheels with discrete free rollers (ETH/omni wheel with 0 deg rollers).
 
     Wheel i sits at ``R (cos phi, sin phi)`` at height ``r``; its hinge axis is the *inward* radial
@@ -679,7 +781,7 @@ def _wheels(body: ET.Element, fr: MjcfFragment, name: str, wheel: WheelGeometry,
     d_r = _el("default", class_="roller")
     _sub(d_r, "geom", contype=str(ROLLER_CONTYPE), conaffinity=str(ROLLER_CONAFF), condim="3",
          friction=(opt.roller_friction, 0.005, 0.0001), rgba=(0.35, 0.35, 0.38, 1), solref=(0.01, 1.0),
-         solimp=(0.95, 0.99, 0.001))
+         solimp=(0.95, 0.99, 0.001), group=HIDDEN_GROUP if cad else "0")
     _sub(d_r, "joint", type="hinge", damping=opt.roller_damping, armature=opt.roller_armature, limited="false")
     if not any(e.get("class") == "roller" for e in fr.default):
         fr.default.append(d_r)
@@ -695,7 +797,9 @@ def _wheels(body: ET.Element, fr: MjcfFragment, name: str, wheel: WheelGeometry,
         hw = wheel.hub_half_width
         _sub(wb, "geom", name=f"{name}_wheel{i}_hub", type="cylinder", fromto=tuple(np.r_[-hw * ur, hw * ur]),
              size=max(rho - wheel.roller_radius * 0.5, 0.005), mass=wheel.wheel_mass, rgba=(0.6, 0.6, 0.62, 1),
-             contype="0", conaffinity="0")
+             contype="0", conaffinity="0", group=HIDDEN_GROUP if cad else "0")
+        if cad:   # spins with the wheel body (the CAD rollers are part of the wheel mesh)
+            _cad_wheel(wb, name, i, float(phi), (0.0, 0.0, 0.0))
         for j in range(n):
             psi = 2 * math.pi * j / n
             p = rho * (math.cos(psi) * t + math.sin(psi) * z)
@@ -753,14 +857,14 @@ def world_root(scene: Scene, route: str, fld: FieldGeometry | None = None, spec:
                wheel: WheelGeometry | None = None, ball: BallSpec | None = None,
                solver: SolverOptions | None = None, route_a: RouteAOptions | None = None,
                route_b: RouteBOptions | None = None, boundary: bool = True,
-               chassis: str = "mesh") -> ET.Element:
+               chassis: str = "mesh", visual: str = "primitive") -> ET.Element:
     route = normalize_route(route)
     fld = fld or load_field_geometry()
     frs = [field_fragment(fld, boundary), ball_fragment(ball or BallSpec(), (scene.ball.x, scene.ball.y))]
     solver = solver or SolverOptions()
     for sp in scene.robots:
         frs.append(robot_fragment(sp.team, sp.id, route, spec, wheel, None, (sp.x, sp.y, sp.theta),
-                                  route_a, route_b, chassis, timestep=solver.timestep))
+                                  route_a, route_b, chassis, timestep=solver.timestep, visual=visual))
     return compose(frs, f"dtssl-route-{route}", solver)
 
 
@@ -809,10 +913,17 @@ def describe_xml(xml: str, title: str = "MJCF model") -> str:
         lines.append("")
     sites = [s.get("name") for s in root.iter("site") if s.get("name")]
     lines += ["## sites", "", ", ".join(f"`{s}`" for s in sites) or "(none)", ""]
+    meshes = [(g.get("name"), g.get("file")) for g in root.iter("mesh") if g.get("file")]
+    if meshes:
+        meta = cad_meta()
+        lines += ["## CAD meshes (visual only)", "", "| asset | file | faces | source |", "|---|---|---|---|"]
+        for nm, f in meshes:
+            part = next((v for v in (meta.get("chassis"), meta.get("wheel")) if v and v.get("file") == f), {})
+            src = ", ".join(meta.get("sources", {}))
+            lines.append(f"| {nm} | {f} | {part.get('faces', '?')} | {src} |")
+        lines.append("")
     try:
-        import mujoco  # noqa: WPS433 (optional)
-
-        m = mujoco.MjModel.from_xml_string(xml)
+        m = load_model(xml)
         lines += ["## compiled sizes", "", f"nbody={m.nbody} njnt={m.njnt} nq={m.nq} nv={m.nv} nu={m.nu} "
                   f"ngeom={m.ngeom} nsite={m.nsite} timestep={m.opt.timestep:.6g}", ""]
     except Exception as e:  # pragma: no cover - mujoco absent or load error
@@ -826,6 +937,7 @@ __all__ = [
     "load_wheel_geometry", "load_deadzone", "ik_matrix", "body_to_wheels", "MjcfFragment", "compose",
     "to_xml_string", "field_fragment", "ball_fragment", "robot_fragment", "build_field_xml",
     "build_ball_xml", "build_robot_xml", "build_world_xml", "world_root", "describe_xml", "yaw_quat",
-    "chassis_inertia",
-    "BALL_BODY", "BALL_JOINT", "CHASSIS_MESH",
+    "chassis_inertia", "VISUAL_MODES", "normalize_visual", "cad_meta", "cad_assets", "mesh_assets",
+    "uses_cad", "load_model", "ASSET_DIR", "CAD_FILES",
+    "BALL_BODY", "BALL_JOINT", "CHASSIS_MESH", "CAD_CHASSIS_MESH", "CAD_WHEEL_MESH", "HIDDEN_GROUP",
 ]
