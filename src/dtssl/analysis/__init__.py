@@ -29,6 +29,7 @@ claim" table, results/CHANGELOG.md, docs/PLANO_V2_EXECUTADO.md, docs/PLANO_V3_EX
 | window_errors_eang | e_ang per window/horizon, twin vs ideal | scripts/window_errors_eang.py |
 | backends_holdout | twin vs MuJoCo routes a/b vs ideal on the hold-out (2026-09) | new |
 | identifiability_insilico | C1: in-silico identifiability, regime x noise x deadzone, known theta (2026-09) | new |
+| closed_loop_stats | C4: closed-loop session of the real strategy on the twin vs competition logs, P1-P5 (2026-09) | new |
 | regenerate_bin_distribution | bin distribution with the CAD radius (D9) | scripts/regenerate_bin_distribution.py |
 | holdout_report | honest hold-out report, twin vs rSim (needs robosim) | phase0_replay/holdout_report.py |
 | loader_report | loader sanity + duration distribution (H_max) | phase0_replay/report.py |
@@ -78,6 +79,7 @@ _ALL: dict[str, str] = {
     "backends_holdout": "dtssl.analysis.backends_holdout",
     "session_report": "dtssl.analysis.session_report",
     "identifiability_insilico": "dtssl.analysis.identifiability_insilico",
+    "closed_loop_stats": "dtssl.analysis.closed_loop_stats",
     # reports
     "metrics_report": "dtssl.analysis.metrics_report",
     "holdout_report": "dtssl.analysis.holdout_report",
