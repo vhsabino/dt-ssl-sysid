@@ -156,7 +156,9 @@ BACKEND_PLANTS: dict[str, tuple[str, str | None]] = {
 
 def make_harness_plant(name: str, params: dict[str, DofParam] | None = None, **world_opts) -> Plant:
     """``fopdt`` / ``ideal`` -> analytic plants; ``mujoco-velocity`` / ``mujoco-rollers`` /
-    ``mujoco-rollers-delay`` -> :class:`WorldPlant`; ``world:<backend>`` -> any registered backend."""
+    ``mujoco-rollers-delay`` -> :class:`WorldPlant`; ``world:<backend>`` -> any registered backend;
+    ``proto:<sim>`` / ``proto:<sim>+delay`` -> an external simulator of ``config/external_sims.json`` over the
+    ssl-simulation-protocol (``dtssl.sim.protocol_plant``), raw or with the identified Td on the commands."""
     from dtssl.models import AnalyticFOPDTPlant, IdealKinematicPlant
 
     if name == "fopdt":
@@ -168,7 +170,13 @@ def make_harness_plant(name: str, params: dict[str, DofParam] | None = None, **w
         return WorldPlant(backend, params=params, delay=delay, world_opts=world_opts or None)
     if name.startswith("world:"):
         return WorldPlant(name[len("world:"):], params=params, world_opts=world_opts or None)
-    raise KeyError(f"unknown plant {name!r}; choose fopdt | ideal | {' | '.join(BACKEND_PLANTS)} | world:<backend>")
+    if name.startswith("proto:"):        # external simulator over the ssl-simulation-protocol (C2b)
+        from dtssl.sim.protocol_plant import ProtocolPlant
+
+        sim, _, tag = name[len("proto:"):].partition("+")
+        return ProtocolPlant(sim, delay="theta" if tag == "delay" else None, params=params, **world_opts)
+    raise KeyError(f"unknown plant {name!r}; choose fopdt | ideal | {' | '.join(BACKEND_PLANTS)} | world:<backend> "
+                   "| proto:<sim>[+delay]")
 
 
 def plant_names() -> Sequence[str]:

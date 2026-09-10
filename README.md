@@ -63,7 +63,7 @@ dtssl serve [--backend fopdt|ideal|mujoco-velocity|mujoco-rollers] [--n-blue 6 -
                                             # servidor ssl-simulation-protocol: visão 224.5.23.2:10006, controle
                                             #   10301 (blue) / 10302 (yellow), SimulatorCommand 10300 (config/bridge.json)
 dtssl fake-strategy --team yellow --target 1 0.5        # cliente de fumaça que emula a estratégia
-dtssl replay shoot_to_goal shoot_to_goal_12_01 [--theta config/twin_params.json] [--plant fopdt|ideal|mujoco-velocity|mujoco-rollers[-delay]]
+dtssl replay shoot_to_goal shoot_to_goal_12_01 [--theta config/twin_params.json] [--plant fopdt|ideal|mujoco-velocity|mujoco-rollers[-delay]|proto:grsim[+delay]]
 dtssl gate twin-vs-ideal | twin-vs-rsim [--mode A|B]    # gate estatístico do hold-out (config/metrics.json)
 dtssl analysis list | run <nome> | info <nome>          # cada número do artigo = um módulo de dtssl.analysis
 dtssl fig <nome>                                        # figuras do artigo
@@ -82,12 +82,25 @@ tools/ssl_unification/run_against_twin.sh --team yellow           # dtssl serve 
 Detalhes (chaves do `config/local/config.json`, rede Windows↔WSL2, DualSense):
 `tools/ssl_unification/README.md`. Nenhuma alteração no C++ da estratégia é necessária.
 
+### grSim e ER-Force no harness do artigo (replay via protocolo)
+
+```bash
+tools/external_sims/install_grsim_wsl.sh && tools/external_sims/install_erforce_wsl.sh   # WSL2; sudo só no apt
+tools/external_sims/run_grsim.sh start && tools/external_sims/run_grsim.sh probe        # sonda: teleporte + 1 janela
+tools/external_sims/run_protocol_holdout.sh          # hold-out via ssl-simulation-protocol (~35 min, tempo real)
+dtssl analysis run protocol_holdout --kw sims=grsim delay=both   # o mesmo, com o simulador já de pé
+```
+
+`ProtocolPlant` (`dtssl.sim.protocol_plant`) replaya as janelas do hold-out em qualquer simulador da liga
+(teleporte + comandos a 60 Hz + visão alinhada), com as mesmas janelas e métrica do gêmeo; endpoints em
+`config/external_sims.json`, detalhes e limitações de cada simulador em `tools/external_sims/README.md`.
+
 ## Layout do repositório
 
 ```
 pyproject.toml            pacote dtssl (src-layout); extras gui/mujoco/rsim/etl/mat/dev
 config/                   twin_params.json (θ oficial), metrics.json, holdout_events.json, robot_geometry.json,
-                          robot_limits.json, field_divB.json, bridge.json, ssl_robot.sldd (SLDD do Simulink)
+                          robot_limits.json, field_divB.json, bridge.json, external_sims.json, ssl_robot.sldd (SLDD do Simulink)
 src/dtssl/                paths, config, units, geometry, kinematics, cli
   data/                   schema, resample, loader, validate, splits, recordio, extract, rotate (+ _proto/)
   models/                 params (θ), Plant, AnalyticFOPDTPlant, IdealKinematicPlant, ConstantVelocity, RSimReplay
@@ -105,7 +118,7 @@ models/                   .mat identificados (promovidos e candidatos)
 results/                  artefatos com carimbo de tempo + CHANGELOG.md (proveniência de cada número)
 docs/                     SPEC_DTSSL.md (contrato), ADRs, relatórios, revisões, refactor_notes/ (índice: docs/README.md)
 latex/  slr/  paper/      artigo, revisão sistemática, outline
-tools/                    make_release.py, ssl_unification/, apply_refactor_manifest.json
+tools/                    make_release.py, ssl_unification/, external_sims/ (grSim/ER-Force no WSL2), apply_refactor_manifest.json
 legacy/                   archive/ (RL TD3, viewers antigos, testes) e apresentacao/ — fora do pacote
 phase0_replay/            shim de compatibilidade (reexporta dtssl; remover em v2)
 assets/ cad/ usd/         STEP/USD do robô (fontes para meshes)

@@ -60,6 +60,42 @@ foi tocado; `sim/entities.py`, `sim/world.py` e `sim/backends.py` foram usados *
 - `Ball.z` = altura da **base** da bola (0 no chão), publicado assim em `SSL_DetectionBall.z` (grSim publica o centro; o ssl-unification ignora `z`).
 - O relógio do mundo acumula `t += dt` (deriva de ulps); o gravador reancora os carimbos em `k·Ts` — quem consumir `WorldState.t` diretamente deve tolerar 1e-12 s.
 
+## Replay via protocolo: simuladores externos no harness (C2b, 10/09/2026)
+
+O caminho inverso do servidor: `dtssl.sim.protocol_plant.ProtocolPlant` é um **cliente** do
+ssl-simulation-protocol que se apresenta ao harness do artigo como uma `Plant`. Serve para avaliar os
+simuladores da liga (grSim, ER-Force `simulator-cli`) — e o próprio `dtssl serve`, como auto-teste — nas mesmas
+janelas re-ancoradas e com a mesma métrica do gêmeo (`dtssl analysis run protocol_holdout`,
+`dtssl replay ... --plant proto:grsim`, `make_harness_plant("proto:<sim>[+delay]")`).
+
+- **Por janela** (`free_run_window`, gancho em lote que `free_run` usa quando existe): `TeleportRobot` (pose real +
+  velocidade de mundo de `velb0`) seguido do primeiro `RobotControl`; os demais comandos saem a `dt` exato de
+  relógio de parede (não amarrados aos pacotes de visão: o atraso de visão do ER-Force atrasaria cada comando);
+  a visão é colhida até `H·dt + cauda`; **alinhamento**: âncora = primeiro quadro após o teleporte consistente com
+  `pose0` (tolerância cresce com |v0|), `tau0` (fração de período entre teleporte e captura) pela projeção do
+  deslocamento em `v0` (ou mediana corrente quando parado), pose em `h·dt` por interpolação linear nos
+  `t_capture` (θ desembrulhado). Envios em fase (meio período após a chegada de um quadro), para nunca cavalgar
+  a fronteira de um tick; base de tempo por contagem de quadros nos simuladores com carimbo de parede
+  (`dtssl serve`), por `t_capture` nos que carimbam tempo simulado (grSim, ER-Force).
+- **Atraso**: `delay=None` (comandos como gravados) ou `"theta"` (Td por DOF do θ oficial aplicado no envio,
+  `ud[j] = u[j − ⌈Td/dt⌉]`, primado com os comandos anteriores à janela — análogo de `mujoco-rollers-delay`).
+- **Endpoints** em `config/external_sims.json` (`dtssl`, `grsim`, `erforce`): portas, grupo de visão, interface do
+  join (`127.0.0.1` para o `dtssl serve`, que envia em `lo`; `0.0.0.0` = interface da rota default, onde grSim e
+  ER-Force enviam — um join na interface errada recebe nada), `vision_rate`, `teleport_omega`.
+- **Diagnóstico** (`ProtocolStats`, no artefato): período/taxa de visão, escala de `t_capture`, latência
+  teleporte→visão (3 teleportes na abertura), `tau0` por janela, fase e jitter de envio, teleportes não vistos,
+  janelas curtas, gaps de `frame_number`.
+- **Verificação**: `tests/test_protocol_plant.py` (7) e `tests/test_protocol_holdout.py` (8): `dtssl serve`
+  (fopdt, Td = 0) em processo + `ProtocolPlant(delay="theta")` reproduz a `AnalyticFOPDTPlant` nas mesmas
+  janelas com erro máximo ≤ 0,5 mm (H = 90; float32 do protocolo + alinhamento sub-quadro), 0 falhas de âncora,
+  jitter de envio < 10 ms; `compute` de ponta a ponta com `repeat=2`, caches `.npz` + `.stats.json` e
+  reanálise offline (`from_cache`) idêntica.
+- **O que os simuladores fazem com o teleporte** (fonte lida): grSim `resetRobot()` + `setSpeed()` → a
+  velocidade vira setpoint dos motores, toda janela parte do repouso; ER-Force aplica a velocidade linear no
+  corpo Bullet e a de guinada no eixo **x** (bug; enviamos 0). A análise reporta o gêmeo com a mesma
+  desvantagem (`fopdt_v0=0`) ao lado do gêmeo do artigo. Scripts WSL2 (instalação com sudo só no `apt`,
+  `simctl.sh`, experimento de ponta a ponta): `tools/external_sims/README.md`.
+
 ## Verificação
 
 - `python3 -m pytest -q`: **217 passed, 1 skipped** (o skip é de outro módulo, dependente de dataset); só os arquivos deste agente: 53 passed em ~2,5 s.

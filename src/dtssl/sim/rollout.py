@@ -21,9 +21,9 @@ from pathlib import Path
 
 import numpy as np
 
-from dtssl.models.params import load_twin_params
-from dtssl.models import Plant
 from dtssl.data.schema import Segment
+from dtssl.models import Plant
+from dtssl.models.params import load_twin_params
 
 __all__ = [
     "DEFAULT_HMAX", "DEFAULT_HORIZONS", "DEFAULT_STRIDE", "DEFAULT_LOOKBACK",
@@ -99,7 +99,16 @@ def free_run(plant: Plant, win_cmds: np.ndarray, pose0, velb0, dt: float,
              prev_cmds=None) -> np.ndarray:
     """Conduz a planta em free-run por len(win_cmds) passos e devolve pose_sim
     (H+1, 3) com pose_sim[0]=pose0. Driver FINO: reset -> (prime) -> step loop.
-    Nenhuma dinamica/integracao aqui — tudo vem da Plant."""
+    Nenhuma dinamica/integracao aqui — tudo vem da Plant.
+
+    Plantas que expõem ``free_run_window(win_cmds, pose0, velb0, dt, prev_cmds)`` (ex.:
+    ``ProtocolPlant``, que precisa transmitir a janela inteira em tempo real) recebem a
+    janela de uma vez; o contrato de saída é o mesmo."""
+    batch = getattr(plant, "free_run_window", None)
+    if batch is not None:
+        pose_sim = np.asarray(batch(np.asarray(win_cmds, dtype=float), pose0, velb0, dt, prev_cmds), dtype=float)
+        pose_sim[0] = pose0
+        return pose_sim
     plant.reset(pose0=pose0, velb0=velb0)
     if prev_cmds is not None and len(prev_cmds) > 0:
         plant.prime_delay(prev_cmds)
@@ -270,9 +279,11 @@ def load_rollouts(path, as_dict: bool = False):
             header = json.loads(str(z["__meta__"]))
             if header.get("format") != ROLLOUT_NPZ_FORMAT:
                 raise ValueError(f"{path}: unknown rollout file format {header.get('format')!r}")
-            metas = header["rollouts"]; keys = header.get("keys")
+            metas = header["rollouts"]
+            keys = header.get("keys")
         elif "meta_json" in names and "n_segments" in names:      # analysis.common layout
-            metas = json.loads(str(z["meta_json"])); keys = None
+            metas = json.loads(str(z["meta_json"]))
+            keys = None
             if len(metas) != int(z["n_segments"]):
                 raise ValueError(f"{path}: meta_json/n_segments mismatch")
         else:
@@ -295,7 +306,7 @@ def load_rollouts(path, as_dict: bool = False):
                     for k in range(nw)]
             out.append(WindowRollout(meta=_meta_from_json(meta), windows=wins))
     if as_dict and keys is not None:
-        return dict(zip(keys, out))
+        return dict(zip(keys, out, strict=True))
     return out
 
 

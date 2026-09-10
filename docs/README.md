@@ -19,7 +19,7 @@ Proveniência de cada número do projeto: `results/CHANGELOG.md`.
 | `refactor_notes/core.md` | núcleo do harness: `units/config/geometry/kinematics`, `eval/` dividido (metrics/stats/verdict/report), `rollout` com cache `.npz`, CLI; caveats (CIs do bootstrap mudam nos últimos dígitos; grade de janelas ancorada no θ oficial). |
 | `refactor_notes/analysis.md` | os 21 scripts do artigo migrados para `dtssl.analysis` (`run(root, out)` + `main()`), cabeçalho de proveniência, `dtssl analysis`/`dtssl fig`, `tools/make_release.py`. |
 | `refactor_notes/etl.md` | ETL dos logs `.log.gz` → parquet (`recordio`, `_proto`, `extract`, `rotate`, `dtssl etl`), substituindo `python/` e os notebooks. |
-| `refactor_notes/bridge.md` | `TwinWorld` (bola 2 fases, colisões, dribbler, watchdog), servidor ssl-simulation-protocol (visão/controle/simcontrol), `fake_strategy`, `recorder`, protos versionados; **como rodar contra o ssl-unification e rede no WSL2**. |
+| `refactor_notes/bridge.md` | `TwinWorld` (bola 2 fases, colisões, dribbler, watchdog), servidor ssl-simulation-protocol (visão/controle/simcontrol), `fake_strategy`, `recorder`, protos versionados; **como rodar contra o ssl-unification e rede no WSL2**; replay via protocolo (`ProtocolPlant`: grSim/ER-Force no harness, C2b). |
 | `refactor_notes/physics.md` | backend MuJoCo: builder MJCF (rota a: FOPDT dirige o ego; rota b: rodas + roletes), `MuJoCoWorld`, `dtssl mjcf`, testes. |
 | `refactor_notes/matlab_docs.md` | MATLAB (`matlab/dtssl` vivo × `matlab/legacy` arquivado, `bootstrap_paths` sem `cd`, `export_plant_golden` com θ), `legacy/`, manifesto de moves/deletes do PC, `.gitignore`/`.gitattributes`, `tools/ssl_unification/`, docs — com a entrada proposta para o CHANGELOG. |
 
@@ -69,4 +69,4 @@ Proveniência de cada número do projeto: `results/CHANGELOG.md`.
 `qc_rotate_*`, `reidentificacao_20260724.md`, gates e ablações de 08/2026), `slr/protocolo_slr.md`
 (+ `CANDIDATOS_CITACAO.md`, `EXTRACAO_CITAVEIS.md`), `paper/outline_artigo.md` (outline IMRaD de junho),
 `latex/` (artigo; bibliografia única `latex/refs/references.bib`), `matlab/legacy/README.md`,
-`legacy/README.md`, `tools/ssl_unification/README.md`, `tools/apply_refactor_manifest.json`.
+`legacy/README.md`, `tools/ssl_unification/README.md`, `tools/external_sims/README.md` (grSim/ER-Force no WSL2 e o experimento C2b), `tools/apply_refactor_manifest.json`.

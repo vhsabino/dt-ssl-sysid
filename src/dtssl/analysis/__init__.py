@@ -3,7 +3,8 @@
 Every module exposes ``run(root: Path | None = None, out: Path | None = None, **kwargs)
 -> dict`` (``dict["path"]`` = main artefact) and an argparse ``main(argv=None)``;
 ``NAME``, ``KIND`` (``analysis`` | ``fig`` | ``report``), ``CLAIM`` (the paper
-claim it supports) and ``REQUIRES`` (``data``, ``rsim_cache``, ``rsim``, ``mat``, ``mujoco``).
+claim it supports) and ``REQUIRES`` (``data``, ``rsim_cache``, ``rsim``, ``mat``, ``mujoco``,
+``net`` = an external simulator must be listening on the ssl-simulation-protocol ports).
 Modules that need ``robosim`` import it lazily inside ``run`` so that the whole
 registry imports on any machine. Shared helpers live in ``dtssl.analysis.common``.
 
@@ -30,6 +31,7 @@ claim" table, results/CHANGELOG.md, docs/PLANO_V2_EXECUTADO.md, docs/PLANO_V3_EX
 | backends_holdout | twin vs MuJoCo routes a/b vs ideal on the hold-out (2026-09) | new |
 | identifiability_insilico | C1: in-silico identifiability, regime x noise x deadzone, known theta (2026-09) | new |
 | closed_loop_stats | C4: closed-loop session of the real strategy on the twin vs competition logs, P1-P5 (2026-09) | new |
+| protocol_holdout | C2b: league simulators (grSim, ER-Force) replayed through the ssl-simulation-protocol on the hold-out (2026-09) | new |
 | regenerate_bin_distribution | bin distribution with the CAD radius (D9) | scripts/regenerate_bin_distribution.py |
 | holdout_report | honest hold-out report, twin vs rSim (needs robosim) | phase0_replay/holdout_report.py |
 | loader_report | loader sanity + duration distribution (H_max) | phase0_replay/report.py |
@@ -80,6 +82,7 @@ _ALL: dict[str, str] = {
     "session_report": "dtssl.analysis.session_report",
     "identifiability_insilico": "dtssl.analysis.identifiability_insilico",
     "closed_loop_stats": "dtssl.analysis.closed_loop_stats",
+    "protocol_holdout": "dtssl.analysis.protocol_holdout",
     # reports
     "metrics_report": "dtssl.analysis.metrics_report",
     "holdout_report": "dtssl.analysis.holdout_report",

@@ -37,6 +37,11 @@ def requirements_missing(requires: Sequence[str]) -> list[str]:
             missing.append("mat (pip install dtssl[mat])")
         elif r == "mujoco" and importlib.util.find_spec("mujoco") is None:
             missing.append("mujoco (pip install dtssl[mujoco])")
+        elif r == "net":
+            # an external simulator listening on the ssl-simulation-protocol ports; only the
+            # module itself can tell (ProtocolPlant.open() probes the vision stream and fails
+            # with a clear message), so it is never reported as missing here
+            continue
         elif r == "rsim_cache":
             try:
                 res = repo_root() / "results"

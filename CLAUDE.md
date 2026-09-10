@@ -25,14 +25,14 @@ número: `results/CHANGELOG.md`. Índice de documentos: `docs/README.md`.*
 
 | Caminho | Papel |
 |---|---|
-| `src/dtssl/` | pacote Python instalável (src-layout): `paths, config, units, geometry, kinematics, cli`; `data/` (schema, resample, loader, validate, splits, recordio, extract, rotate); `models/` (θ, `Plant`, `AnalyticFOPDTPlant` — porte bit-a-bit de `deadreckoning_p1d.m`, `IdealKinematicPlant`, `RSimReplay`); `sim/` (`TwinWorld`, bola, colisões, rollout, `backends`: `fopdt`/`ideal`/`mujoco-velocity`/`mujoco-rollers`); `eval/` (métrica por janela multi-horizonte, stats, veredito, relatório); `analysis/` (1 módulo por número/figura do artigo); `bridge/` (servidor ssl-simulation-protocol, fake_strategy, recorder, protos versionados); `gui/`; `physics/` (MJCF + MuJoCoWorld) |
+| `src/dtssl/` | pacote Python instalável (src-layout): `paths, config, units, geometry, kinematics, cli`; `data/` (schema, resample, loader, validate, splits, recordio, extract, rotate); `models/` (θ, `Plant`, `AnalyticFOPDTPlant` — porte bit-a-bit de `deadreckoning_p1d.m`, `IdealKinematicPlant`, `RSimReplay`); `sim/` (`TwinWorld`, bola, colisões, rollout, `backends`: `fopdt`/`ideal`/`mujoco-velocity`/`mujoco-rollers`; `world_plant`/`protocol_plant`: qualquer backend ou simulador externo via ssl-simulation-protocol como `Plant` do harness); `eval/` (métrica por janela multi-horizonte, stats, veredito, relatório); `analysis/` (1 módulo por número/figura do artigo); `bridge/` (servidor ssl-simulation-protocol, fake_strategy, recorder, protos versionados); `gui/`; `physics/` (MJCF + MuJoCoWorld) |
 | CLI `dtssl` | `info · replay · gate · cache-convert · analysis · fig · etl · serve · fake-strategy · proto-build · mjcf · gui · release` |
-| `config/` | `twin_params.json` (θ), `metrics.json`, `holdout_events.json`, `robot_geometry.json`, `robot_limits.json`, `field_divB.json`, `bridge.json`, `ssl_robot.sldd` |
+| `config/` | `twin_params.json` (θ), `metrics.json`, `holdout_events.json`, `robot_geometry.json`, `robot_limits.json`, `field_divB.json`, `bridge.json`, `external_sims.json` (endpoints grSim/ER-Force), `ssl_robot.sldd` |
 | `matlab/` | `bootstrap_paths.m` (sem `cd`); `dtssl/` VIVO (identificação, gate SE(2), `deadreckoning_p1d`, métricas, goldens, cadeia do oráculo Simulink); `sldd/`; `simulink_io/`; `legacy/` (arquivado, README por grupo) |
 | `simulink/parameter_estimation_model_pid_v3.slx` | único oráculo Simulink mantido (~9,5 s/sim) |
 | `tests/` | pytest; marcadores `requires_data / requires_mujoco / requires_gui / requires_net / requires_rsim`; goldens em `tests/fixtures/` (θ do golden em `plant_golden_theta.json`, **não** o θ oficial) |
 | `data/` (DVC) · `models/` (.mat) · `results/` (artefatos + CHANGELOG) · `docs/` · `latex/` · `slr/` · `notebooks/` | dados, modelos, resultados, documentação, artigo |
-| `tools/` | `make_release.py` (pacote anonimizado → `dist/`), `ssl_unification/` (build WSL2 + `config/local`), `apply_refactor_manifest.json` |
+| `tools/` | `make_release.py` (pacote anonimizado → `dist/`), `ssl_unification/` (build WSL2 + `config/local`), `external_sims/` (grSim/ER-Force no WSL2 + experimento C2b), `apply_refactor_manifest.json` |
 | `legacy/` | `archive/` (RL TD3 de maio, viewers, testes) e `apresentacao/` — fora do pacote |
 | `phase0_replay/` | shim de compatibilidade (reexporta `dtssl`); remover em v2 |
 

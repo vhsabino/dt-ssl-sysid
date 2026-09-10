@@ -3,7 +3,7 @@
 Built-in subcommands (core dependencies only):
 
     dtssl info                                   version, repo root, dataset, backends, extras
-    dtssl replay <label> <event> [--theta P] [--plant fopdt|ideal|mujoco-velocity|mujoco-rollers[-delay]] [--out DIR]
+    dtssl replay <label> <event> [--theta P] [--plant fopdt|ideal|mujoco-velocity|mujoco-rollers[-delay]|proto:<sim>[+delay]] [--out DIR]
     dtssl gate twin-vs-ideal [--stride S] [--h-max H]      hold-out gate (SE(2) multi-horizon)
     dtssl gate twin-vs-rsim  [--mode A|B] ...              (needs robosim)
     dtssl cache-convert <pkl> <npz>              legacy pickle rollout cache -> .npz
@@ -83,7 +83,8 @@ def build_parser(with_optional: bool = True) -> tuple[argparse.ArgumentParser, d
     p.add_argument("event", help="event id, e.g. side_to_side_01_05")
     p.add_argument("--theta", type=Path, default=None, help="theta JSON (default config/twin_params.json)")
     p.add_argument("--plant", default="fopdt",
-                   help="fopdt | ideal | mujoco-velocity | mujoco-rollers | mujoco-rollers-delay | world:<backend>")
+                   help="fopdt | ideal | mujoco-velocity | mujoco-rollers | mujoco-rollers-delay | world:<backend> | "
+                        "proto:<sim>[+delay] (external simulator of config/external_sims.json, real time)")
     p.add_argument("--dataset", default=None, help="dataset id under data/extracted (default: canonical)")
     p.add_argument("--h-max", type=int, default=None, help="rollout horizon in samples (default 90)")
     p.add_argument("--stride", type=int, default=None, help="window stride in samples (default 15)")
@@ -195,8 +196,9 @@ def cmd_replay(args) -> int:
     H = np.asarray(horizons, int)
     if ro.n_total:
         E = np.array([_window_errors(w, H) for w in ro.windows])       # (nw, 2, nh)
-        epos_med, epos_p90 = np.median(E[:, 0], 0), np.percentile(E[:, 0], 90, axis=0)
-        eang_med = np.median(E[:, 1], 0)
+        with np.errstate(all="ignore"):                                # proto: plants: lost windows are NaN
+            epos_med, epos_p90 = np.nanmedian(E[:, 0], 0), np.nanpercentile(E[:, 0], 90, axis=0)
+            eang_med = np.nanmedian(E[:, 1], 0)
     else:
         epos_med = epos_p90 = eang_med = np.full(H.size, np.nan)
 
@@ -245,7 +247,9 @@ def _gate_twin_vs_ideal_minimal(stride: int | None, h_max: int | None, out: Path
     twin_ros = [rollout_segment(s, twin, **kw) for s in segs]
     def_ros = [rollout_segment(s, ideal, **kw) for s in segs]
     result = evaluate(twin_ros, def_ros, params=params, mcfg=mcfg)
-    print("=" * 70); print(format_bin_distribution(result["table"])); print("=" * 70)
+    print("=" * 70)
+    print(format_bin_distribution(result["table"]))
+    print("=" * 70)
     print("\nVereditos por bin:")
     for b in BIN_ORDER:
         v = result["verdicts"][b]
