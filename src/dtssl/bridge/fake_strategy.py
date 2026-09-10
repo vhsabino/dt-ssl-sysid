@@ -140,7 +140,7 @@ class FakeStrategy:
         s.settimeout(self.recv_timeout if timeout is None else timeout)
         try:
             data, _ = s.recvfrom(65535)
-        except TimeoutError:
+        except (TimeoutError, ConnectionResetError):     # the reset is Windows' ICMP port unreachable, harmless
             return None
         pkt = SSL_WrapperPacket()
         try:
@@ -214,7 +214,7 @@ class FakeStrategy:
         self.control_sock.settimeout(self.recv_timeout if timeout is None else timeout)
         try:
             data, _ = self.control_sock.recvfrom(65535)
-        except TimeoutError:
+        except (TimeoutError, ConnectionResetError):
             return None
         resp = RobotControlResponse()
         try:

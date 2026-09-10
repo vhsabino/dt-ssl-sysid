@@ -250,3 +250,81 @@ def test_threaded_receivers_are_thread_safe_under_load():
     finally:
         srv.stop()
         fs.close()
+
+
+class _ResettingSocket:
+    """Wraps a UDP socket so that the first ``n`` ``recvfrom`` calls raise ``ConnectionResetError`` -- what Windows
+    does (WSAECONNRESET) after a reply was sent to a client port that has since gone away."""
+
+    def __init__(self, sock: socket.socket, n: int = 3):
+        self._sock = sock
+        self.left = n
+
+    def recvfrom(self, bufsize: int):
+        if self.left > 0:
+            self.left -= 1
+            raise ConnectionResetError(10054, "WSAECONNRESET")
+        return self._sock.recvfrom(bufsize)
+
+    def __getattr__(self, name):
+        return getattr(self._sock, name)
+
+
+def test_control_and_simcontrol_survive_windows_connection_resets():
+    """A ConnectionResetError on recvfrom must not kill the receive threads (it used to ``break`` out of the loop,
+    leaving ``dtssl serve`` deaf to every later command)."""
+    world = make_world("fopdt", n_blue=1, n_yellow=0, watchdog_clock="sim")
+    cfg = BridgeConfig.load().with_overrides(vision_ip="127.0.0.1", vision_port=0, blue_port=0, yellow_port=0,
+                                             simcontrol_port=0, bind_ip="127.0.0.1")
+    srv = SimServer(world, cfg, step_mode=True, threaded_receivers=False)
+    srv.start()
+    try:
+        srv.control.socks["blue"] = _ResettingSocket(srv.control.socks["blue"], n=3)
+        srv.simcontrol.sock = _ResettingSocket(srv.simcontrol.sock, n=2)
+        # no receiver threads: tick() -> poll() drains the sockets through the wrappers
+        tx = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        rc = P.RobotControl()
+        c = rc.robot_commands.add()
+        c.id = 0
+        lv = c.move_command.local_velocity
+        lv.forward, lv.left, lv.angular = 0.7, 0.0, 0.0
+        for _ in range(6):
+            tx.sendto(rc.SerializeToString(), ("127.0.0.1", srv.control.port("blue")))
+            time.sleep(0.02)
+        sc = P.SimulatorCommand()
+        tr = sc.control.teleport_robot.add()
+        tr.id.id, tr.id.team = 0, P.TEAM_ENUM["blue"]
+        tr.x, tr.y, tr.orientation = 1.5, -0.5, 0.3
+        for _ in range(4):
+            tx.sendto(sc.SerializeToString(), ("127.0.0.1", srv.simcontrol.port))
+            time.sleep(0.02)
+        for _ in range(5):
+            srv.tick()
+            time.sleep(0.01)
+        st = srv.control.stats.of("blue")
+        assert st.resets == 3 and st.commands >= 1, vars(st)
+        assert srv.simcontrol.resets == 2 and srv.simcontrol.teleports_robot >= 1, srv.simcontrol.stats
+        ws = world.state()
+        r = ws.robots[("blue", 0)]
+        assert math.hypot(r.x - 1.5, r.y + 0.5) < 0.2
+        tx.close()
+    finally:
+        srv.stop()
+    # threaded receivers: the loop must keep running after the resets
+    world = make_world("fopdt", n_blue=1, n_yellow=0, watchdog_clock="sim")
+    srv = SimServer(world, cfg, step_mode=True, threaded_receivers=True)
+    srv.control.start(threaded=False)                      # sockets first, then wrap, then the threads
+    srv.control.socks["blue"] = _ResettingSocket(srv.control.socks["blue"], n=2)
+    t = threading.Thread(target=srv.control._loop, args=("blue",), daemon=True)
+    t.start()
+    try:
+        tx = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        for _ in range(4):
+            tx.sendto(rc.SerializeToString(), ("127.0.0.1", srv.control.port("blue")))
+            time.sleep(0.02)
+        assert _wait(lambda: srv.control.stats.of("blue").commands >= 2)
+        assert srv.control.stats.of("blue").resets == 2 and t.is_alive()
+        tx.close()
+    finally:
+        srv.control.stop()
+        t.join(timeout=1.0)

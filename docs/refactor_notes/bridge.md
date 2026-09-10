@@ -51,6 +51,18 @@ foi tocado; `sim/entities.py`, `sim/world.py` e `sim/backends.py` foram usados *
 - **Watchdog** com relógio de parede (`time.monotonic`) por default; `watchdog_clock="sim"` nos testes/modo passo determinístico.
 - **Robô ausente do mundo**: comandos para ids não instanciados são ignorados (`--n-blue/--n-yellow` ou `TeleportRobot{present=true}` para adicionar).
 
+## Correção 10/09/2026: `recvfrom` com `ConnectionResetError` no Windows
+
+No Windows, um socket UDP que **enviou** um datagrama a uma porta que deixou de existir (cliente fechou) recebe
+um ICMP "port unreachable" e o próximo `recvfrom` levanta `ConnectionResetError` (WSAECONNRESET). Os loops de
+recepção do controle e do simcontrol faziam `except OSError: break` — a thread morria em silêncio e o `dtssl
+serve` ficava **surdo** para todos os comandos seguintes daquele time (o robô só respondia a teleportes).
+Encontrado pelo replay via protocolo em processo no PC (a partir da 3.ª instância de `ProtocolPlant`, os
+comandos deixavam de chegar). Agora `ConnectionResetError` é contado (`ControlStats.resets`,
+`SimControlServer.resets`) e ignorado; outro `OSError` só encerra o loop quando o servidor está parando.
+Mesmo tratamento em `VisionReceiver` e `FakeStrategy`. Teste: `tests/test_bridge_net.py::
+test_control_and_simcontrol_survive_windows_connection_resets` (socket embrulhado que levanta o erro n vezes).
+
 ## Limitações conhecidas
 
 - Sem `by_force` (tratado como teleporte direto), sem `teleport_safely`, sem `SimulatorConfig.geometry/robot_specs/realism` (respondidos como `UNSUPPORTED`), sem modo síncrono (`SimulationSyncRequest` — mensagens geradas, servidor não).

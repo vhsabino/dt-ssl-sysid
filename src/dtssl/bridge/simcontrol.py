@@ -47,6 +47,7 @@ class SimControlServer:
         self.running = False
         self.packets = 0
         self.parse_errors = 0
+        self.resets = 0                     # ConnectionResetError on recvfrom (Windows ICMP port unreachable), ignored
         self.teleports_ball = 0
         self.teleports_robot = 0
         self.speed_changes = 0
@@ -94,8 +95,17 @@ class SimControlServer:
                 data, addr = sock.recvfrom(65535)
             except TimeoutError:
                 continue
+            except ConnectionResetError:
+                # Windows (WSAECONNRESET): ICMP "port unreachable" from a client that went away after we replied;
+                # the socket is fine (a break would leave the simulator deaf to every later SimulatorCommand)
+                self.resets += 1
+                continue
             except OSError:
-                break
+                if self._stop.is_set():
+                    break
+                log.warning("simcontrol: recvfrom failed; retrying", exc_info=True)
+                time.sleep(0.01)
+                continue
             self._process(data, addr, sock)
 
     def poll(self, max_packets: int = 64) -> int:
@@ -108,6 +118,9 @@ class SimControlServer:
             for _ in range(max_packets):
                 try:
                     data, addr = sock.recvfrom(65535)
+                except ConnectionResetError:              # Windows, see _loop
+                    self.resets += 1
+                    continue
                 except (BlockingIOError, InterruptedError, OSError):
                     break
                 self._process(data, addr, sock)
@@ -219,7 +232,7 @@ class SimControlServer:
 
     @property
     def stats(self) -> dict:
-        return {"port": self.port, "packets": self.packets, "parse_errors": self.parse_errors,
+        return {"port": self.port, "packets": self.packets, "parse_errors": self.parse_errors, "resets": self.resets,
                 "teleports_ball": self.teleports_ball, "teleports_robot": self.teleports_robot,
                 "speed_changes": self.speed_changes, "last_addr": self.last_addr}
 

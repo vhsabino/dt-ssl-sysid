@@ -96,6 +96,7 @@ class TeamPortStats:
     responses: int = 0
     parse_errors: int = 0
     invalid_ids: int = 0
+    resets: int = 0                     # ConnectionResetError on recvfrom (Windows ICMP port unreachable), ignored
     last_addr: tuple[str, int] | None = None
     last_recv: float = 0.0
     port: int = 0
@@ -176,8 +177,17 @@ class ControlServer:
                 data, addr = sock.recvfrom(65535)
             except TimeoutError:
                 continue
+            except ConnectionResetError:
+                # Windows (WSAECONNRESET): an ICMP "port unreachable" from a client whose port went away after we
+                # answered it; the socket itself is fine -- a break here would silently deafen the server
+                self.stats.of(team).resets += 1
+                continue
             except OSError:
-                break
+                if self._stop.is_set():
+                    break
+                log.warning("control %s: recvfrom failed; retrying", team, exc_info=True)
+                time.sleep(0.01)
+                continue
             self._process(team, data, addr, sock)
 
     def poll(self, max_packets: int = 64) -> int:
@@ -191,6 +201,9 @@ class ControlServer:
                         data, addr = sock.recvfrom(65535)
                     except (BlockingIOError, InterruptedError):
                         break
+                    except ConnectionResetError:          # Windows, see _loop
+                        self.stats.of(team).resets += 1
+                        continue
                     except OSError:
                         break
                     self._process(team, data, addr, sock)

@@ -223,6 +223,8 @@ class VisionReceiver(threading.Thread):
                 data, _ = self.sock.recvfrom(65535)
             except TimeoutError:
                 continue
+            except ConnectionResetError:          # Windows ICMP port unreachable: the socket is still usable
+                continue
             except OSError:
                 break
             t_recv = _clock()
