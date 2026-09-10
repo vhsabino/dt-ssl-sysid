@@ -30,6 +30,7 @@ ports, so run one simulator at a time and merge the caches offline (``from_cache
 
     dtssl analysis run protocol_holdout --kw sims=grsim [delay=both|none|theta] [repeat=1]
     dtssl analysis run protocol_holdout --kw sims=erforce
+    dtssl analysis run protocol_holdout --kw sims=grsim max_events=1 delay=none   # 1-minute smoke test, not a result
     dtssl analysis run protocol_holdout --kw from_cache=results/_cache_protocol_grsim_*.npz,results/_cache_protocol_erforce_*.npz
 
 Output: ``results/protocol_holdout_<stamp>.md`` (+ ``.csv``, ``.json``) and the rollouts of every variant in
@@ -174,11 +175,13 @@ def _attach_repeat(runs: list[dict], repeat: int) -> dict:
 
 
 def compute(ctx: C.Ctx, sims=DEFAULT_SIMS, delay: str = "both", repeat: int = 1, h_ref: int | None = None,
-            save_cache: bool = True, endpoints_path: str | Path | None = None) -> dict:
+            save_cache: bool = True, endpoints_path: str | Path | None = None, max_events: int | None = None) -> dict:
     from dtssl.sim.protocol_plant import ProtocolPlant, load_endpoint
     from dtssl.sim.rollout import save_rollouts
 
     segs, dropped = ctx.holdout()
+    if max_events is not None:                       # smoke test of the pipeline, never a result
+        segs = list(segs)[:int(max_events)]
     P, H = ctx.params, ctx.horizons
     h_ref = int(ctx.mcfg["verdict"]["h_ref"] if h_ref is None else h_ref)
     kref = H.index(h_ref)
@@ -215,10 +218,13 @@ def compute(ctx: C.Ctx, sims=DEFAULT_SIMS, delay: str = "both", repeat: int = 1,
             runs.append(summ)
         models[label] = _attach_repeat(runs, int(repeat))
         order.append(label)
-    return _finish(ctx, tw, tw0, H, kref, segs, dropped, models, order, cost, caches, delay, repeat)
+    r = _finish(ctx, tw, tw0, H, kref, segs, dropped, models, order, cost, caches, delay, repeat)
+    if max_events is not None:
+        r["smoke"] = int(max_events)
+    return r
 
 
-def compute_from_caches(ctx: C.Ctx, paths, h_ref: int | None = None) -> dict:
+def compute_from_caches(ctx: C.Ctx, paths, h_ref: int | None = None, max_events: int | None = None) -> dict:
     """Re-analyse saved protocol rollouts (no simulator needed); variants and repeats from the file names."""
     from dtssl.sim.rollout import load_rollouts
 
@@ -233,6 +239,8 @@ def compute_from_caches(ctx: C.Ctx, paths, h_ref: int | None = None) -> dict:
         label, _, rep = parse_cache_name(f)
         groups.setdefault(label, []).append((rep, f))
     segs, dropped = ctx.holdout()
+    if max_events is not None:
+        segs = list(segs)[:int(max_events)]
     P, H = ctx.params, ctx.horizons
     h_ref = int(ctx.mcfg["verdict"]["h_ref"] if h_ref is None else h_ref)
     kref = H.index(h_ref)
@@ -262,8 +270,11 @@ def compute_from_caches(ctx: C.Ctx, paths, h_ref: int | None = None) -> dict:
         order.append(label)
     delay = "both" if any("+delay" in n for n in order) and any("+delay" not in n for n in order) else (
         "theta" if all("+delay" in n for n in order) else "none")
-    return _finish(ctx, tw, tw0, H, kref, segs, dropped, models, order, cost, caches, delay,
-                   max(len(v) for v in groups.values()))
+    r = _finish(ctx, tw, tw0, H, kref, segs, dropped, models, order, cost, caches, delay,
+                max(len(v) for v in groups.values()))
+    if max_events is not None:
+        r["smoke"] = int(max_events)
+    return r
 
 
 def instrument_validity(M: dict) -> tuple[bool, str]:
@@ -296,6 +307,8 @@ def render(ctx: C.Ctx, r: dict) -> list[str]:
     L = C.result_header("Simuladores da liga no hold-out via ssl-simulation-protocol: gemeo x grSim / ER-Force", ctx,
                         generator=f"dtssl.analysis.{NAME}",
                         extra="mesmas janelas do theta oficial, stride 15, H_max 90; replay em tempo real via protocolo")
+    if r.get("smoke"):
+        L += [f"**TESTE DE FUMACA: so os primeiros {r['smoke']} evento(s) do hold-out (max_events); NAO e um resultado.**", ""]
     zero = r.get("twin_v0zero", {}).get("rows")
     L += [f"Hold-out: {r['n_events']} eventos ({', '.join(r['events'])}); {r['n_windows']} janelas; "
           f"h_ref = {r['h_ref']} amostras = {r['h_ref_s']:.2f} s. Variantes: {', '.join(r['order'])} "
@@ -381,17 +394,18 @@ def render(ctx: C.Ctx, r: dict) -> list[str]:
 
 def run(root: Path | None = None, out: Path | None = None, *, sims: str = ",".join(DEFAULT_SIMS),
         delay: str = "both", repeat: int = 1, h_ref: int | None = None, save_cache: bool = True,
-        endpoints: str | None = None, from_cache: str | None = None, quiet: bool = False, **kw) -> dict:
+        endpoints: str | None = None, from_cache: str | None = None, max_events: int | None = None,
+        quiet: bool = False, **kw) -> dict:
     if delay not in ("both", "none", "theta"):
         raise ValueError("delay must be both | none | theta")
     ctx = C.make_context(root, out)
     if from_cache:
         paths = [p.strip() for p in str(from_cache).split(",") if p.strip()]
-        r = compute_from_caches(ctx, paths, h_ref=h_ref)
+        r = compute_from_caches(ctx, paths, h_ref=h_ref, max_events=max_events)
     else:
         names = [s.strip() for s in str(sims).split(",") if s.strip()]
         r = compute(ctx, names, delay=delay, repeat=int(repeat), h_ref=h_ref, save_cache=bool(save_cache),
-                    endpoints_path=endpoints)
+                    endpoints_path=endpoints, max_events=max_events)
     r["validity"] = {n: instrument_validity(M)[0] for n, M in r["models"].items()}
     L = render(ctx, r)
     p = ctx.write_text(NAME, L)

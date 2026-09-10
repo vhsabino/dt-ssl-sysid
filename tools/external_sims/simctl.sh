@@ -8,7 +8,7 @@
 #   tools/external_sims/run_erforce.sh start
 #
 # Opções (depois do comando):
-#   --bin PATH        binário (default: ~/grsim/build/bin/grSim | ~/erforce/build/bin/simulator-cli, ou o que
+#   --bin PATH        binário (default: ~/grsim/bin/grSim | ~/erforce/build/bin/simulator-cli, ou o que
 #                     install_*_wsl.sh imprimiu)
 #   --args "..."      argumentos extras para o simulador (grSim default: "--headless -platform offscreen";
 #                     ER-Force default: "-g 2020B --realism None")
@@ -37,7 +37,7 @@ die()  { printf '\033[1;31m[simctl %s] ERRO:\033[0m %s\n' "$SIM" "$*" >&2; exit 
 
 case "$SIM" in
   grsim)
-    DEFAULT_BIN="$HOME/grsim/build/bin/grSim"
+    DEFAULT_BIN="$HOME/grsim/bin/grSim"
     DEFAULT_ARGS="--headless -platform offscreen"
     ;;
   erforce)
@@ -52,7 +52,13 @@ STATE="$HOME/external_sims"; mkdir -p "$STATE"
 PIDF="$STATE/$SIM.pid"; LOGF="$STATE/$SIM.log"
 
 alive() { [[ -f "$PIDF" ]] && kill -0 "$(cat "$PIDF")" 2>/dev/null; }
-port_open() { ss -lun 2>/dev/null | grep -qE "[:.]$1[[:space:]]"; }
+port_open() {              # UDP port bound? (ss when available, else /proc/net/udp{,6} with the port in hex)
+  if command -v ss >/dev/null 2>&1; then ss -lun 2>/dev/null | grep -qE "[:.]$1[[:space:]]"
+  else grep -qiE ":$(printf '%04X' "$1") " /proc/net/udp /proc/net/udp6 2>/dev/null; fi
+}
+open_ports() {             # the league ports currently bound, for the status line
+  for p in 10020 10300 10301 10302; do port_open "$p" && printf '%s ' "$p"; done
+}
 
 case "$CMD" in
   start)
@@ -69,7 +75,7 @@ case "$CMD" in
       sleep 0.5
     done
     port_open 10300 || { tail -20 "$LOGF"; die "porta 10300 não abriu em ${TIMEOUT}s (veja $LOGF)"; }
-    log "pronto: pid $(cat "$PIDF"); portas $(ss -lun | grep -oE '[:.]10(020|30[0-2])[[:space:]]' | tr -d ' :.' | sort -u | tr '\n' ' ')"
+    log "pronto: pid $(cat "$PIDF"); portas UDP abertas: $(open_ports)"
     ;;
   stop)
     if alive; then
@@ -83,8 +89,7 @@ case "$CMD" in
     rm -f "$PIDF"
     ;;
   status)
-    if alive; then log "rodando (pid $(cat "$PIDF")); portas abertas: $(ss -lun | grep -oE '[:.]10(020|30[0-2])[[:space:]]' | tr -d ' :.' | sort -u | tr '\n' ' ')";
-    else log "parado"; fi
+    if alive; then log "rodando (pid $(cat "$PIDF")); portas UDP abertas: $(open_ports)"; else log "parado"; fi
     ;;
   log)
     tail -n 50 "$LOGF" 2>/dev/null || log "sem log em $LOGF"

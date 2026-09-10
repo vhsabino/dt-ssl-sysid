@@ -12,7 +12,7 @@
     "port_blue": 10301, "port_yellow": 10302, "port_simcontrol": 10300,
     "vision_ip": "224.5.23.2", "vision_port": 10020, "multicast_if": "0.0.0.0",
     "team": "blue", "robot_id": 0, "vision_rate": null, "n_robots_per_team": 11,
-    "notes": "grSim >= 2021 (ssl-simulation-protocol), `grSim --headless -platform offscreen`; ODE at 60 Hz, vision 60 Hz, noise/vanishing off (defaults). TeleportRobot (sslworld.cpp processTeleportRobot) resets the robot and turns v_x/v_y/v_angular into wheel-motor setpoints under its acceleration limits: every window starts from rest (the initial velocity of the harness is not honoured)."
+    "notes": "grSim >= 2021 (ssl-simulation-protocol), `grSim --headless -platform offscreen`; ODE at 60 Hz, vision 60 Hz, noise/vanishing off (defaults); robot profile = config/Parsian.ini (default: R 0.09 m, wheel r 0.027 m, a_max 4 m/s^2, v_max 5 m/s). TeleportRobot (sslworld.cpp processTeleportRobot) resets the robot and turns v_x/v_y/v_angular into wheel-motor setpoints under its acceleration limits: every window starts from rest (the initial velocity of the harness is not honoured)."
   },
   "erforce": {
     "host": "127.0.0.1",

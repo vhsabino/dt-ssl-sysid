@@ -56,8 +56,19 @@ PKGS=(git build-essential cmake pkg-config qt6-base-dev libqt6opengl6-dev libgl1
       libprotobuf-dev protobuf-compiler libssl-dev)
 if [[ $NO_DEPS -eq 0 ]]; then
   log "etapa 1/3: apt-get install (sudo): ${PKGS[*]}"
-  sudo apt-get update -qq
-  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "${PKGS[@]}"
+  sudo apt-get update -qq || warn "apt-get update terminou com erros (repositório de terceiros fora do ar?) — seguindo com os índices existentes"
+  # pacotes que não existem nesta versão do Ubuntu são pulados com aviso (ex.: libqt6opengl6-dev foi absorvido
+  # pelo qt6-base-dev no 26.04)
+  AVAIL=()
+  for p in "${PKGS[@]}"; do
+    pol="$(apt-cache policy "$p" 2>/dev/null || true)"
+    if [[ -z "$pol" ]] || grep -q 'Candidate: (none)' <<<"$pol" || ! grep -q 'Candidate:' <<<"$pol"; then
+      warn "pacote $p não existe neste Ubuntu — pulado"
+    else
+      AVAIL+=("$p")
+    fi
+  done
+  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "${AVAIL[@]}"
 else
   log "etapa 1/3: pulada (--no-deps)"
 fi
@@ -79,11 +90,15 @@ if [[ $CLEAN -eq 1 && -d "$BUILD" ]]; then rm -rf "$BUILD"; fi
 # CMake >= 4.0 (Ubuntu 26.04) recusa projetos com cmake_minimum_required < 3.5 (o Bullet 2.83 externo, p.ex.);
 # a variável de ambiente abaixo é a válvula oficial e vale também para os ExternalProject filhos.
 export CMAKE_POLICY_VERSION_MINIMUM="${CMAKE_POLICY_VERSION_MINIMUM:-3.5}"
-log "etapa 3/3: cmake -S $DIR -B $BUILD (Release, DOWNLOAD_V8=OFF) + build simulator-cli -j$JOBS (baixa Bullet/Eigen)"
-cmake -S "$DIR" -B "$BUILD" -DCMAKE_BUILD_TYPE=Release -DDOWNLOAD_V8=OFF -DBUILD_FIRMWARE=OFF >"$BUILD.cmake.log" 2>&1 \
-  || { tail -40 "$BUILD.cmake.log"; die "cmake falhou (log: $BUILD.cmake.log)"; }
-cmake --build "$BUILD" --target simulator-cli -j"$JOBS" >"$BUILD.build.log" 2>&1 \
-  || { tail -60 "$BUILD.build.log"; die "build falhou (log: $BUILD.build.log)"; }
+if [[ -x "$BUILD/bin/simulator-cli" && $CLEAN -eq 0 && $UPDATE -eq 0 ]]; then
+  log "etapa 3/3: $BUILD/bin/simulator-cli já existe — build pulado (use --clean para recompilar do zero)"
+else
+  log "etapa 3/3: cmake -S $DIR -B $BUILD (Release, DOWNLOAD_V8=OFF) + build simulator-cli -j$JOBS (baixa Bullet/Eigen)"
+  cmake -S "$DIR" -B "$BUILD" -DCMAKE_BUILD_TYPE=Release -DDOWNLOAD_V8=OFF -DBUILD_FIRMWARE=OFF >"$BUILD.cmake.log" 2>&1 \
+    || { tail -40 "$BUILD.cmake.log"; die "cmake falhou (log: $BUILD.cmake.log; um build anterior incompleto? tente --clean)"; }
+  cmake --build "$BUILD" --target simulator-cli -j"$JOBS" >"$BUILD.build.log" 2>&1 \
+    || { tail -60 "$BUILD.build.log"; die "build falhou (log: $BUILD.build.log)"; }
+fi
 
 BIN=""
 for cand in "$BUILD/bin/simulator-cli" "$BUILD/src/simulator/simulator-cli" "$(find "$BUILD" -name simulator-cli -type f -perm -u+x 2>/dev/null | head -1)"; do

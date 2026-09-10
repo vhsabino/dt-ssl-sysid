@@ -56,8 +56,19 @@ PKGS=(git build-essential cmake pkg-config qtbase5-dev libqt5opengl5-dev libgl1-
       libprotobuf-dev protobuf-compiler libode-dev libboost-dev)
 if [[ $NO_DEPS -eq 0 ]]; then
   log "etapa 1/4: apt-get install (sudo): ${PKGS[*]}"
-  sudo apt-get update -qq
-  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "${PKGS[@]}"
+  sudo apt-get update -qq || warn "apt-get update terminou com erros (repositório de terceiros fora do ar?) — seguindo com os índices existentes"
+  # pacotes que não existem nesta versão do Ubuntu são pulados com aviso (ex.: libqt6opengl6-dev foi absorvido
+  # pelo qt6-base-dev no 26.04)
+  AVAIL=()
+  for p in "${PKGS[@]}"; do
+    pol="$(apt-cache policy "$p" 2>/dev/null || true)"
+    if [[ -z "$pol" ]] || grep -q 'Candidate: (none)' <<<"$pol" || ! grep -q 'Candidate:' <<<"$pol"; then
+      warn "pacote $p não existe neste Ubuntu — pulado"
+    else
+      AVAIL+=("$p")
+    fi
+  done
+  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "${AVAIL[@]}"
 else
   log "etapa 1/4: pulada (--no-deps)"
 fi
@@ -80,13 +91,23 @@ if [[ $CLEAN -eq 1 && -d "$BUILD" ]]; then rm -rf "$BUILD"; fi
 # CMake >= 4.0 (Ubuntu 26.04) recusa projetos com cmake_minimum_required < 3.5 (VarTypes/ODE externos);
 # a variável de ambiente abaixo é a válvula oficial e vale também para os ExternalProject filhos.
 export CMAKE_POLICY_VERSION_MINIMUM="${CMAKE_POLICY_VERSION_MINIMUM:-3.5}"
-log "etapa 3/4: cmake -S $DIR -B $BUILD (Release) + build -j$JOBS"
-cmake -S "$DIR" -B "$BUILD" -DCMAKE_BUILD_TYPE=Release >"$BUILD.cmake.log" 2>&1 || { tail -40 "$BUILD.cmake.log"; die "cmake falhou (log: $BUILD.cmake.log)"; }
-cmake --build "$BUILD" -j"$JOBS" >"$BUILD.build.log" 2>&1 || { tail -60 "$BUILD.build.log"; die "build falhou (log: $BUILD.build.log)"; }
+if [[ -x "$DIR/bin/grSim" && $CLEAN -eq 0 && $UPDATE -eq 0 ]]; then
+  # reconfigurar um build existente do grSim quebra (o protobuf externo já instalado passa a ser "encontrado" e os
+  # makefiles ficam com dependências órfãs): só recompila com --clean ou --update
+  log "etapa 3/4: $DIR/bin/grSim já existe — build pulado (use --clean para recompilar do zero)"
+else
+  if [[ $UPDATE -eq 1 && -d "$BUILD" ]]; then rm -rf "$BUILD"; fi
+  log "etapa 3/4: cmake -S $DIR -B $BUILD (Release) + build -j$JOBS"
+  # só o alvo grSim (o cliente Qt de exemplo não é necessário)
+  cmake -S "$DIR" -B "$BUILD" -DCMAKE_BUILD_TYPE=Release -DBUILD_CLIENTS=OFF >"$BUILD.cmake.log" 2>&1 \
+    || { tail -40 "$BUILD.cmake.log"; die "cmake falhou (log: $BUILD.cmake.log; um build anterior incompleto? tente --clean)"; }
+  cmake --build "$BUILD" --target grSim -j"$JOBS" >"$BUILD.build.log" 2>&1 \
+    || { tail -60 "$BUILD.build.log"; die "build falhou (log: $BUILD.build.log)"; }
+fi
 
-BIN=""
-for cand in "$BUILD/bin/grSim" "$BUILD/grSim"; do [[ -x "$cand" ]] && { BIN="$cand"; break; }; done
-[[ -n "$BIN" ]] || die "binário grSim não encontrado em $BUILD (veja $BUILD.build.log)"
+BIN=""   # o CMakeLists do grSim manda o executável para <repo>/bin/grSim (não para build/)
+for cand in "$DIR/bin/grSim" "$BUILD/bin/grSim" "$BUILD/grSim"; do [[ -x "$cand" ]] && { BIN="$cand"; break; }; done
+[[ -n "$BIN" ]] || die "binário grSim não encontrado em $DIR/bin nem em $BUILD (veja $BUILD.build.log)"
 
 # ---- 4. config ao lado do binário --------------------------------------------------------------
 # Rodando de dentro de $HOME o grSim procura os .ini dos robôs em <dir do binário>/../config/ (configwidget.cpp);

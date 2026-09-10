@@ -10,7 +10,7 @@ no mesmo host); o resultado é escrito no repo do Windows via `/mnt/c`.
 
 | Arquivo | Para quê | Precisa de sudo? |
 |---|---|---|
-| `install_grsim_wsl.sh` | clona `RoboCup-SSL/grSim`, instala dependências (Qt 5, ODE, protobuf, boost), compila em `~/grsim/build` (VarTypes é baixado pelo CMake do grSim), copia os `.ini` dos robôs para o lado do binário | **sim**, só o `apt-get install` (`--no-deps` pula) |
+| `install_grsim_wsl.sh` | clona `RoboCup-SSL/grSim`, instala dependências (Qt 5, ODE, protobuf, boost), compila em `~/grsim/build` (VarTypes e, com protobuf ≥ 3.21 do sistema, o protobuf 3.6.1 são baixados e compilados pelo CMake do grSim); binário em `~/grsim/bin/grSim` | **sim**, só o `apt-get install` (`--no-deps` pula) |
 | `install_erforce_wsl.sh` | clona `robotics-erlangen/framework`, instala dependências (Qt 6, protobuf, OpenSSL), compila só o alvo `simulator-cli` (baixa Bullet/Eigen de `downloads.robotics-erlangen.de`) | **sim**, só o `apt-get install` |
 | `simctl.sh <sim> start\|stop\|status\|log\|probe` (`run_grsim.sh`, `run_erforce.sh` = atalhos) | sobe o simulador em background (`~/external_sims/<sim>.{log,pid}`), espera as portas 10300/10301, derruba, sonda | não |
 | `run_protocol_holdout.sh` | de ponta a ponta: para cada simulador sobe → sonda → `dtssl analysis run protocol_holdout` → derruba; ao final reanalisa os caches dos dois numa tabela só | não |
@@ -36,19 +36,27 @@ Alternativa sem compilar (Linux nativo; no Docker Desktop do Windows o `--net=ho
 não serve aqui): `docker run --net=host robocupssl/grsim` (headless) e
 `docker run --net=host -e GEOMETRY=2020B -e REALISM=None roboticserlangen/simulatorcli`.
 
-## 2. Sanidade (sem sudo, 1 min por simulador)
+## 2. Sanidade (sem sudo, 1–2 min por simulador)
 
 ```bash
 tools/external_sims/run_grsim.sh start      # headless (-platform offscreen); portas 10020/10300-10302
-tools/external_sims/run_grsim.sh probe      # teleporte + 1 janela de 1 s a 0,5 m/s: window_ok=true, moved ~0,5 m
+tools/external_sims/run_grsim.sh probe      # teleporte + 1 janela de 1 s a 0,5 m/s: window_ok=true (grSim: moved ~0,43 m, parte do repouso)
 tools/external_sims/run_grsim.sh stop
 tools/external_sims/run_erforce.sh start    # simulator-cli -g 2020B --realism None
 tools/external_sims/run_erforce.sh probe
 tools/external_sims/run_erforce.sh stop
+tools/external_sims/run_protocol_holdout.sh --sims grsim,erforce --smoke --out /tmp/c2b_smoke   # 1 evento por simulador (~2 min cada): valida o ambiente inteiro
 ```
 
 A sonda imprime as estatísticas do replay (`stats`): período de visão medido, latência teleporte→visão, `tau0`,
-jitter de envio, falhas de âncora. Os dois simuladores usam as mesmas portas: um de cada vez.
+jitter de envio, falhas de âncora. Os dois simuladores usam as mesmas portas: um de cada vez. O `--smoke`
+(`max_events=1`) escreve um artefato marcado "TESTE DE FUMACA" que nunca vale como resultado; use `--out` fora de
+`results/`.
+
+Validado na nuvem (Ubuntu 24.04, 10/09/2026): `install_grsim_wsl.sh` compila e o grSim headless responde à sonda e
+ao `run_protocol_holdout.sh --smoke` (27 janelas, 0 perdidas, jitter médio 0,01 ms); o `install_erforce_wsl.sh`
+configura o alvo `simulator-cli` (apt + cmake OK) mas o build só termina onde `robotics-erlangen.de` é alcançável
+(Bullet/Eigen/protobuf baixados pelo CMake) — no WSL do PC.
 
 ## 3. O experimento (C2b)
 
@@ -73,6 +81,7 @@ reanalisa offline, sem simulador). Depois: entrada no `results/CHANGELOG.md` e c
 | velocidade linear inicial | aplicada (estado FOPDT) | **ignorada**: `resetRobot()` zera o corpo e `setSpeed(vx,vy,vw)` vira setpoint dos motores (limitado pela aceleração) — toda janela parte do repouso | aplicada (`setLinearVelocity`) |
 | velocidade de guinada inicial | aplicada | ignorada (idem) | aplicada **no eixo x** do Bullet (bug) → `teleport_omega=false` no endpoint: enviamos 0 |
 | visão | 60 Hz, sem atraso | 60 Hz (ODE 60 Hz), sem ruído por default | 66,67 Hz, atraso 35 ms + 5 ms em todo perfil de realismo (`None` = sem ruído, `command_delay` 0); robô para 0,1 s sem comando |
+| robô | FOPDT θ oficial | perfil `config/Parsian.ini` (default): R 0,09 m, r 0,027 m, a_max 4 m/s², v_max 5 m/s | especificação ER-Force default (`robotSetDefault`), 11 robôs por time |
 
 Por isso o artefato traz a coluna `fopdt_v0=0` (o gêmeo com os estados zerados em t0, a mesma desvantagem do
 grSim): separa "física da liga vs FOPDT" de "condição inicial". O alinhamento por âncora (primeiro quadro em que o
