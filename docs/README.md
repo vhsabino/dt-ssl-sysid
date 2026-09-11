@@ -33,6 +33,9 @@ Proveniência de cada número do projeto: `results/CHANGELOG.md`.
 | `PLANO_PAPER_SBR2026.md` | planejamento de escrita do paper SBR/LARS 2026 (23/06, atualizado 24/07 com V10 = ω promovido). |
 | `PREREGISTRO_OMEGA_20260724.md` | **pré-registro** dos critérios de promoção de ω (gravado antes da estimação; ainda válido como defesa metodológica). |
 | `PREREGISTRO_IDENTIFICABILIDADE_INSILICO_20260907.md` | **pré-registro** do experimento C1 (identificabilidade in-silico com θ conhecido: regime × ruído × zona morta, hipóteses H1–H4, estimador e regra de decisão) — executado por `dtssl analysis run identifiability_insilico` (VIGENTE). |
+| `PREREGISTRO_IDENTIFICABILIDADE_INSILICO_C1B_20260907.md` / `…_C1B_V2_…` | **pré-registros** do C1b (gerador físico; v1 falhou pela célula de referência e foi mantida; v2 re-registrada). |
+| `PREREGISTRO_C4_MALHA_FECHADA_20260908.md` | **pré-registro** do C4 (sessão em malha fechada × competição, critérios P1–P5). |
+| `PREREGISTRO_C2B_SIMULADORES_LIGA_20260910.md` | **pré-registro** do C2b (grSim/ER-Force no hold-out via ssl-simulation-protocol: H1–H3 e critério V de validade do instrumento) — executado por `dtssl analysis run protocol_holdout` (10/09). |
 | `INVENTARIO_RL_2026-07-24.md` | inventário do repo `planning-rl-greybox` (WSL2): experimento de gap de dinâmica com SAC+FSCAPS — fora de escopo nesta rodada. |
 | `RSIM_EXPLORATION.md` | viabilidade do `RSimReplay` (rSoccer/rSim) — bloqueios encontrados (16/06). |
 | `TASKS_CLAUDE_CODE.md` | pendências que exigiam execução para o paper (07/08); parte executada em 09–10/08 (ver CHANGELOG). |
@@ -61,6 +64,8 @@ Proveniência de cada número do projeto: `results/CHANGELOG.md`.
 | `LOG_FINALIZACAO_ARTIGO_20260731.md` | log da sessão multiagente que levou o artigo ao PDF submissível (31/07). |
 | `REUNIAO_MODELO_E_LITERATURA.md` | verificação arquivo-a-arquivo do modelo/MATLAB/literatura para reunião (26/06). |
 | `REUNIAO_FIGURAS.md` | índice e roteiro das figuras da reunião de 26/06. |
+| `RESUMO_ORIENTACAO_20260909.pdf` | resumo de 2 páginas para a orientadora (09/09): infraestrutura, resultados C2a/C1/C1b/B3/C4/C5-C6 com proveniência, leitura, próximos passos e as duas decisões pedidas. |
+| `DEMO_ORIENTACAO_20260911.md` | roteiro da demonstração de 30 min para a orientadora (11/09): blocos com comando, fala e plano B, próximos passos, perguntas a fazer, números de bolso. |
 | `../legacy/apresentacao/orientacao_20260612.m` | roteiro executável da reunião de orientação de 12/06 (só artefatos salvos). |
 
 ## Fora de `docs/`
