@@ -15,7 +15,7 @@ from dtssl.sim.entities import BallState, RobotCmd, RobotSpawn, Scene
 from dtssl.sim.twin_world import TwinWorld, body_to_wheels
 from dtssl.sim.world import FieldGeometry
 
-MODULES = ["ssl_gc_common_pb2", "ssl_simulation_config_pb2", "ssl_simulation_control_pb2",
+MODULES = ["rc_communication_pb2", "ssl_gc_common_pb2", "ssl_simulation_config_pb2", "ssl_simulation_control_pb2",
            "ssl_simulation_error_pb2", "ssl_simulation_robot_control_pb2",
            "ssl_simulation_robot_feedback_pb2", "ssl_simulation_synchronous_pb2",
            "ssl_vision_detection_pb2", "ssl_vision_geometry_pb2", "ssl_vision_wrapper_pb2"]

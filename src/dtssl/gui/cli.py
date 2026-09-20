@@ -37,6 +37,10 @@ def add_gui_arguments(p: argparse.ArgumentParser) -> None:
     p.add_argument("--event", default=None, help="Replay: event id to load at start-up")
     p.add_argument("--no-3d", action="store_true", help="do not create the 3D tab (pyqtgraph.opengl)")
     p.add_argument("--no-cad", action="store_true", help="3D tab: primitive shapes instead of the CAD meshes")
+    p.add_argument("--no-robot-tab", action="store_true", help="do not create the Robot (telemetry) tab")
+    p.add_argument("--telemetry", action="store_true",
+                   help="Robot tab: listen for real-robot Feedback over the radio multicast (config/telemetry.json)")
+    p.add_argument("--telemetry-config", type=Path, default=None, help="telemetry JSON (default config/telemetry.json)")
     p.add_argument("-v", "--verbose", action="store_true")
 
 

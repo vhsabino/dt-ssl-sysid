@@ -76,6 +76,10 @@ O próprio `gui` diz isso quando falta algo. Ficam duas janelas Qt lado a lado: 
 gêmeo (o que acontece com os robôs). A aba 3D no WSLg usa renderização por software; se pesar, fique na aba 2D. Sem o
 terminal da direita nesse modo: a barra de status da GUI mostra Hz e pacotes.
 
+Aba **Robot** (19/09, pedido da orientadora): o robô selecionado em destaque com as rodas pela cinemática inversa,
+comando × resultante, watchdog, sensor de bola e o bloco de hardware (bateria e capacitor de um modelo ilustrativo, rotulado;
+valores reais quando `GUI_ARGS=--telemetry` e há robôs reais reportando pelo rádio). Selecione o robô com `,`/`.` ou pelo clique no campo 2D.
+
 Aba 3D no WSLg (visto em 18/09): o log encheu de `OpenGL.error.Error: Attempt to retrieve context when no valid context`
 a cada repintura da aba 3D, e a aba ficou vazia (o resto da GUI e o servidor seguem, o pyqtgraph engole a exceção). Causa:
 o Qt criou o contexto GL por um caminho (EGL ou GLX) e o PyOpenGL, que desenha as malhas, procurou o contexto pelo outro

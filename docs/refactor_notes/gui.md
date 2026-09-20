@@ -204,6 +204,39 @@ construído do `WorldState` → funciona com qualquer backend (`fopdt`, `ideal`,
   renderização real (`grab_image` ≠ quadro vazio, `top` muda a imagem — roda sob `xvfb-run` ou num desktop; é
   *skip* no offscreen), `MainWindow` com/sem a aba. Captura: `docs/img/gui_3d_tab.png`.
 
+## Aba Robot: telemetria por robô (19/09/2026)
+
+Pedido da orientadora em 18/09: ver cada robô em destaque com os dados de hardware. A aba **Robot** (`gui/robot_tab.py`)
+mostra o robô selecionado (o mesmo da toolbar, das teclas `,`/`.` e do clique no campo): um *spotlight* de cima
+(chassi com a face do dribbler, as quatro rodas coloridas pela velocidade, setas de velocidade de corpo comandada
+(tracejada) e resultante (cheia), arco de ω, a bola quando o sensor a vê), a tabela de estado (pose, v comando, v
+resultante, idade do comando, watchdog, dribbler, sensor de bola, chutes do mundo), as quatro rodas em barras
+(comando × resultante, rad/s) e nos últimos 10 s como curvas, e o bloco de hardware (bateria, capacitor, IR).
+
+De onde vem cada valor (`dtssl/bridge/telemetry.py`, um `RobotTelemetry` por fonte):
+
+- **gêmeo** (`twin_telemetry`): do `WorldState` e do último `RobotCmd`; as velocidades por roda pela cinemática inversa
+  de `dtssl.kinematics` (a mesma que gira as rodas da aba 3D), com a zona morta por roda aplicada ao comando quando o
+  mundo a tem ligada; idade do comando e watchdog pelo `t_recv` do comando e `watchdog_s` do mundo. **Bateria e capacitor
+  não existem no modelo identificado**: `SyntheticHardware` é um modelo *ilustrativo* (capacitor esvazia no chute e
+  recarrega com `capacitor_tau_s`; bateria cai com `battery_drain_per_rad · Σ|ω_roda| · dt`), parâmetros em
+  `config/telemetry.json` (`synthetic`), e a aba escreve "modelo ILUSTRATIVO" por cima. Nada disso toca a simulação.
+- **rádio** (`TelemetryReceiver`, `dtssl gui --telemetry` ou `real.enabled` no JSON): os datagramas
+  `RCCommunication.Feedback` do `rc_communication.proto` (cópia verbatim do ssl-unification em `bridge/proto`, `_pb2`
+  gerado com o mesmo protoc 25.1 dos demais), que os robôs reais mandam pelo `CommunicationWifi` (multicast
+  224.0.1.99, porta 19903; comandos saem na 19901): vx, vy, w; velocidade comandada e medida por motor (`d_speed`/`c_speed`,
+  mapeamento em `real.fields`), PWM, erro do PI e corrente por motor, `capacitorCharge`, `batteryCharge`, `hasBall`. As
+  unidades são as que o firmware reporta; os rótulos vêm de `real.units` e nada é convertido. O `Feedback` não traz o
+  time: `real.team` (default: o `--team` da GUI) diz de quem são os ids. Registro mais recente por id, descartado
+  depois de `stale_s`; quando há registro fresco do robô selecionado, o bloco de hardware passa a mostrar os valores
+  reais e a tabela por motor é preenchida, ao lado do gêmeo (barras: real em rosa).
+
+Sem robôs reais a aba funciona só com a fonte gêmeo; com eles, é o uso de gêmeo digital como monitor (previsto ×
+medido para o mesmo robô), sem mudar nada além de ligar o receptor. Flags: `--no-robot-tab`, `--telemetry`,
+`--telemetry-config`. A aba só redesenha quando visível. Testes: `tests/test_telemetry.py` (7: IK, zona morta,
+hardware ilustrativo, parser do Feedback cru/embrulhado/comando/lixo, receptor com socket em loopback, config) e
+`tests/test_gui_robot_tab.py` (5: widgets pintam, registros gêmeo e real na aba, `MainWindow` com e sem a aba, flags).
+
 ## Correção 03/09/2026 — `ZeroDivisionError` do pyqtgraph ao trocar de robô
 
 Sintoma (Windows, pyqtgraph 0.14.0, modo Debug): ao selecionar um robô, o console repete

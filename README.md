@@ -57,7 +57,8 @@ Dados (`data/extracted/<dataset>/splits/<label>/<evento>/*.parquet`) são gerenc
 ## Uso rápido
 
 ```bash
-dtssl gui [--no-3d | --no-cad]              # interface: campo 2D + aba 3D com o CAD, bola, telemetria cmd×estado,
+dtssl gui [--no-3d | --no-cad] [--telemetry]   # interface: campo 2D + aba 3D com o CAD + aba Robot (telemetria por robô;
+                                            #   --telemetry lê o Feedback dos robôs reais pelo rádio), plots cmd×estado,
                                             #   editor de θ; modos Debug (DualSense/teclado), Bridge (ssl-unification), Replay
 dtssl serve [--backend fopdt|ideal|mujoco-velocity|mujoco-rollers] [--n-blue 6 --n-yellow 6] [--record DIR]
                                             # servidor ssl-simulation-protocol: visão 224.5.23.2:10006, controle

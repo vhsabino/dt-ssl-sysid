@@ -17,6 +17,7 @@ import logging
 import sys
 import time
 from collections.abc import Sequence
+from pathlib import Path
 
 from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6.QtCore import Qt
@@ -26,6 +27,7 @@ from dtssl.gui.field_view import FieldView
 from dtssl.gui.params_panel import ParamsPanel
 from dtssl.gui.plots import VelocityPlots
 from dtssl.gui.replay import SPEEDS, ReplaySession, list_datasets, list_events, list_labels
+from dtssl.gui.robot_tab import RobotTab
 from dtssl.gui.view3d import View3D
 
 log = logging.getLogger(__name__)
@@ -89,7 +91,8 @@ class MainWindow(QtWidgets.QMainWindow):
                  bridge_config=None, joy_map=None, n_blue: int = 6, n_yellow: int = 6, publish: bool = False,
                  realtime: bool | None = None, params=None, world_opts: dict | None = None,
                  use_pygame: bool | None = None, autostart: bool = True, view3d: bool = True,
-                 cad: bool = True, parent=None):
+                 cad: bool = True, robot_tab: bool = True, telemetry: bool | None = None,
+                 telemetry_config: str | Path | None = None, parent=None):
         super().__init__(parent)
         self.setWindowTitle("dtssl gui — SSL digital twin")
         self.controller = Controller(backend=backend, mode=mode, team=team, bridge_config=bridge_config,
@@ -107,6 +110,29 @@ class MainWindow(QtWidgets.QMainWindow):
             self.view3d = View3D(w.field, spec=w.spec, cad=cad)
             self.view3d.set_selected(c.selected)
             self.tabs.addTab(self.view3d, "3D (CAD)")
+        # Robot tab: telemetry of the selected robot (twin side always; real side when the radio receiver is on)
+        self.robot_tab: RobotTab | None = None
+        self.telemetry_rx = None
+        self._hw = None
+        self._geom = None
+        self._telemetry_cfg = None
+        if robot_tab:
+            from dtssl.bridge.telemetry import SyntheticHardware, load_telemetry_config
+            from dtssl.config import load_geometry
+
+            self._telemetry_cfg = load_telemetry_config(telemetry_config)
+            try:
+                self._geom = load_geometry()
+            except Exception as e:  # noqa: BLE001 - keep the GUI usable without config/robot_geometry.json
+                log.warning("robot geometry unavailable (%s); default wheel angles", e)
+            self._hw = SyntheticHardware(self._telemetry_cfg)
+            angles = self._geom.wheel_angles_deg if self._geom is not None else (60.0, 135.0, 225.0, 300.0)
+            self.robot_tab = RobotTab(wheel_angles_deg=angles, units=self._telemetry_cfg["real"].get("units"))
+            self.robot_tab.set_selected(c.selected)
+            self.tabs.addTab(self.robot_tab, "Robot")
+            want_rx = bool(self._telemetry_cfg["real"].get("enabled", False)) if telemetry is None else bool(telemetry)
+            if want_rx:
+                self._start_telemetry(team)
         self.setCentralWidget(self.tabs)
         self.plots = VelocityPlots()
         self.params_panel = ParamsPanel(c.params)
@@ -130,6 +156,41 @@ class MainWindow(QtWidgets.QMainWindow):
         self.resize(1400, 860)
         if autostart:
             self.start()
+
+    def _start_telemetry(self, team: str) -> None:
+        from dtssl.bridge.telemetry import TelemetryReceiver
+
+        try:
+            cfg_team = self._telemetry_cfg["real"].get("team") if self._telemetry_cfg else None
+            self.telemetry_rx = TelemetryReceiver(self._telemetry_cfg, team=cfg_team or team)
+            self.telemetry_rx.start()
+            if self.robot_tab is not None:
+                self.robot_tab.set_receiver_state(f"receptor ligado em {self.telemetry_rx.endpoint} "
+                                                  f"(time {self.telemetry_rx.team}); aguardando Feedback")
+        except OSError as e:
+            self.telemetry_rx = None
+            log.warning("telemetry receiver not started: %s", e)
+            if self.robot_tab is not None:
+                self.robot_tab.set_receiver_state(f"receptor nao abriu: {e}")
+
+    def _robot_records(self, fr: Frame):
+        """``(twin, real)`` telemetry records of the selected robot for the Robot tab."""
+        from dtssl.bridge.telemetry import twin_telemetry
+        from dtssl.gui.controller import commanded
+
+        key = fr.selected
+        if key is None or key not in fr.ws.robots:
+            return None, None
+        w = self.controller.world
+        dz = float(getattr(w, "deadzone_wheel_rad_s", 0.0)) if getattr(w, "deadzone", False) else 0.0
+        twin = twin_telemetry(fr.ws, tuple(key), commanded(w, tuple(key)), geom=self._geom, deadzone_rad_s=dz,
+                              watchdog_s=getattr(w, "watchdog_s", None), kicks=getattr(w, "kicks", None),
+                              hardware=self._hw)
+        real = None
+        rx = self.telemetry_rx
+        if rx is not None and (rx.team is None or rx.team == key[0]):
+            real = rx.latest(int(key[1]))
+        return twin, real
 
     # ------------------------------------------------------------------ UI construction
     def _build_docks(self) -> None:
@@ -289,6 +350,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def closeEvent(self, ev: QtGui.QCloseEvent) -> None:
         self.stop()
+        if self.telemetry_rx is not None:
+            self.telemetry_rx.stop()
         self.controller.shutdown()
         for name in ("dtssl", "py.warnings"):
             logging.getLogger(name).removeHandler(self._log_handler)
@@ -343,6 +406,10 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.view3d is not None:
             self.view3d.set_field(w.field)
         self.plots.clear()
+        if self._hw is not None:
+            self._hw.reset()
+        if self.robot_tab is not None:
+            self.robot_tab.wheel_plot.clear_data()
         self._refresh_robot_combo()
         self.log(f"backend: {name} ({getattr(w, 'name', type(w).__name__)})")
 
@@ -371,6 +438,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.field_view.set_selected(tuple(key) if key is not None else None)
         if self.view3d is not None:
             self.view3d.set_selected(tuple(key) if key is not None else None)
+        if self.robot_tab is not None:
+            self.robot_tab.set_selected(tuple(key) if key is not None else None)
         if self.plots.mode == "sliding":
             self.plots.clear()
 
@@ -482,6 +551,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.field_view.update_state(fr.ws, fr.selected, fr.truth_pose, fr.t)
         if self.view3d is not None:
             self.view3d.update_state(fr.ws, fr.selected, fr.t)
+        if self.robot_tab is not None:
+            twin, real = self._robot_records(fr)
+            self.robot_tab.update_record(twin, real)
         if fr.mode == "replay" and fr.replay_index is not None:
             rp = self.controller.replay
             if rp is not None:
@@ -522,6 +594,12 @@ class MainWindow(QtWidgets.QMainWindow):
             L["time"].setText(f" {rp['label']}/{rp['event']} {rp['index']}/{rp['n']} ")
         else:
             L["time"].setText(f" t={st['sim_time']:.1f} s ")
+        rx = self.telemetry_rx
+        if rx is not None and self.robot_tab is not None:
+            ids = rx.ids()
+            self.robot_tab.set_receiver_state(
+                f"receptor em {rx.endpoint} (time {rx.team}): {rx.packets} pacotes, {rx.rate_hz:.0f}/s, "
+                f"ids vistos {ids if ids else '-'}, {rx.decode_errors} erros de decodificacao")
 
     # ------------------------------------------------------------------ keyboard fallback
     def eventFilter(self, obj, ev) -> bool:
@@ -571,7 +649,10 @@ def run(args) -> int:
                      joy_map=args.joy_map, n_blue=args.n_blue, n_yellow=args.n_yellow, publish=args.publish,
                      realtime=(False if getattr(args, "no_realtime", False) else None), params=params,
                      world_opts=world_opts, use_pygame=(False if getattr(args, "no_joystick", False) else None),
-                     view3d=not getattr(args, "no_3d", False), cad=not getattr(args, "no_cad", False))
+                     view3d=not getattr(args, "no_3d", False), cad=not getattr(args, "no_cad", False),
+                     robot_tab=not getattr(args, "no_robot_tab", False),
+                     telemetry=(True if getattr(args, "telemetry", False) else None),
+                     telemetry_config=getattr(args, "telemetry_config", None))
     if getattr(args, "event", None) and getattr(args, "label", None):
         win.select_replay(getattr(args, "dataset", None), args.label, args.event)
         win.load_replay(args.label, args.event, getattr(args, "dataset", None))

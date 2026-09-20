@@ -266,7 +266,7 @@ def test_mainwindow_has_the_3d_tab(qapp):
     win = MainWindow(backend="fopdt", mode="debug", team="yellow", n_blue=1, n_yellow=1, use_pygame=False,
                      autostart=False)
     try:
-        assert win.tabs.count() == 2 and win.view3d is not None and win.tabs.widget(1) is win.view3d
+        assert win.tabs.count() == 3 and win.view3d is not None and win.tabs.widget(1) is win.view3d   # 2D, 3D, Robot
         assert win.view3d.selected == win.controller.selected == ("yellow", 0)
         win.controller.select(("blue", 0))
         assert win.view3d.selected == ("blue", 0)
@@ -278,7 +278,7 @@ def test_mainwindow_has_the_3d_tab(qapp):
     win2 = MainWindow(backend="fopdt", mode="debug", team="yellow", n_blue=1, n_yellow=1, use_pygame=False,
                       autostart=False, view3d=False)
     try:
-        assert win2.tabs.count() == 1 and win2.view3d is None
+        assert win2.tabs.count() == 2 and win2.view3d is None                                          # 2D, Robot
         win2.fit_current_view()
     finally:
         win2.close()
