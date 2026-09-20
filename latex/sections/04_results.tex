@@ -1,0 +1,393 @@
+%==============================================================================
+% RESULTS — WRITTEN COMPLETE from results/ (Mode A primary, Mode B robustness).
+% Numbers ONLY from registered runs. Where a number is not in a readable table,
+% it is marked % [A VERIFICAR].
+% Sources:
+%   tab params  : config/twin_params.json ; RELATORIO sec.5 ; CHANGELOG 2026-06-14
+%   twin/rSim   : results/eval_twin_vs_rsim_modeA_20260617_0030.md (primary)
+%                 results/eval_twin_vs_rsim_modeB_20260617_0031.md (robustness)
+%   twin/ideal  : results/phase0_metrics_report_20260616_0811.md
+%   bins        : results/bin_distribution_20260619_000422.md/.csv
+%   omega       : results/diag_omega_gain_by_band_20260613_2239.csv ;
+%                 results/eval_omega_v3_se2_20260613_2340.csv ; CHANGELOG 2026-06-13
+%   bayesopt    : results/eval_bayesopt_v2_holdout_20260614_2130.csv ; CHANGELOG
+%==============================================================================
+\section{Results}
+\label{sec:results}
+
+\subsection{Identified model}
+\label{sec:results:id}
+% CORTE 2026-08-10 (9->6 pag.): prosa comprimida; todos os numeros preservados.
+Table~\ref{tab:sysid} reports the per-DOF parameters. Both translational
+channels identify as fast FOPDT models, with hold-out fit $86.7\%$ ($v_x$) and
+$87.1\%$ ($v_y$); against the previous, slower parameters they improve every
+event-by-horizon cell of the $\SEtwo$ gate ($20/20$ and $65/65$). Yaw is
+identified from a separate open-loop dataset at $71.1\%$
+(Sec.~\ref{sec:results:omega}). Re-running the pipeline with identical seed,
+data and toolbox version reproduces all nine parameters exactly.
+% source: CHANGELOG 2026-06-14 10:24 ; twin_params.json ;
+%   results/eval_vy_v2_se2_20260614_1028.csv ; reidentificacao_20260724.md Partes A-B
+
+\input{tables/tab_sysid_params}
+
+%------------------------------------------------------------------------------
+% FIG. B (revisão maior 2026-08-07, T4). CHOICE JUSTIFIED:
+% Option (ii) -- paired re-anchored error by horizon with effect size -- was
+% REJECTED because Fig.~\ref{fig:twinrsim} and Table~\ref{tab:twinvsrsim}
+% already carry exactly that content; a second panel of the same thing buys
+% nothing at 6 pages. Option (i) was chosen because the reviewer's single
+% strongest figure request (S1) is that the reader never sees a measured vs.
+% simulated trace for ANY channel -- neither the positive translational result
+% nor the central yaw result. Both assets already exist, verified, in-repo.
+% SCOPE CAVEAT: the requested rSim and ideal-kinematics arms are NOT drawn.
+% They are not recoverable: the rSim trajectories of run 20260617_0030 were
+% never persisted and robosim is unavailable in the current environment
+% (docs/BACKLOG_EXTENSAO_JINT.md, pendência 1). Drawing them would require
+% re-running rSim -- registered as TASKS_CLAUDE_CODE.md item R1, NOT invented here.
+% Source: results/figs/fit_holdout_vxvy_20260731_024049.{png,pdf} (Python fits
+%   reproduce the MATLAB ones to <=0.05 p.p., results/fit_holdout_vxvy_20260731_024049.csv)
+%   ; results/figs/identificacao_omega_stepresponse_20260724_1727.png
+%------------------------------------------------------------------------------
+% 2026-08-07 (orçamento de páginas): reduzida de figure* dois painéis para
+% figure de coluna única com o painel de omega apenas. O painel vx/vy foi
+% cortado porque a translação já tem Fig.~\ref{fig:twinrsim} e a
+% Tabela~\ref{tab:twinvsrsim}; o degrau de omega é o resultado CENTRAL e não
+% tem substituto. Painel cortado disponível em
+% results/figs/fit_holdout_vxvy_20260731_024049.pdf (backlog JINT).
+\begin{figure}[!t]
+% FIG. 2 SUBSTITUIDA 2026-08-10: a versao anterior (omega_stepresponse.png) estava
+% EM PORTUGUES ("Identificacao", "medido", "simulado", "t - inicio bruto do
+% evento") e com 6 paineis numa coluna, ilegivel -- exatamente o defeito C1/C2 que
+% o revisor apontou na Fig.1. Regerada em ingles com 3 paineis (1 treino, 2
+% hold-out) por scripts/fig_omega_stepresponse_en.py, a partir dos mesmos splits
+% e do mesmo theta de config/twin_params.json. Nenhum numero recomputado.
+% FUSAO 2026-08-10 (9->6 pag.): as duas figuras de evidencia viraram UM float de
+% largura dupla. Duas figuras de coluna unica custavam ~36 linhas mais o
+% desperdicio de empacotamento. Nenhuma evidencia perdida: (a) medido vs
+% simulado (pedido S1 do revisor); (b) trajetoria real vs modelos (item 10).
+% CORTE FINAL 2026-08-10 (7->6 pag.): o float voltou a ser de coluna unica com
+% APENAS o painel (a). O painel (b), a trajetoria real vs modelos, era o item 10
+% do revisor e custava ~0,25 pag. -- a ultima coisa cortavel sem tocar em
+% resultado. Fica em results/figs/trajectory_holdout_en.png para a extensao JINT
+% e para o repositorio publico. Registrado em docs/REGISTRO_DESVIOS.md.
+  \centerline{\includegraphics[width=0.70\columnwidth]{omega_stepresponse_en.png}}
+  \caption{Measured vs.\ simulated yaw rate on the dedicated open-loop
+  staircase (one training, two hold-out steps). Same model structure and
+  identification tooling as on the competition logs; only the excitation regime
+  differs.}
+  \label{fig:fits}
+\end{figure}
+
+\subsection{Motion distribution of the hold-out}
+\label{sec:results:bins}
+% CORTE 2026-08-10 (9->6 pag.): prosa comprimida; 265/264/1/0, 99.6% e N_indep
+% preservados.
+The hold-out windows are overwhelmingly translation-dominated: of $265$ dense
+windows ($49$ non-overlapping), $264$ fall in the translation bin ($99.6\%$),
+one is rotation-dominated and none are mixed. Translational fidelity is
+therefore the statistically powered claim, and this population is unaffected by
+the yaw model: re-classifying after $\omega$ was identified reproduces the same
+$264/1/0$ split and leaves both other bins with $N_{\mathrm{indep}}=0$, now for
+lack of rotation-rich competition windows rather than for lack of a yaw model.
+Every verdict below is scoped to the translation bin, and rotational fidelity
+remains unverified against a competition-like distribution.
+% source: results/bin_distribution_20260619_000422.md ;
+%   results/phase0_metrics_report_20260724_1729.md ; bin_distribution_20260724_155551.md
+% 2026-08-07 (orçamento de páginas): tab_validation_composition.tex retirada do
+% build -- os três números (264/1/0, 99.6%, N_indep) já estão nesta frase e na
+% anterior. Tabela mantida em latex/tables/ para a extensão JINT.
+
+% CUT (2026-07-31, page budget, decisão do usuário — item C): Fig. bins removida;
+% os números 264/265/99.6% permanecem no texto acima. Ver docs/BACKLOG_EXTENSAO_JINT.md.
+
+\subsection{Translational fidelity against ideal kinematics}
+\label{sec:results:rsim}
+% REPOSICIONADO 2026-08-10 (revisao independente, B2/B3): o comparador PRIMARIO
+% passa a ser a cinematica ideal, que roda no MESMO harness e com a MESMA
+% inicializacao. O rSim vira contexto: baseline nao sintonizado, harness
+% diferente, e um warm-up de 15 amostras move seu gap por fator 3 -- o revisor
+% mostrou que boa parte do que se media ali era estado inicial.
+% CORTE 2026-08-10 (pedido do autor: "secao gigante"): quatro paragrafos
+% reduzidos a tres, com a evidencia e a estatistica fundidas. Nenhum numero
+% removido.
+Ideal kinematics is the primary comparison because it isolates what the
+identified dynamics contribute: both plants run in the same harness, are seeded
+with the same measured body velocity, and are scored on the same windows, so
+the model is the only difference. Its median position error is below the
+baseline's at every horizon (Fig.~\ref{fig:main} and Table~\ref{tab:three}):
+% CANONICO 2026-08-10: todos os e_pos deste artigo vem de UMA execucao,
+% results/epos_eang_three_models_20260810_1022.md, que e a mesma da Tabela III e
+% da Fig. 2. Valores em h_ref: modelo 0.039, ideal 0.101, rSim 0.129.
+$\SI{0.039}{m}$ against $\SI{0.101}{m}$ at $h_{\mathrm{ref}}$, and
+$\SI{0.119}{m}$ against $\SI{0.291}{m}$ at $\SI{1.5}{s}$. For scale, the median
+commanded speed over these windows is ${\sim}\SI{1}{m/s}$, so the reference
+horizon spans about $\SI{0.4}{m}$ of travel and the robot's contact diameter is
+$\SI{0.16}{m}$. The scored population is $264$ dense windows, $49$
+non-overlapping, which at $H_{\max}$ is $\SI{73.5}{s}$ of motion from ten
+hold-out events. Since windows from one event share robot, surface, session and
+controller, we take the \emph{event} as the unit of analysis: pairing event
+medians, the model wins $10$ of $10$ (rank-biserial $+1.000$), median gap
+$+\SI{0.069}{m}$, bootstrap CI over events $[+0.038,+0.097]\,\si{m}$, one-sided
+Wilcoxon $p = 9.8\times10^{-4}$, the smallest value attainable at $n=10$. The
+window-level test gives a far smaller $p$ that we do not headline, because
+windows within an event are not independent. Both units clear all four gate
+conditions: over the $49$ non-overlapping windows the gap is $+\SI{0.054}{m}$
+with $p=1.2\times10^{-8}$ and effect $+0.633$; over events it is
+$+\SI{0.069}{m}$ with $p=9.8\times10^{-4}$ and effect $+1.000$. The verdict is
+the same, and the per-event figure is the conservative one.
+% source: results/gate_window_vs_event_20260810_1743.md ; reconcilia o gate
+%   pre-registrado (janela) com a unidade reportada (evento).
+These ten events are exactly the
+frozen hold-out list, and they are disjoint from every event used to fit: the
+five that validated $v_x$ and $v_y$ are a subset of them, and the remaining five
+carry a motion label (\texttt{shoot\_to\_goal}) that entered neither fit. No
+event contributed to both parameter selection and fidelity scoring.
+% source: results/gap_decomposition_20260809_2308.md ;
+%   results/clustered_stats_20260809_2309.md ; config/holdout_events.json vs
+%   results/fit_holdout_vxvy_20260731_024049.csv (verificado: ID subset de FID).
+
+\input{tables/tab_three_models}
+
+\begin{figure*}[!t]
+  \centerline{\includegraphics[width=0.86\textwidth]{main_result_en.png}}
+  \caption{(a) Median free-run position error against horizon on
+  translation-dominated hold-out windows, for the FOPDT model, ideal kinematics
+  and an untuned rSim. The two baselines cross near $\SI{1}{s}$. (b) The same
+  comparison resolved by event at $h_{\mathrm{ref}}$: each line is one of the
+  ten hold-out events, and the model is lower in all ten.
+  % source: results/epos_eang_three_models_20260810_1022.md ;
+  %   results/clustered_stats_20260809_2309.md ; scripts/fig_main_result.py
+  }
+  \label{fig:main}
+\end{figure*}
+
+% Figura de trajetoria movida para o painel (b) da Fig.~\ref{fig:fits}
+% (fusao 2026-08-10). Fonte: scripts/fig_trajectory_holdout.py ; janela mediana
+% seg=1 win=9, e_pos(1.5 s) = 0.1192 m; rSim de results/_cache_rsim_rollouts.pkl.
+
+\paragraph{What in the model produces the improvement}
+% REESCRITO 2026-08-10 (revisao V2, B4): a versao anterior era uma ablacao
+% CUMULATIVA, logo dependente de ordem, e atribuia ~90% ao lag. O fatorial
+% completo 2^3 com atribuicao de Shapley REFUTA essa leitura: lag e dead time
+% sao comparaveis (55% vs 43%). Corrigido; acrescentado o braco de IC que o
+% revisor pediu. Fonte: results/ablation_orderfree_20260810_1021.md
+Attributing the improvement to a parameter group is order-dependent if the
+groups are switched on cumulatively, so we run the full $2^3$ factorial over
+$\{K,\tau,\Td\}$ and report the Shapley value of each, which averages over all
+orderings. Of the $\SI{0.062}{m}$ separating the two plants at
+$h_{\mathrm{ref}}$, the time constant accounts for $\SI{0.034}{m}$ ($55\%$),
+the dead time for $\SI{0.027}{m}$ ($43\%$) and the gain for $\SI{0.001}{m}$
+($2\%$). The lag and the dead time are therefore \emph{comparable}
+contributors, not one dominant and one marginal: a cumulative ablation that
+enables $\tau$ first assigns the lag nine tenths of the credit, but that is an
+artifact of ordering, since the two terms are partly redundant in their effect
+on a delayed first-order response.
+
+\paragraph{How much of the advantage is the initial condition}
+Both plants are re-anchored to the true pose and seeded with the measured body
+velocity, but ideal kinematics is memoryless, so only the dynamic plant can
+carry that state forward. We therefore isolate it. Extrapolating the measured
+initial velocity at constant speed, ignoring the command stream entirely, gives
+$\SI{0.160}{m}$, worse than ideal kinematics: the initial condition alone is not
+informative at these horizons. Running the full model from rest, as rSim does,
+gives $\SI{0.114}{m}$, which is also no better than ideal kinematics. Only the
+combination reaches $\SI{0.039}{m}$. The advantage is thus a joint effect: the
+identified dynamics are what allow the measured initial state to be propagated,
+and neither ingredient helps on its own. We regard the measured initial velocity
+as part of the model interface rather than privileged information, since a twin
+running alongside the robot has that estimate available, but the decomposition
+makes the dependence explicit. One caveat follows from it: the loader estimates
+the initial velocity by a central difference, which at the anchor reads one
+sample from inside the evaluation window. Re-estimating it with a strictly
+causal backward difference raises both plants' error --- the model to
+$\SI{0.047}{m}$ at $h_{\mathrm{ref}}$ --- but \emph{widens} the per-event gap to
+$+\SI{0.071}{m}$, still ten wins out of ten at the same $p$. The verdict does
+not depend on that sample.
+% source: results/causal_ic_check_20260810_1102.md
+% source: results/ablation_orderfree_20260810_1021.md (secoes 1-3)
+% source: results/gap_decomposition_20260809_2308.md
+
+% CORTE 2026-08-10: paragrafo de contexto do rSim reduzido de ~110 para ~55
+% palavras. O rSim ja foi demovido a contexto no reposicionamento; os numeros
+% que sustentam a ressalva (0.129, fator 3 do warm-up, ablacao de atraso)
+% permanecem, sem o desenvolvimento.
+\paragraph{The untuned ODE simulator, for context}
+rSim reaches $\SI{0.129}{m}$ at $h_{\mathrm{ref}}$, so the zero-parameter
+baseline already outperforms it. We do not build on this comparison: rSim runs
+at default parameters against a plant fitted to this robot, and starts from rest
+for want of a velocity setter, which alone moves its gap by a factor of three.
+Giving it the model's dead time as a pure output shift widens rather than closes
+the gap, so the delay term does not separate them either.
+% source: results/eval_twin_vs_rsim_mode{A,B}_20260617_*.md ;
+%   results/eval_rsim_delay_ablation_20260809_2154.md
+% source: results/eval_twin_vs_rsim_modeA_20260617_0030.md ;
+%   results/eval_twin_vs_rsim_modeB_20260617_0031.md ;
+%   results/eval_rsim_delay_ablation_20260809_2154.md
+
+% CORTE 2026-08-10: paragrafo "Robustness and second baseline" absorvido pelo
+% paragrafo de contexto do rSim acima (Modo B e o fator 3 ja estao la) e pela
+% estatistica por evento (que substitui o par p/efeito por janela). Nenhum
+% numero perdido: +0.282 m consta acima; +0.063 m / +0.736 eram a versao por
+% janela do que agora se reporta por evento (+0.069 m, +1.000, n=10).
+
+\paragraph{Heading error}
+% CORRECAO 2026-08-10: a versao anterior afirmava que o e_ang do modelo EXCEDE o
+% do rSim em horizontes longos. Ao medir o e_ang do rSim (C6 da revisao V2, que
+% cobrava justamente o numero que faltava), a afirmacao NAO se sustenta: o
+% modelo e menor em todos os seis horizontes. Fonte:
+% results/epos_eang_three_models_20260810_1022.md
+Heading error carries no verdict, since the rotation and mixed bins lack
+scorable population (Sec.~\ref{sec:results:bins}). Descriptively
+(Table~\ref{tab:three}), the model's median $\eang$ is the lowest of the three
+plants at every horizon, but its margin closes as the horizon grows: it is
+roughly half the baselines' at $\SI{0.1}{s}$ and within $\SI{0.005}{rad}$ of
+both by $\SI{1.5}{s}$. The position advantage therefore does not transfer to
+heading in the same proportion, which is consistent with the yaw channel being
+the one the competition logs cannot constrain.
+% source: results/window_errors_eang_twin_vs_ideal_20260731_023856.csv +
+%         results/window_errors_eang_summary_20260731_023856.md (medians, scope all;
+%         e_pos medians in that run reproduce phase0_metrics_report_20260724_1729.md exactly)
+
+\subsection{Yaw identifiability is a function of excitation regime}
+\label{sec:results:omega}
+The excitation available per channel can be read off the logs before any model
+is fitted. Aligning each command with its identified dead time and regressing
+the measured body velocity on it, the command explains $96\%$ of the variance
+for $v_x$ and $94\%$ for $v_y$ (cross-correlation $0.98$ and $0.97$), but only
+$56\%$ for $\omega$ (cross-correlation $0.75$). Nearly half of the rotation the
+vision system measures in competition is therefore not attributable to the yaw
+command, which is the quantitative form of the claim developed below.
+% source: results/excitation_per_dof_20260810_1022.md ; responde C8/C9 e as
+%   perguntas 7-8 da revisao V2, que cobravam um diagnostico de excitacao para
+%   omega analogo ao 0.99 reportado para vx/vy.
+
+% CONSOLIDADO 2026-08-10: o ajuste de omega em malha fechada era descrito em
+% QUATRO lugares com valores diferentes de K (1.35 / 1.3-1.5 / 1.307 / 1.378),
+% que e a objecao "K_omega tem quatro valores". Agora ha UMA descricao, com os
+% numeros do recomputo sob o mesmo criterio de hold-out (R3), e a faixa
+% por amplitude fica explicitamente rotulada como outra grandeza.
+Fitting the same P1D structure to the highest-rotation \emph{closed-loop}
+events, under the same event-wise split and the same fit of Eq.~\ref{eq:fit},
+gives $(K_\omega,\tau_\omega,\Td{}_\omega)=(1.378,0.043,\SI{0.112}{s})$ with a
+hold-out fit of $44.8\%$ --- below the pre-registered $60\%$ gate, against
+$71.1\%$ for the dedicated collection scored the same way. Using it also
+\emph{worsens} free-run position, because a gain above unity amplifies
+accumulated heading drift, and it is not promoted. A separate per-amplitude
+analysis puts the effective gain between $1.3$ and $1.5$ across the closed-loop
+command range, with no dead-zone knee in the \emph{body}-frame yaw signal.
+% source: results/r3_closedloop_omega_fit_20260810_1036.md (recomputo sob o
+%   criterio do artigo) ; results/diag_omega_gain_by_band_20260613_2239.csv
+%   (faixa por amplitude) ; CHANGELOG 2026-06-11 e 2026-06-13.
+A linear re-identification restricted to the high-rotation closed-loop regime
+fails whiteness (Ljung--Box rejects) and is \textsc{no-go} on the
+multi-horizon gate: it is \emph{worse} than the placeholder at every horizon,
+pooled gap $+0.0489\,\si{m}$ at $\SI{4}{s}$, $p=3.8\times10^{-9}$.
+% source: results/eval_omega_v3_se2_20260613_2340.csv ; CHANGELOG 2026-06-13 23:40
+
+\paragraph{The same structure, different data}
+Firmware inspection locates the dominant non-linearity as an \emph{electrical,
+per-wheel} dead-zone, applied to each wheel setpoint \emph{after} the firmware's
+command kinematics --- not a body-frame Hammerstein dead-zone that a
+closed-loop fit could absorb. Re-deriving the commanded-yaw dead-zone
+from this per-wheel threshold and the robot's wheel-to-contact-radius ratio
+(measured from CAD, cross-checked against the firmware's implied constant)
+places it at $0.58$--$0.60\,\si{rad/s}$ of body yaw rate, reported as an
+interval because the two independent geometric sources agree only to that
+precision. Recomputing the fraction of \emph{commanded} yaw-rate samples in the
+competition logs that fall below this threshold gives $94.3\%$ pooled across all
+$46$ splits, and $77.3\%$ even on \texttt{shoot\_to\_goal}, the label richest in
+rotation. The conclusion does not hinge on where inside the empirical bracket
+$(0.5,\,1.0]\,\si{rad/s}$ the threshold sits: the pooled fraction moves only
+from $92.5\%$ to $97.6\%$ across it.
+% source: results/qc_rotate_20260724_125828.md sec.5,7 ; config/robot_geometry.json ;
+%   results/identificacao_omega_20260724.md Etapa 4 ;
+%   results/omega_threshold_sensitivity_20260807_133917.csv
+
+\paragraph{The threshold does not suppress yaw --- it buries it}
+% CORTE 2026-08-10 (9->6 pag.): prosa enxugada; todos os numeros preservados.
+Read naively, that statistic predicts something that does \emph{not} happen. If
+those samples were truly unactuated, a command-to-velocity fit over them should
+\emph{deflate} the apparent gain and a dead-zone knee should appear in the
+body-frame yaw signal. Neither occurs. The resolution is that the threshold
+applies \emph{per wheel, after} the command kinematics, and in competition the
+wheels are already turning because of translation: among sub-threshold samples
+the median per-wheel translational setpoint is $\SI{24.0}{rad/s}$, $15\times$
+the $\SI{1.567}{rad/s}$ clamp, and $97.8\%$ of them have at least one wheel
+driven above it, with only $2.2\%$ fully clamped. The wheels sit at $60^\circ$,
+$135^\circ$, $225^\circ$ and $300^\circ$, recovered from the odometry matrix;
+sweeping nine plausible layouts moves those figures by less than half a point.
+The yaw command is therefore not suppressed in play; it is \emph{diluted},
+contributing a median of $1.0\%$ of the per-wheel setpoint. The $94.3\%$ is thus
+not a claim that the actuator is idle but a signal-to-noise statement: what the
+wheels are asked to do is $99\%$ translation. Both anomalies dissolve, since
+nothing is zeroed and the dead-zone engages in only ${\sim}2\%$ of samples. The
+dedicated collection removes the dilution rather than the feedback: with
+$v_x=v_y=0$ the yaw command becomes the entire actuation.
+% source: results/omega_excitation_analysis_20260807_133917.json ; angulos
+%   recuperados por minimos quadrados sobre pinv(K), residuo 5.7e-22 -- ver
+%   CHANGELOG 2026-08-10 (R1 encerrado).
+
+We therefore identify $\omega$ from the dedicated open-loop collection
+(Sec.~\ref{sec:method:omega-data}), using the \emph{same} P1D structure and
+identification tooling; Fig.~\ref{fig:fits} shows the fit on one training and
+two hold-out steps. The result is
+% FIX 2026-08-10 (revisao V2, objecao 2): a figura nao era citada em lugar
+% nenhum do texto -- flutuava sem ancora.
+$K_\omega=1.0016$, $\tau_\omega=\SI{0.0828}{s}$, $\Td{}_\omega=\SI{0.0890}{s}$,
+with hold-out fit $71.1\%$, above the pre-registered $60\%$ gate. We
+deliberately attach \emph{no} confidence interval to $K_\omega$: the estimator's
+asymptotic interval presupposes white residuals, and Ljung--Box rejects
+whiteness for both yaw fits, so it would understate uncertainty by an unknown
+factor over four training events. The
+comparison we rely on is the point estimate against the closed-loop one,
+$1.00$ against $1.38$, a discrepancy no plausible widening of an interval would
+close, not a formal test of $K_\omega = 1$.
+% source: results/identificacao_omega_20260724.md Etapa 2-3
+% CORTE 2026-08-10: este paragrafo repetia integralmente os numeros do ajuste
+% closed-loop, agora dados uma unica vez no inicio de IV-D.
+On the multi-horizon $\SEtwo$ gate against the placeholder, the closed-loop
+model is \emph{worse} at every horizon (pooled $+0.0489\,\si{m}$,
+$p=3.8\times10^{-9}$). The open-loop model,
+evaluated on the same closed-loop population, is \emph{better} at all five
+horizons (pooled $-0.1138\,\si{m}$, $p=1.7\times10^{-16}$). Both are scored
+against the same reference, a no-dynamics placeholder ($K=1$, $\tau=0.1\,\si{s}$,
+$\Td=0$), on the same population and gate, so the verdict inverts under
+identical tooling. The two campaigns still differ in more than loop topology
+(Sec.~\ref{sec:limitations}), so the inversion isolates the tooling, not a
+single causal factor.
+% FIX 2026-08-10 (revisao V2, objecao 4): "with the data regime as the only
+% difference" contradizia a propria Secao V-C, que declara tres diferencas
+% simultaneas. E o "placeholder" nunca havia sido definido no PDF.
+% CORTE 2026-08-10 (9->6 pag.): tab_omega_regime.tex retirada do build; as duas
+% linhas cabem nesta frase. Resolve tambem a objecao C5 do revisor, que apontava
+% a linha "Closed-loop" da tabela como armadilha de leitura (era a
+% re-identificacao restrita ao regime, nao o ajuste direto de 52.6%).
+% Arquivo mantido em latex/tables/ para a extensao JINT.
+% source: results/eval_omega_v3_se2_20260724_1723.csv ; identificacao_omega_20260724.md Etapa 5
+The gate verdict for all three DOFs is unchanged under a $\pm 21\%$
+perturbation of $\Td$ to its neighboring integer-step quantization.
+% source: results/reidentificacao_20260724.md Partes A-C
+% 2026-08-07: repetição do bloco de determinismo bit-exato removida aqui
+% (revisor S6: três menções, "substituição retórica"); permanece uma única
+% menção em IV-A. Espaço reaproveitado pela análise de diluição.
+
+% CUT (2026-07-31, page budget, reserva aprovada pelo usuário): Fig. ganho×amplitude
+% removida; claim permanece no texto. Ver docs/BACKLOG_EXTENSAO_JINT.md.
+
+\paragraph{Negative control: joint calibration}
+\label{sec:results:bayesopt}
+% CORTE 2026-08-09: mesma informacao, uma clausula a menos. Os quatro numeros
+% e o veredito de nao-promocao permanecem.
+% REESCRITO 2026-08-10 (C3 da revisao V2): o controle negativo era reportado por
+% JANELA enquanto o resultado principal e por EVENTO. Recomputado sob o mesmo
+% padrao. Fonte: results/negcontrol_perevent_20260810_1035.md
+A joint $9$-parameter Bayesian calibration ($400$ evaluations) was fitted on the
+same logs and scored under the same per-event protocol. It matches the per-DOF
+model rather than improving on it: both reach $\SI{0.042}{m}$ per event at
+$h_{\mathrm{ref}}$ and both beat ideal kinematics in $10$ of $10$ events by the
+same $\SI{0.069}{m}$. The per-DOF model is ahead by $\SI{0.004}{m}$ in $7$ of
+$10$ events ($p=0.042$), a margin we read as a tie. Four hundred evaluations of
+joint calibration buy nothing over identifying each DOF separately, which is
+what the excitation argument predicts.
+% source: results/phase0_proxy_ranking_20260614_2105.csv ;
+%         results/eval_bayesopt_v2_holdout_20260614_2130.csv ; CHANGELOG 2026-06-14 21:05/21:30

@@ -1,0 +1,71 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dtssl"
+version = "1.0.0a1"
+description = "Behavioral digital twin of the RobôCIn SSL omnidirectional robot: FOPDT-per-DOF plant, replay/evaluation harness, ssl-simulation-protocol server, GUI with DualSense debug mode, MuJoCo physics backends."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Victor H. S. Sabino (CIn-UFPE / RobôCIn)" }]
+keywords = ["digital twin", "system identification", "RoboCup", "SSL", "omnidirectional robot", "MuJoCo"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Topic :: Scientific/Engineering",
+]
+dependencies = [
+  "numpy>=1.26",
+  "pandas>=2.1",
+  "scipy>=1.11",
+  "pyarrow>=14",
+  "matplotlib>=3.8",
+  "protobuf>=4.25",
+]
+
+[project.optional-dependencies]
+gui = ["PySide6>=6.6", "pyqtgraph>=0.13.4", "PyOpenGL>=3.1", "pygame-ce>=2.5"]  # pygame-ce: drop-in `import pygame`, ships cp314 wheels (pygame 2.6 does not)
+mujoco = ["mujoco>=3.1"]
+rsim = ["robosim==1.0"]
+etl = []  # ETL usa os _pb2 gerados (grpcio-tools em dev); betterproto nao e mais necessario
+mat = ["h5py>=3.10"]
+dev = ["pytest>=8", "pytest-timeout>=2.3", "ruff>=0.5", "grpcio-tools>=1.60"]
+all = ["dtssl[gui,mujoco,etl,mat,dev]"]
+
+[project.scripts]
+dtssl = "dtssl.cli:main"
+
+[project.urls]
+Repository = "https://github.com/vhsabino/dt-ssl-sysid"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+dtssl = ["bridge/proto/*.proto", "physics/assets/*", "_config/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = [
+  "requires_data: needs data/extracted (DVC) — skipped when absent",
+  "requires_mujoco: needs the mujoco package",
+  "requires_gui: needs PySide6/pyqtgraph (offscreen)",
+  "requires_net: opens UDP sockets on loopback",
+  "requires_rsim: needs robosim (Linux/ODE)",
+]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+src = ["src", "tests"]
+extend-exclude = ["legacy", "phase0_replay", "src/dtssl/data/_proto", "src/dtssl/bridge/proto"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]

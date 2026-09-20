@@ -1,0 +1,37 @@
+%==============================================================================
+% TABLE: yaw (omega) P1D identification, closed-loop competition logs vs.
+% dedicated open-loop rotation-only collection. Same model structure and
+% identification tooling on both rows; only the data source differs.
+% Source: results/identificacao_omega_20260724.md (Etapa 5, comparison table);
+%         results/eval_omega_v3_se2_20260613_2340.csv (closed-loop gate);
+%         results/eval_omega_v3_se2_20260724_1723.csv (open-loop gate).
+%==============================================================================
+\begin{table}[t]
+  \caption{Yaw (\(\omega\)) P1D identification: closed-loop competition logs
+  vs.\ a dedicated open-loop rotation-only collection. Same model structure
+  (Eq.~\ref{eq:fopdt}) and identification tooling; only the excitation regime
+  differs. SE(2) gate: pooled median gap vs.\ placeholder
+  ($K{=}1,\tau{=}0.1\,\si{s},\Td{=}0$), non-overlapping Wilcoxon $p$.}
+  \label{tab:omega-regime}
+  \centering
+  \begin{tabular}{lcccc}
+    \toprule
+     & $K_\omega$ & $\tau_\omega$ (s) & $\Td{}_\omega$ (s) & hold-out fit \\
+    \midrule
+    Closed-loop, regime-restricted$^\dagger$ & 1.307  & 0.0222 & 0.1179 & \emph{n/a} \\
+    Open-loop (dedicated) & \textbf{1.0016} & \textbf{0.0828} & \textbf{0.0890} & \textbf{71.1\,\%} \\
+    \midrule
+     & \multicolumn{2}{c}{gate $\Delta$median (pool)} & \multicolumn{2}{c}{gate $p$} \\
+    \midrule
+    Closed-loop  & \multicolumn{2}{c}{$+0.0489$\,m (worse)} & \multicolumn{2}{c}{$3.8\times10^{-9}$} \\
+    Open-loop (dedicated) & \multicolumn{2}{c}{$\mathbf{-0.1138}$\,m (better)} & \multicolumn{2}{c}{$\mathbf{1.7\times10^{-16}}$} \\
+    \bottomrule
+  \end{tabular}
+  \\[2pt]
+  \raggedright\footnotesize $^\dagger$Closed-loop row: the regime-restricted
+  linear re-identification of Sec.~\ref{sec:results:omega} (not the direct
+  high-rotation fit quoted first there). It was scored by the earlier
+  regime-split criterion (fit $31.9\,\%$ high-amplitude / $-11.2\,\%$
+  low-amplitude), not a single hold-out number; it failed the
+  physical/whiteness checks regardless.
+\end{table}

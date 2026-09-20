@@ -1,1 +1,0 @@
-__all__ = ['data_filter_operator']

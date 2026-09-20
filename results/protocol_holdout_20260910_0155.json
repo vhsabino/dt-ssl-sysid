@@ -1,0 +1,442 @@
+{
+  "models": {
+    "erforce": {
+      "rows": [
+        {
+          "h": 6,
+          "h_s": 0.1,
+          "epos_twin_trans": 0.007917288293312017,
+          "epos_model_trans": 0.01829472625119135,
+          "epos_twin_all": 0.007863776521337405,
+          "epos_model_all": 0.01839919345467612,
+          "eang_twin_trans": 0.012766017113583692,
+          "eang_model_trans": 0.024811328146069345,
+          "p_wilcoxon": 0.0009765625,
+          "rank_biserial": 1.0,
+          "wins": 10,
+          "n_events": 10
+        },
+        {
+          "h": 12,
+          "h_s": 0.2,
+          "epos_twin_trans": 0.01779496567328239,
+          "epos_model_trans": 0.03862887961620317,
+          "epos_twin_all": 0.017830268991895593,
+          "epos_model_all": 0.038853279596571755,
+          "eang_twin_trans": 0.031106256625596112,
+          "eang_model_trans": 0.04618489678084588,
+          "p_wilcoxon": 0.0009765625,
+          "rank_biserial": 1.0,
+          "wins": 10,
+          "n_events": 10
+        },
+        {
+          "h": 24,
+          "h_s": 0.4,
+          "epos_twin_trans": 0.0388378965569626,
+          "epos_model_trans": 0.08813224645404946,
+          "epos_twin_all": 0.038794867992855406,
+          "epos_model_all": 0.08872927611054346,
+          "eang_twin_trans": 0.04399195962896664,
+          "eang_model_trans": 0.06462078941560069,
+          "p_wilcoxon": 0.0009765625,
+          "rank_biserial": 1.0,
+          "wins": 10,
+          "n_events": 10
+        },
+        {
+          "h": 42,
+          "h_s": 0.7,
+          "epos_twin_trans": 0.06173039646697673,
+          "epos_model_trans": 0.1327773800447803,
+          "epos_twin_all": 0.06095622883864312,
+          "epos_model_all": 0.13250727865506817,
+          "eang_twin_trans": 0.06273238853343031,
+          "eang_model_trans": 0.07744128888063226,
+          "p_wilcoxon": 0.0009765625,
+          "rank_biserial": 1.0,
+          "wins": 10,
+          "n_events": 10
+        },
+        {
+          "h": 60,
+          "h_s": 1.0,
+          "epos_twin_trans": 0.09196620255100446,
+          "epos_model_trans": 0.1862019833913842,
+          "epos_twin_all": 0.09184475287370122,
+          "epos_model_all": 0.18560396187081127,
+          "eang_twin_trans": 0.07332839288622366,
+          "eang_model_trans": 0.09158515095015252,
+          "p_wilcoxon": 0.0009765625,
+          "rank_biserial": 1.0,
+          "wins": 10,
+          "n_events": 10
+        },
+        {
+          "h": 90,
+          "h_s": 1.5,
+          "epos_twin_trans": 0.11928369797237338,
+          "epos_model_trans": 0.2596640665614018,
+          "epos_twin_all": 0.11922637878307533,
+          "epos_model_all": 0.2581053991883558,
+          "eang_twin_trans": 0.08954989448400069,
+          "eang_model_trans": 0.08740829091188236,
+          "p_wilcoxon": 0.0009765625,
+          "rank_biserial": 1.0,
+          "wins": 10,
+          "n_events": 10
+        }
+      ],
+      "per_event": [
+        [
+          0,
+          0.017236096177965624,
+          0.05584866078605238
+        ],
+        [
+          1,
+          0.058098940908348246,
+          0.13622683535340013
+        ],
+        [
+          2,
+          0.044860365620600605,
+          0.09553588911444398
+        ],
+        [
+          3,
+          0.022351551379293524,
+          0.05401446800462083
+        ],
+        [
+          4,
+          0.021260926058479266,
+          0.054570092094726616
+        ],
+        [
+          5,
+          0.05517959253686725,
+          0.11072125177271143
+        ],
+        [
+          6,
+          0.03934351743214175,
+          0.07051352839983265
+        ],
+        [
+          7,
+          0.04360428968466158,
+          0.1057490746353688
+        ],
+        [
+          8,
+          0.054003197293052044,
+          0.14345719944298427
+        ],
+        [
+          9,
+          0.040649982156637746,
+          0.10650928495720423
+        ]
+      ],
+      "gap_vs_twin_med": 0.04729612654594763,
+      "gap_vs_twin_max": 0.43965964999076834,
+      "n_windows": 265,
+      "n_trans": 264,
+      "n_failed": 0,
+      "diagnostics": {
+        "windows": 265,
+        "anchor_failures": 0,
+        "anchor_late": 1,
+        "short_windows": 0,
+        "tau0_estimated": 248,
+        "send_jitter_max": 0.0026234856668452267,
+        "send_jitter_mean": 2.8798713533391875e-06,
+        "send_late": 0,
+        "vision_period_wall": 0.014870019999989381,
+        "vision_rate_sim": 67.34568174703656,
+        "capture_scale": 1.0000000000000002,
+        "wall_per_sim": 1.0,
+        "teleport_latency_wall": 0.04369527599988032,
+        "teleport_latency_spread": 0.001164323000011791,
+        "vision_gaps": 0,
+        "decode_errors": 0,
+        "controls_sent": 28090,
+        "teleports": 268,
+        "tau0_median": 0.0006385715749308895,
+        "frames_used_median": 115.0,
+        "send_phase_median": 0.5000433086252967
+      },
+      "endpoint": {
+        "name": "erforce",
+        "host": "127.0.0.1",
+        "vision": "224.5.23.2:10020",
+        "control_port": 10301,
+        "team": "blue",
+        "robot_id": 0,
+        "teleport_omega": false
+      }
+    },
+    "erforce+delay": {
+      "rows": [
+        {
+          "h": 6,
+          "h_s": 0.1,
+          "epos_twin_trans": 0.007917288293312017,
+          "epos_model_trans": 0.013318113268805422,
+          "epos_twin_all": 0.007863776521337405,
+          "epos_model_all": 0.013316896228070129,
+          "eang_twin_trans": 0.012766017113583692,
+          "eang_model_trans": 0.02176197044173983,
+          "p_wilcoxon": 0.001953125,
+          "rank_biserial": 0.9636363636363636,
+          "wins": 9,
+          "n_events": 10
+        },
+        {
+          "h": 12,
+          "h_s": 0.2,
+          "epos_twin_trans": 0.01779496567328239,
+          "epos_model_trans": 0.029141501381506146,
+          "epos_twin_all": 0.017830268991895593,
+          "epos_model_all": 0.029021456056930118,
+          "eang_twin_trans": 0.031106256625596112,
+          "eang_model_trans": 0.035679610832826704,
+          "p_wilcoxon": 0.0009765625,
+          "rank_biserial": 1.0,
+          "wins": 10,
+          "n_events": 10
+        },
+        {
+          "h": 24,
+          "h_s": 0.4,
+          "epos_twin_trans": 0.0388378965569626,
+          "epos_model_trans": 0.055541295361393156,
+          "epos_twin_all": 0.038794867992855406,
+          "epos_model_all": 0.05543651044427541,
+          "eang_twin_trans": 0.04399195962896664,
+          "eang_model_trans": 0.0485470584608986,
+          "p_wilcoxon": 0.001953125,
+          "rank_biserial": 0.9636363636363636,
+          "wins": 9,
+          "n_events": 10
+        },
+        {
+          "h": 42,
+          "h_s": 0.7,
+          "epos_twin_trans": 0.06173039646697673,
+          "epos_model_trans": 0.09686307356942665,
+          "epos_twin_all": 0.06095622883864312,
+          "epos_model_all": 0.09655556445168997,
+          "eang_twin_trans": 0.06273238853343031,
+          "eang_model_trans": 0.06456904486400136,
+          "p_wilcoxon": 0.0068359375,
+          "rank_biserial": 0.8545454545454545,
+          "wins": 9,
+          "n_events": 10
+        },
+        {
+          "h": 60,
+          "h_s": 1.0,
+          "epos_twin_trans": 0.09196620255100446,
+          "epos_model_trans": 0.13034481121739877,
+          "epos_twin_all": 0.09184475287370122,
+          "epos_model_all": 0.13013234073645463,
+          "eang_twin_trans": 0.07332839288622366,
+          "eang_model_trans": 0.07389862772747388,
+          "p_wilcoxon": 0.0009765625,
+          "rank_biserial": 1.0,
+          "wins": 10,
+          "n_events": 10
+        },
+        {
+          "h": 90,
+          "h_s": 1.5,
+          "epos_twin_trans": 0.11928369797237338,
+          "epos_model_trans": 0.18187301284403085,
+          "epos_twin_all": 0.11922637878307533,
+          "epos_model_all": 0.18168453478358457,
+          "eang_twin_trans": 0.08954989448400069,
+          "eang_model_trans": 0.07645651126037871,
+          "p_wilcoxon": 0.001953125,
+          "rank_biserial": 0.9636363636363636,
+          "wins": 9,
+          "n_events": 10
+        }
+      ],
+      "per_event": [
+        [
+          0,
+          0.017236096177965624,
+          0.044728413000447116
+        ],
+        [
+          1,
+          0.058098940908348246,
+          0.09398457500911363
+        ],
+        [
+          2,
+          0.044860365620600605,
+          0.06077695470774751
+        ],
+        [
+          3,
+          0.022351551379293524,
+          0.04605443509678562
+        ],
+        [
+          4,
+          0.021260926058479266,
+          0.04372170287983072
+        ],
+        [
+          5,
+          0.05517959253686725,
+          0.054647603451197575
+        ],
+        [
+          6,
+          0.03934351743214175,
+          0.042505645680268184
+        ],
+        [
+          7,
+          0.04360428968466158,
+          0.07061139829236268
+        ],
+        [
+          8,
+          0.054003197293052044,
+          0.1042048204873348
+        ],
+        [
+          9,
+          0.040649982156637746,
+          0.05633993987299917
+        ]
+      ],
+      "gap_vs_twin_med": 0.032278221626491646,
+      "gap_vs_twin_max": 0.2675529877448986,
+      "n_windows": 265,
+      "n_trans": 264,
+      "n_failed": 0,
+      "diagnostics": {
+        "windows": 265,
+        "anchor_failures": 0,
+        "anchor_late": 2,
+        "short_windows": 0,
+        "tau0_estimated": 248,
+        "send_jitter_max": 0.0016631826665616245,
+        "send_jitter_mean": 2.9651710390548548e-06,
+        "send_late": 0,
+        "vision_period_wall": 0.015058208000027662,
+        "vision_rate_sim": 66.31725431754619,
+        "capture_scale": 1.0,
+        "wall_per_sim": 1.0,
+        "teleport_latency_wall": 0.04405545300005542,
+        "teleport_latency_spread": 0.008694737000041641,
+        "vision_gaps": 0,
+        "decode_errors": 0,
+        "controls_sent": 28090,
+        "teleports": 268,
+        "tau0_median": 0.0007853134502603544,
+        "frames_used_median": 115.0,
+        "send_phase_median": 0.5000466854763914
+      },
+      "endpoint": {
+        "name": "erforce",
+        "host": "127.0.0.1",
+        "vision": "224.5.23.2:10020",
+        "control_port": 10301,
+        "team": "blue",
+        "robot_id": 0,
+        "teleport_omega": false
+      }
+    }
+  },
+  "order": [
+    "erforce",
+    "erforce+delay"
+  ],
+  "horizons": [
+    6,
+    12,
+    24,
+    42,
+    60,
+    90
+  ],
+  "h_ref": 24,
+  "h_ref_s": 0.4,
+  "n_events": 10,
+  "n_windows": 265,
+  "events": [
+    "front_to_back_01_01",
+    "side_to_side_01_05",
+    "side_to_side_01_06",
+    "side_to_side_01_07",
+    "side_to_side_02_03",
+    "shoot_to_goal_05_02",
+    "shoot_to_goal_08_01",
+    "shoot_to_goal_09_01",
+    "shoot_to_goal_12_01",
+    "shoot_to_goal_14_02"
+  ],
+  "dropped": [],
+  "cost_s": {
+    "fopdt": 0.4088917889998811,
+    "erforce": 480.794808889,
+    "erforce+delay": 480.8378794119999
+  },
+  "caches": {
+    "erforce": "/mnt/c/Users/victo/Documents/digitaltwin/results/_cache_protocol_erforce_20260910_0155.npz",
+    "erforce+delay": "/mnt/c/Users/victo/Documents/digitaltwin/results/_cache_protocol_erforce_delay_20260910_0155.npz"
+  },
+  "delay": "both",
+  "repeat": 1,
+  "twin_v0zero": {
+    "rows": [
+      {
+        "h": 6,
+        "h_s": 0.1,
+        "epos_model_trans": 0.06829381212740901,
+        "eang_model_trans": 0.02699934535913545
+      },
+      {
+        "h": 12,
+        "h_s": 0.2,
+        "epos_model_trans": 0.096375581568588,
+        "eang_model_trans": 0.03659055748644938
+      },
+      {
+        "h": 24,
+        "h_s": 0.4,
+        "epos_model_trans": 0.11372715030555389,
+        "eang_model_trans": 0.04547600765853795
+      },
+      {
+        "h": 42,
+        "h_s": 0.7,
+        "epos_model_trans": 0.12197649452127132,
+        "eang_model_trans": 0.06625476662306315
+      },
+      {
+        "h": 60,
+        "h_s": 1.0,
+        "epos_model_trans": 0.14187514577787946,
+        "eang_model_trans": 0.07565348449986223
+      },
+      {
+        "h": 90,
+        "h_s": 1.5,
+        "epos_model_trans": 0.17831646700770454,
+        "eang_model_trans": 0.07755186787276443
+      }
+    ]
+  },
+  "validity": {
+    "erforce": true,
+    "erforce+delay": true
+  }
+}

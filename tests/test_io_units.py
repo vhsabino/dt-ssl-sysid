@@ -2,9 +2,11 @@
 import numpy as np
 import pytest
 
-from phase0_replay import load_segment, TS_DEFAULT, event_dir
-from phase0_replay.schema import validate_segment
-from phase0_replay.validate import check_velocity_units
+from dtssl import load_segment, TS_DEFAULT, event_dir
+from dtssl.data.schema import validate_segment
+from dtssl.data.validate import check_velocity_units
+
+pytestmark = pytest.mark.requires_data   # every test here loads a real event
 
 LABEL, EVENT = "side_to_side", "side_to_side_01_05"
 

@@ -1,0 +1,93 @@
+syntax = "proto3";
+
+package RCCommunication;
+
+message Speed {
+  uint32 id = 1;
+  double vx = 2;
+  double vy = 3;
+  double w = 4;
+  bool front = 5;
+  bool chip = 6;
+  bool charge = 7;
+  double kickStrength = 8;
+  bool dribbler = 9;
+  double dribblerSpeed = 10;
+  uint32 command = 11;
+  bool robotLockedToMove = 12;
+  bool criticalMoveTurbo = 13;
+};
+
+message Position {
+  double x = 1;
+  double y = 2;
+  double w = 3;
+  enum PosType{
+      unknown = 0;
+      source = 1;
+      stop = 2;
+      driveToTarget = 3;
+      rotateOnSelf = 4;
+      rotateInPoint = 5;
+  }
+  PosType posType = 4;
+  bool front  = 5;
+  bool chip  = 6;
+  bool charge  = 7;
+  double kickStrength = 8 ;
+  bool dribbler = 9;
+  double dribblerSpeed = 10;
+  bool resetOdometry = 11;
+  double minSpeed = 12;
+  double maxSpeed = 13;
+};
+
+message Feedback {
+  uint32 id = 1;
+  
+  double vx = 2;
+  double vy = 3;
+  double w = 4;
+
+  double c_speed_m1 = 5;
+  double c_speed_m2 = 6;
+  double c_speed_m3 = 7;
+  double c_speed_m4 = 8;
+
+  double d_speed_m1 = 9;
+  double d_speed_m2 = 10;
+  double d_speed_m3 = 11;
+  double d_speed_m4 = 12;
+
+  double capacitorCharge = 13;
+  double batteryCharge = 14;
+
+  bool hasBall = 15;
+
+  double pwm_m1 = 16;
+  double pwm_m2 = 17;
+  double pwm_m3 = 18;
+  double pwm_m4 = 19;
+
+  double error_m1 = 20;
+  double error_m2 = 21;
+  double error_m3 = 22;
+  double error_m4 = 23;
+
+  double current_m1 = 24;
+  double current_m2 = 25;
+  double current_m3 = 26;
+  double current_m4 = 27;
+}
+
+message CommandList {
+  repeated Speed speed = 1;
+}
+
+message WrapperMessage {
+  oneof message {
+    CommandList command = 1;
+    Position position = 2;
+    Feedback feedback = 3; 
+  }
+};
