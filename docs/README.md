@@ -36,6 +36,7 @@ Proveniência de cada número do projeto: `results/CHANGELOG.md`.
 | `PREREGISTRO_IDENTIFICABILIDADE_INSILICO_C1B_20260907.md` / `…_C1B_V2_…` | **pré-registros** do C1b (gerador físico; v1 falhou pela célula de referência e foi mantida; v2 re-registrada). |
 | `PREREGISTRO_C4_MALHA_FECHADA_20260908.md` | **pré-registro** do C4 (sessão em malha fechada × competição, critérios P1–P5). |
 | `PREREGISTRO_C2B_SIMULADORES_LIGA_20260910.md` | **pré-registro** do C2b (grSim/ER-Force no hold-out via ssl-simulation-protocol: H1–H3 e critério V de validade do instrumento) — executado por `dtssl analysis run protocol_holdout` (10/09). |
+| `PREREGISTRO_C2B2_PREROLAGEM_20260916.md` | **pré-registro** do C2b2 (pré-rolagem no replay via protocolo: o simulador chega a t0 pela própria dinâmica sob o prefixo real de comandos, trajetória re-ancorada em t0; H1' a H4' e V'); código pronto (`dtssl.sim.preroll`, `preroll=` do `protocol_holdout`), **experimento ainda não executado**. |
 | `INVENTARIO_RL_2026-07-24.md` | inventário do repo `planning-rl-greybox` (WSL2): experimento de gap de dinâmica com SAC+FSCAPS — fora de escopo nesta rodada. |
 | `RSIM_EXPLORATION.md` | viabilidade do `RSimReplay` (rSoccer/rSim) — bloqueios encontrados (16/06). |
 | `TASKS_CLAUDE_CODE.md` | pendências que exigiam execução para o paper (07/08); parte executada em 09–10/08 (ver CHANGELOG). |
@@ -66,6 +67,7 @@ Proveniência de cada número do projeto: `results/CHANGELOG.md`.
 | `REUNIAO_FIGURAS.md` | índice e roteiro das figuras da reunião de 26/06. |
 | `RESUMO_ORIENTACAO_20260909.pdf` | resumo de 2 páginas para a orientadora (09/09): infraestrutura, resultados C2a/C1/C1b/B3/C4/C5-C6 com proveniência, leitura, próximos passos e as duas decisões pedidas. |
 | `DEMO_ORIENTACAO_20260911.md` | roteiro da demonstração de 30 min para a orientadora (11/09): blocos com comando, fala e plano B, próximos passos, perguntas a fazer, números de bolso. |
+| `RUNBOOK_VIDEOS_D5_20260916.md` | passo a passo único dos dois vídeos que faltaram na demo (drop-in do ssl-unification; ER-Force rodando e avaliado pelo gêmeo), com os scripts `tools/demo/video1_dropin.sh` e `tools/demo/video2_erforce.sh` (check, run/start, probe, replay, strategy, stop), fala, plano B e falhas comuns. |
 | `../legacy/apresentacao/orientacao_20260612.m` | roteiro executável da reunião de orientação de 12/06 (só artefatos salvos). |
 
 ## Fora de `docs/`
