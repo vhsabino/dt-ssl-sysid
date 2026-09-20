@@ -79,11 +79,50 @@ def test_zero_ic_twin_equals_the_twin_only_when_the_window_starts_at_rest():
 
 
 def test_variants_follow_the_delay_option():
-    assert PH._variants(["grsim"], "none") == [("grsim", "grsim", None)]
-    assert PH._variants(["grsim"], "theta") == [("grsim+delay", "grsim", "theta")]
+    assert PH._variants(["grsim"], "none") == [("grsim", "grsim", None, False)]
+    assert PH._variants(["grsim"], "theta") == [("grsim+delay", "grsim", "theta", False)]
     assert PH._variants(["grsim", "erforce"], "both") == [
-        ("grsim", "grsim", None), ("grsim+delay", "grsim", "theta"),
-        ("erforce", "erforce", None), ("erforce+delay", "erforce", "theta")]
+        ("grsim", "grsim", None, False), ("grsim+delay", "grsim", "theta", False),
+        ("erforce", "erforce", None, False), ("erforce+delay", "erforce", "theta", False)]
+
+
+def test_variants_with_the_preroll_option_and_their_cache_names():
+    v = PH._variants(["grsim"], "both", preroll=0.5)
+    assert [x[0] for x in v] == ["grsim", "grsim+preroll", "grsim+delay", "grsim+delay+preroll"]
+    assert [x[3] for x in v] == [False, True, False, True]
+    assert PH._variants(["erforce"], "none", preroll=0.5, preroll_only=True) == [("erforce+preroll", "erforce", None, True)]
+    assert PH._variants(["erforce"], "none", preroll=0.0, preroll_only=True) == [("erforce", "erforce", None, False)]
+    for label in ("grsim+preroll", "grsim+delay+preroll", "erforce+delay"):
+        assert PH.parse_cache_name(PH.cache_stem(label, "20260916_0101", 1) + ".npz") == (label, "20260916_0101", 1)
+    # the C2b cache names of 10/09 are still parsed as before
+    assert PH.parse_cache_name("_cache_protocol_erforce_delay_20260910_0155.npz") == ("erforce+delay", "20260910_0155", 0)
+
+
+def test_preroll_twin_control_uses_the_prefix_and_keeps_the_window_grid():
+    from dtssl.sim.preroll import PreRollPlant
+
+    P = load_twin_params()
+    H = [6, 12, 24]
+    segs = [_synth_segment(AnalyticFOPDTPlant(P), N=260, seed=7)]
+    tw = C.ros(segs, lambda: AnalyticFOPDTPlant(P), horizons=H)
+    pre = PH._preroll_twin(segs, P, H, 0.5)
+    assert pre is not None and pre[0].n_total == tw[0].n_total
+    assert [w.t0 for w in pre[0].windows] == [w.t0 for w in tw[0].windows]       # same grid
+    used = pre[0].meta["preroll_samples"]
+    assert len(used) == tw[0].n_total and max(used) == 30 and min(used) >= 1     # 0.5 s at 60 Hz, first windows shorter
+    assert PH._preroll_twin(segs, P, H, 0.0) is None
+    assert PH._lookback(0.5, segs) == 30 and PH._lookback(0.0, segs) == C.LW
+    # the synthetic event IS the twin: driven through the real prefix, the twin recovers its own internal state
+    # at t0 better than the harness can impose it from the derived velocity series (velb0), so the pre-rolled
+    # twin is at least as close to the truth as the exact-IC twin at every horizon, and within 2 cm everywhere
+    def err(ro):
+        e = np.array([np.hypot(*(w.pose_sim[:, :2] - w.pose_real[:, :2]).T)[H] for w in ro[0].windows])
+        return np.median(e, axis=0), e.max()
+    med_tw, _ = err(tw)
+    med_pre, max_pre = err(pre)
+    assert (med_pre <= med_tw + 1e-9).all(), (med_pre, med_tw)
+    assert max_pre < 0.02, max_pre
+    assert isinstance(PreRollPlant(AnalyticFOPDTPlant(P), 0.5).params, dict)
 
 
 def test_summary_excludes_lost_windows_and_counts_them(tmp_path):
@@ -224,3 +263,59 @@ def test_compute_against_an_in_process_twin_server(tmp_path, monkeypatch):
         other = _synth_segment(AnalyticFOPDTPlant(theta), N=120, seed=2)
         monkeypatch.setattr(ctx2, "holdout", lambda *a, **k: ([other], []))
         PH.compute_from_caches(ctx2, list(r["caches"].values()))
+
+
+@pytest.mark.requires_net
+def test_compute_with_preroll_against_an_in_process_twin_server(tmp_path, monkeypatch):
+    """``compute(..., preroll=0.5)``: the ``+preroll`` variant runs next to the plain one, the ``fopdt+preroll``
+    control column is filled, the caches carry ``pre_roll_s`` and the offline re-analysis reproduces it all."""
+    from dtssl.bridge.config import BridgeConfig
+    from dtssl.bridge.server import SimServer
+    from dtssl.sim.backends import make_world
+
+    theta = load_twin_params()
+    theta_nodelay = {d: DofParam(K=p.K, tau=p.tau, Td=0.0) for d, p in theta.items()}
+    world = make_world("fopdt", n_blue=1, n_yellow=0, params=theta_nodelay, watchdog_clock="sim")
+    vport = _free_port()
+    cfg = BridgeConfig.load().with_overrides(vision_ip="127.0.0.1", vision_port=vport, blue_port=0, yellow_port=0,
+                                             simcontrol_port=0, bind_ip="127.0.0.1")
+    srv = SimServer(world, cfg)
+    srv.start()
+    th = srv.run_in_thread()
+    try:
+        eps = tmp_path / "external_sims.json"
+        eps.write_text(json.dumps({"test": dict(
+            host="127.0.0.1", port_blue=srv.control.port("blue"), port_simcontrol=srv.simcontrol.port,
+            vision_ip="127.0.0.1", vision_port=vport, unicast=True, team="blue", robot_id=0, vision_rate=60.0,
+            clear_others=False)}), encoding="utf-8")
+        ctx = C.make_context(repo_root(), tmp_path / "out")
+        seg = _synth_segment(AnalyticFOPDTPlant(theta), N=150, seed=2)      # 4 windows of H_max = 90
+        monkeypatch.setattr(ctx, "holdout", lambda *a, **k: ([seg], []))
+        r = PH.compute(ctx, ["test"], delay="theta", repeat=1, save_cache=True, endpoints_path=eps, preroll=0.5)
+    finally:
+        srv.stop()
+        th.join(timeout=2.0)
+    assert r["order"] == ["test+delay", "test+delay+preroll"] and r["preroll_s"] == 0.5
+    M, Mp = r["models"]["test+delay"], r["models"]["test+delay+preroll"]
+    assert M["pre_roll_s"] == 0.0 and Mp["pre_roll_s"] == 0.5
+    assert Mp["n_failed"] == 0 and Mp["diagnostics"]["reanchor_failures"] == 0
+    assert Mp["diagnostics"]["preroll_windows"] == Mp["n_windows"] == r["n_windows"] >= 3
+    assert Mp["diagnostics"]["preroll_samples_median"] >= 15                 # lookback 30, first window shorter
+    tol = 0.03 if sys.platform == "win32" else 5e-3
+    assert M["gap_vs_twin_max"] < tol, M
+    # the pre-rolled protocol replay vs the paper's twin = the pre-rolled twin vs the paper's twin (control column)
+    pre_rows = r["twin_preroll"]["rows"]
+    assert len(pre_rows) == len(r["horizons"]) and r["twin_preroll"]["samples_median"] >= 15
+    for rw, ctl in zip(Mp["rows"], pre_rows, strict=True):
+        assert abs(rw["epos_model_trans"] - ctl["epos_model_trans"]) < tol, (rw, ctl)
+    assert set(r["caches"]) == {"test+delay", "test+delay+preroll"}
+    text = "\n".join(PH.render(ctx, r))
+    assert "fopdt+preroll |" in text and "| test+delay+preroll | " in text and "Pre-rolagem" in text
+    # offline: labels and pre_roll_s from the file names and sidecars
+    ctx2 = C.make_context(repo_root(), tmp_path / "out2")
+    monkeypatch.setattr(ctx2, "holdout", lambda *a, **k: ([seg], []))
+    r2 = PH.compute_from_caches(ctx2, list(r["caches"].values()))
+    assert r2["order"] == r["order"] and r2["preroll_s"] == 0.5 and "twin_preroll" in r2
+    for n in r["order"]:
+        for a, b in zip(r["models"][n]["rows"], r2["models"][n]["rows"], strict=True):
+            assert a["epos_model_trans"] == pytest.approx(b["epos_model_trans"], abs=1e-12)

@@ -8,6 +8,7 @@
 #   tools/external_sims/run_protocol_holdout.sh --sims erforce --delay none --no-merge
 #   tools/external_sims/run_protocol_holdout.sh --merge-only          # só a tabela conjunta dos caches existentes
 #   tools/external_sims/run_protocol_holdout.sh --sims grsim --smoke   # 1 evento, ~2 min: valida o ambiente, NAO e resultado
+#   tools/external_sims/run_protocol_holdout.sh --delay none --preroll 0.5   # C2b2: <sim> e <sim>+preroll (pre-registro C2B2)
 #
 # Opções:
 #   --sims a,b        simuladores de config/external_sims.json (default: grsim,erforce; um de cada vez: mesmas portas)
@@ -18,16 +19,19 @@
 #   --merge-only      pula os replays e gera o artefato conjunto de results/_cache_protocol_*.npz
 #   --keep-up         não derruba o simulador ao terminar cada replay
 #   --smoke           só o primeiro evento do hold-out (max_events=1): teste de fumaça do ambiente, nunca resultado
+#   --preroll S       pré-rolagem de S segundos (C2b2): cada variante também roda como <variante>+preroll (0 = desligado)
+#   --preroll-only    com --preroll: só as variantes +preroll (sem as cruas)
 #   --out DIR         diretório de saída (default: results/ do repo; use outro para o --smoke)
 #
-# Tempo: ~8 min por variante (265 janelas x 1,5 s + cauda); grsim+erforce com delay=both, repeat=1 ~35 min.
+# Tempo: ~8 min por variante (265 janelas x 1,5 s + cauda; +2 min com pré-rolagem de 0,5 s); grsim+erforce com
+# delay=both, repeat=1 ~35 min; C2b2 (--delay none --preroll 0.5) ~40 min.
 # Saída: results/protocol_holdout_<stamp>.{md,json,csv} por simulador + um conjunto; caches em
 # results/_cache_protocol_*.npz (+ .stats.json), ignorados pelo git. Registrar no results/CHANGELOG.md.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$HERE/../.." && pwd)"
-SIMS="grsim,erforce"; DELAY="both"; REPEAT=1; PY=""; MERGE=1; MERGE_ONLY=0; KEEP_UP=0; SMOKE=0; OUT=""
+SIMS="grsim,erforce"; DELAY="both"; REPEAT=1; PY=""; MERGE=1; MERGE_ONLY=0; KEEP_UP=0; SMOKE=0; OUT=""; PREROLL="0"; PREROLL_ONLY=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --sims) SIMS="$2"; shift 2 ;;
@@ -39,7 +43,9 @@ while [[ $# -gt 0 ]]; do
     --keep-up) KEEP_UP=1; shift ;;
     --smoke) SMOKE=1; shift ;;
     --out) OUT="$2"; shift 2 ;;
-    -h|--help) sed -n '2,25p' "$0"; exit 0 ;;
+    --preroll) PREROLL="$2"; shift 2 ;;
+    --preroll-only) PREROLL_ONLY=1; shift ;;
+    -h|--help) sed -n '2,29p' "$0"; exit 0 ;;
     *) echo "opção desconhecida: $1" >&2; exit 2 ;;
   esac
 done
@@ -60,6 +66,9 @@ MARK="$(mktemp)"
 touch "$MARK"
 EXTRA_KW=()
 [[ $SMOKE -eq 1 ]] && EXTRA_KW+=("max_events=1")
+RUN_KW=()
+[[ "$PREROLL" != "0" ]] && RUN_KW+=("preroll=$PREROLL")
+[[ $PREROLL_ONLY -eq 1 ]] && RUN_KW+=("preroll_only=1")
 OUT_ARGS=()
 [[ -n "$OUT" ]] && OUT_ARGS+=(--out "$OUT")
 RES_DIR="${OUT:-results}"
@@ -72,9 +81,9 @@ if [[ $MERGE_ONLY -eq 0 ]]; then
     "$HERE/simctl.sh" "$SIM" start
     log "==== $SIM: sonda (teleporte + 1 janela de 1 s)"
     "$PY" -m dtssl.sim.protocol_plant --sim "$SIM" || { "$HERE/simctl.sh" "$SIM" log; "$HERE/simctl.sh" "$SIM" stop; die "sonda falhou em $SIM"; }
-    log "==== $SIM: dtssl analysis run protocol_holdout --kw sims=$SIM delay=$DELAY repeat=$REPEAT  (tempo real; ~8 min por variante)"
+    log "==== $SIM: dtssl analysis run protocol_holdout --kw sims=$SIM delay=$DELAY repeat=$REPEAT ${RUN_KW[*]:-}  (tempo real; ~8 min por variante)"
     T0=$(date +%s)
-    "$PY" -m dtssl.cli analysis run protocol_holdout "${OUT_ARGS[@]}" --kw "sims=$SIM" "delay=$DELAY" "repeat=$REPEAT" quiet=true "${EXTRA_KW[@]}" \
+    "$PY" -m dtssl.cli analysis run protocol_holdout "${OUT_ARGS[@]}" --kw "sims=$SIM" "delay=$DELAY" "repeat=$REPEAT" quiet=true "${RUN_KW[@]}" "${EXTRA_KW[@]}" \
       || { [[ $KEEP_UP -eq 1 ]] || "$HERE/simctl.sh" "$SIM" stop; die "análise falhou em $SIM"; }
     log "==== $SIM: concluído em $(( $(date +%s) - T0 )) s"
     [[ $KEEP_UP -eq 1 ]] || "$HERE/simctl.sh" "$SIM" stop

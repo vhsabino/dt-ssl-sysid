@@ -24,7 +24,14 @@ a motor setpoint: every window starts from rest; ER-Force honours the linear vel
 ``teleport_omega``).  The twin with the same handicap (``fopdt_v0=0``: FOPDT states reset to zero at ``t0``) is
 reported next to the paper's twin so the reader can separate "league physics vs FOPDT" from "initial condition".
 
-Real time: ~8 min per variant for the 265 windows.  Run it on the same machine / network namespace as the
+Pre-roll (``preroll=<seconds>``, C2b2, ``docs/PREREGISTRO_C2B2_PREROLAGEM_20260916.md``): every variant is also run
+with the tag ``+preroll`` (``preroll_only=1`` runs only those): the robot is teleported ``P`` samples before ``t0``
+and driven with the recorded command prefix, so the simulator reaches ``t0`` with its own state (grSim can then
+carry an initial velocity, ER-Force a yaw rate), and the poses are re-anchored at ``t0`` (``dtssl.sim.preroll``).
+The twin gets the same treatment as a control column (``fopdt+preroll``: the pre-roll applied to a plant whose
+exact initial condition the harness can impose).  ``preroll=0`` (default) is the C2b analysis unchanged.
+
+Real time: ~8 min per variant for the 265 windows (+~2 min with a 0.5 s pre-roll).  Run it on the same machine / network namespace as the
 simulator (multicast; in WSL2, inside WSL -- ``tools/external_sims/README.md``); grSim and ER-Force use the same
 ports, so run one simulator at a time and merge the caches offline (``from_cache``):
 
@@ -32,9 +39,10 @@ ports, so run one simulator at a time and merge the caches offline (``from_cache
     dtssl analysis run protocol_holdout --kw sims=erforce
     dtssl analysis run protocol_holdout --kw sims=grsim max_events=1 delay=none   # 1-minute smoke test, not a result
     dtssl analysis run protocol_holdout --kw from_cache=results/_cache_protocol_grsim_*.npz,results/_cache_protocol_erforce_*.npz
+    dtssl analysis run protocol_holdout --kw sims=grsim,erforce delay=none preroll=0.5      # C2b2 (pre-roll vs plain)
 
 Output: ``results/protocol_holdout_<stamp>.md`` (+ ``.csv``, ``.json``) and the rollouts of every variant in
-``results/_cache_protocol_<sim>[_delay]_<stamp>[_r<k>].npz`` (+ ``.stats.json`` with the replay diagnostics),
+``results/_cache_protocol_<sim>[_delay][_preroll]_<stamp>[_r<k>].npz`` (+ ``.stats.json`` with the replay diagnostics),
 re-analysable offline without the simulator through ``from_cache`` (labels and repeats are read from the file names).
 Self-test: ``sims=dtssl`` with ``dtssl serve --backend fopdt --theta <theta with Td = 0>`` running reproduces the
 twin (``tests/test_protocol_plant.py`` / ``tests/test_protocol_holdout.py`` do it in-process at the mm level).
@@ -60,16 +68,19 @@ REQUIRES = ("data", "net")
 DEFAULT_SIMS = ("grsim", "erforce")
 
 
-_CACHE_RE = re.compile(r"_cache_protocol_(?P<sim>[A-Za-z0-9-]+?)(?P<delay>_delay)?_(?P<stamp>\d{8}_\d{4,6})(?:_r(?P<rep>\d+))?\.npz$")
+_CACHE_RE = re.compile(r"_cache_protocol_(?P<sim>[A-Za-z0-9-]+?)(?P<delay>_delay)?(?P<preroll>_preroll)?"
+                       r"_(?P<stamp>\d{8}_\d{4,6})(?:_r(?P<rep>\d+))?\.npz$")
 
 
-def _variants(sims, delay: str) -> list[tuple[str, str, str | None]]:
-    """``(label, sim, delay_mode)`` for the requested simulators and delay option."""
+def _variants(sims, delay: str, preroll: float = 0.0, preroll_only: bool = False) -> list[tuple[str, str, str | None, bool]]:
+    """``(label, sim, delay_mode, preroll?)`` for the requested simulators, delay option and pre-roll option."""
     modes = {"both": (None, "theta"), "none": (None,), "theta": ("theta",)}[delay]
+    pre = ((True,) if preroll_only else (False, True)) if preroll > 0.0 else (False,)
     out = []
     for s in sims:
         for m in modes:
-            out.append((f"{s}+delay" if m == "theta" else s, s, m))
+            for pr in pre:
+                out.append(((f"{s}+delay" if m == "theta" else s) + ("+preroll" if pr else ""), s, m, pr))
     return out
 
 
@@ -82,7 +93,7 @@ def parse_cache_name(path: str | Path) -> tuple[str, str, int]:
     m = _CACHE_RE.search(Path(path).name)
     if m is None:
         raise KeyError(f"{Path(path).name}: not a protocol_holdout cache name (_cache_protocol_<sim>[_delay]_<stamp>[_r<k>].npz)")
-    label = m.group("sim") + ("+delay" if m.group("delay") else "")
+    label = m.group("sim") + ("+delay" if m.group("delay") else "") + ("+preroll" if m.group("preroll") else "")
     return label, m.group("stamp"), int(m.group("rep") or 0)
 
 
@@ -153,12 +164,42 @@ def _check_cache(ro, segs, path) -> None:
             raise ValueError(f"{path}: rollout of {r.meta.get('event')!r} paired with segment {s.meta.get('event')!r}")
 
 
-def _finish(ctx: C.Ctx, tw, tw0, H, kref, segs, dropped, models, order, cost, caches, delay, repeat) -> dict:
+def _finish(ctx: C.Ctx, tw, tw0, H, kref, segs, dropped, models, order, cost, caches, delay, repeat,
+            preroll: float = 0.0, tw_pre=None) -> dict:
     zero = _rows_only(ctx, tw, tw0, H)
-    return dict(models=models, order=order, horizons=list(H), h_ref=int(H[kref]), h_ref_s=float(H[kref] * tw[0].meta["ts"]),
-                n_events=len(segs), n_windows=sum(r.n_total for r in tw), events=[s.meta.get("event") for s in segs],
-                dropped=[d.get("event") if isinstance(d, dict) else str(d) for d in dropped], cost_s=cost,
-                caches=caches, delay=delay, repeat=int(repeat), twin_v0zero=dict(rows=zero))
+    r = dict(models=models, order=order, horizons=list(H), h_ref=int(H[kref]), h_ref_s=float(H[kref] * tw[0].meta["ts"]),
+             n_events=len(segs), n_windows=sum(r.n_total for r in tw), events=[s.meta.get("event") for s in segs],
+             dropped=[d.get("event") if isinstance(d, dict) else str(d) for d in dropped], cost_s=cost,
+             caches=caches, delay=delay, repeat=int(repeat), twin_v0zero=dict(rows=zero), preroll_s=float(preroll))
+    if tw_pre is not None:
+        r["twin_preroll"] = dict(rows=_rows_only(ctx, tw, tw_pre, H),
+                                 samples_median=float(np.median(tw_pre[0].meta.get("preroll_samples") or [0])))
+    return r
+
+
+def _preroll_twin(segs, P, H, preroll: float):
+    """The paper's twin driven through the pre-roll (control column ``fopdt+preroll``); the samples used per
+    window are kept in the rollout meta."""
+    from dtssl.sim.preroll import PreRollPlant
+
+    if preroll <= 0.0:
+        return None
+    plants: list[PreRollPlant] = []
+
+    def factory():
+        plants.append(PreRollPlant(AnalyticFOPDTPlant(P), preroll))
+        return plants[-1]
+
+    ro = C.ros(segs, factory, horizons=H, lookback=_lookback(preroll, segs))
+    used = [n for pl in plants for n in pl.samples_used]
+    ro[0].meta["preroll_samples"] = used
+    return ro
+
+
+def _lookback(preroll: float, segs) -> int:
+    """Window lookback (samples) large enough for the pre-roll prefix (never below the gate's ``LW``)."""
+    ts = float(segs[0].ts) if segs else 1.0 / 60.0
+    return max(C.LW, int(round(preroll / ts)))
 
 
 def _attach_repeat(runs: list[dict], repeat: int) -> dict:
@@ -175,7 +216,8 @@ def _attach_repeat(runs: list[dict], repeat: int) -> dict:
 
 
 def compute(ctx: C.Ctx, sims=DEFAULT_SIMS, delay: str = "both", repeat: int = 1, h_ref: int | None = None,
-            save_cache: bool = True, endpoints_path: str | Path | None = None, max_events: int | None = None) -> dict:
+            save_cache: bool = True, endpoints_path: str | Path | None = None, max_events: int | None = None,
+            preroll: float = 0.0, preroll_only: bool = False) -> dict:
     from dtssl.sim.protocol_plant import ProtocolPlant, load_endpoint
     from dtssl.sim.rollout import save_rollouts
 
@@ -188,18 +230,21 @@ def compute(ctx: C.Ctx, sims=DEFAULT_SIMS, delay: str = "both", repeat: int = 1,
     t0 = time.perf_counter()
     tw = C.ros(segs, lambda: AnalyticFOPDTPlant(P), horizons=H)
     tw0 = C.ros(segs, lambda: _ZeroICPlant(P), horizons=H)
+    preroll = float(preroll)
+    tw_pre = _preroll_twin(segs, P, H, preroll)
     cost = {"fopdt": time.perf_counter() - t0}
     models: dict[str, dict] = {}
     caches: dict[str, str] = {}
     order = []
-    for label, sim, mode in _variants(sims, delay):
+    for label, sim, mode, pre in _variants(sims, delay, preroll, preroll_only):
         ep = load_endpoint(sim, endpoints_path)
         runs = []
         for r in range(int(repeat)):
-            plant = ProtocolPlant(ep, delay=mode, params=P)
+            plant = ProtocolPlant(ep, delay=mode, params=P, pre_roll=preroll if pre else 0.0)
             t1 = time.perf_counter()
             try:
-                ro = C.ros(segs, lambda plant=plant: plant, horizons=H)
+                ro = C.ros(segs, lambda plant=plant: plant, horizons=H,
+                           lookback=_lookback(preroll, segs) if pre else C.LW)
             finally:
                 plant.close()
             key = f"{label}#{r}" if repeat > 1 else label
@@ -209,16 +254,18 @@ def compute(ctx: C.Ctx, sims=DEFAULT_SIMS, delay: str = "both", repeat: int = 1,
             summ["endpoint"] = dict(name=ep.name, host=ep.host, vision=f"{ep.vision_ip}:{ep.vision_port}",
                                     control_port=ep.control_port, team=ep.team, robot_id=ep.robot_id,
                                     teleport_omega=bool(ep.teleport_omega))
+            summ["pre_roll_s"] = preroll if pre else 0.0
             if save_cache:
                 path = save_rollouts(ctx.out / cache_stem(label, ctx.stamp, r if repeat > 1 else None), ro)
                 side = dict(label=label, sim=sim, delay=mode, repeat=r, endpoint=summ["endpoint"],
-                            diagnostics=summ["diagnostics"], cost_s=cost[key], stamp=ctx.stamp)
+                            diagnostics=summ["diagnostics"], cost_s=cost[key], stamp=ctx.stamp,
+                            pre_roll_s=summ["pre_roll_s"])
                 path.with_suffix(".stats.json").write_text(json.dumps(side, indent=1, default=str), encoding="utf-8")
                 caches[key] = str(path)
             runs.append(summ)
         models[label] = _attach_repeat(runs, int(repeat))
         order.append(label)
-    r = _finish(ctx, tw, tw0, H, kref, segs, dropped, models, order, cost, caches, delay, repeat)
+    r = _finish(ctx, tw, tw0, H, kref, segs, dropped, models, order, cost, caches, delay, repeat, preroll, tw_pre)
     if max_events is not None:
         r["smoke"] = int(max_events)
     return r
@@ -251,6 +298,7 @@ def compute_from_caches(ctx: C.Ctx, paths, h_ref: int | None = None, max_events:
     models: dict[str, dict] = {}
     caches: dict[str, str] = {}
     order = []
+    preroll = 0.0
     for label, items in groups.items():
         runs = []
         for rep, f in sorted(items):
@@ -260,6 +308,8 @@ def compute_from_caches(ctx: C.Ctx, paths, h_ref: int | None = None, max_events:
             side_path = f.with_suffix(".stats.json")
             side = json.loads(side_path.read_text(encoding="utf-8")) if side_path.is_file() else {}
             summ["diagnostics"] = side.get("diagnostics", {})
+            summ["pre_roll_s"] = float(side.get("pre_roll_s", 0.0))
+            preroll = max(preroll, summ["pre_roll_s"])
             summ["endpoint"] = side.get("endpoint", dict(name=label.split("+")[0], host="?", vision="?", control_port="?",
                                                          team="?", robot_id="?"))
             key = f"{label}#{rep}" if len(items) > 1 else label
@@ -271,7 +321,7 @@ def compute_from_caches(ctx: C.Ctx, paths, h_ref: int | None = None, max_events:
     delay = "both" if any("+delay" in n for n in order) and any("+delay" not in n for n in order) else (
         "theta" if all("+delay" in n for n in order) else "none")
     r = _finish(ctx, tw, tw0, H, kref, segs, dropped, models, order, cost, caches, delay,
-                max(len(v) for v in groups.values()))
+                max(len(v) for v in groups.values()), preroll, _preroll_twin(segs, P, H, preroll))
     if max_events is not None:
         r["smoke"] = int(max_events)
     return r
@@ -310,22 +360,33 @@ def render(ctx: C.Ctx, r: dict) -> list[str]:
     if r.get("smoke"):
         L += [f"**TESTE DE FUMACA: so os primeiros {r['smoke']} evento(s) do hold-out (max_events); NAO e um resultado.**", ""]
     zero = r.get("twin_v0zero", {}).get("rows")
+    pre = r.get("twin_preroll", {}).get("rows")
+    pre_s = float(r.get("preroll_s", 0.0))
+    pre_txt = ""
+    if pre_s > 0.0:
+        pre_txt = (f" `+preroll` = pre-rolagem de {pre_s:.2f} s: teleporte P amostras antes de t0, prefixo real de comandos "
+                   "transmitido, trajetoria re-ancorada em SE(2) em t0 (dtssl.sim.preroll; pre-registro C2b2). "
+                   "`fopdt+preroll` = o gemeo submetido a mesma pre-rolagem (controle: o efeito do procedimento "
+                   "numa planta cuja condicao inicial exata o harness impoe).")
+    ctrl_hdr = "| h (s) | fopdt | fopdt_v0=0 | " + ("fopdt+preroll | " if pre else "")
+    ctrl_sep = "|---|---|---|" + ("---|" if pre else "")
     L += [f"Hold-out: {r['n_events']} eventos ({', '.join(r['events'])}); {r['n_windows']} janelas; "
           f"h_ref = {r['h_ref']} amostras = {r['h_ref_s']:.2f} s. Variantes: {', '.join(r['order'])} "
           f"(`+delay` = Td identificado aplicado nos comandos enviados). `fopdt_v0=0` = o gemeo com os estados "
-          "FOPDT zerados em t0 (a mesma desvantagem do grSim, que ignora a velocidade inicial no teleporte).", "",
+          "FOPDT zerados em t0 (a mesma desvantagem do grSim, que ignora a velocidade inicial no teleporte)." + pre_txt, "",
           "## e_pos mediano por horizonte (bin translacional, janelas densas; NaN = janelas perdidas excluidas)", "",
-          "| h (s) | fopdt | fopdt_v0=0 | " + " | ".join(r["order"]) + " |", "|---|---|---|" + "---|" * len(r["order"])]
+          ctrl_hdr + " | ".join(r["order"]) + " |", ctrl_sep + "---|" * len(r["order"])]
     first = r["models"][r["order"][0]]["rows"]
     z = lambda k, key: f"{zero[k][key]:.4f}" if zero else "-"  # noqa: E731
+    q = lambda k, key: [f"{pre[k][key]:.4f}"] if pre else []  # noqa: E731
     for k, row in enumerate(first):
-        cells = [f"{row['h_s']:.2f}", f"{row['epos_twin_trans']:.4f}", z(k, "epos_model_trans")]
+        cells = [f"{row['h_s']:.2f}", f"{row['epos_twin_trans']:.4f}", z(k, "epos_model_trans")] + q(k, "epos_model_trans")
         cells += [f"{r['models'][n]['rows'][k]['epos_model_trans']:.4f}" for n in r["order"]]
         L.append("| " + " | ".join(cells) + " |")
     L += ["", "## e_ang mediano por horizonte (rad, bin translacional)", "",
-          "| h (s) | fopdt | fopdt_v0=0 | " + " | ".join(r["order"]) + " |", "|---|---|---|" + "---|" * len(r["order"])]
+          ctrl_hdr + " | ".join(r["order"]) + " |", ctrl_sep + "---|" * len(r["order"])]
     for k, row in enumerate(first):
-        cells = [f"{row['h_s']:.2f}", f"{row['eang_twin_trans']:.4f}", z(k, "eang_model_trans")]
+        cells = [f"{row['h_s']:.2f}", f"{row['eang_twin_trans']:.4f}", z(k, "eang_model_trans")] + q(k, "eang_model_trans")
         cells += [f"{r['models'][n]['rows'][k]['eang_model_trans']:.4f}" for n in r["order"]]
         L.append("| " + " | ".join(cells) + " |")
     kref = r["horizons"].index(r["h_ref"])
@@ -344,8 +405,8 @@ def render(ctx: C.Ctx, r: dict) -> list[str]:
           "## Diagnostico do replay via protocolo", "",
           "| variante | endpoint | visao (Hz sim) | latencia teleporte (ms) | tau0 mediano (ms) | tau0 estimado | "
           "fase de envio | jitter envio max/med (ms) | envios atrasados | teleporte nao visto | ancora tardia | "
-          "janelas curtas | gaps de visao |",
-          "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+          "janelas curtas | gaps de visao | pre-rolagem P mediano (amostras) / curtas / re-ancoragem falhou |",
+          "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for n in r["order"]:
         M = r["models"][n]
         d, e = M["diagnostics"], M["endpoint"]
@@ -357,7 +418,9 @@ def render(ctx: C.Ctx, r: dict) -> list[str]:
                  f"{g('tau0_estimated')}/{g('windows')} | {f(d.get('send_phase_median'))} | "
                  f"{f(d.get('send_jitter_max'), 1e3)} / {f(d.get('send_jitter_mean'), 1e3)} | "
                  f"{g('send_late')}/{g('controls_sent')} | {g('anchor_failures')} | {g('anchor_late')} | {g('short_windows')} | "
-                 f"{g('vision_gaps')} |")
+                 f"{g('vision_gaps')} | "
+                 + (f"{f(d.get('preroll_samples_median'))} / {g('preroll_short')} / {g('reanchor_failures')}"
+                    if d.get("preroll_windows") else "-") + " |")
     L += ["", "Validade do instrumento (pre-registro C2b, criterio V: janelas perdidas <= 5 %, jitter medio de envio < 2 ms "
           "com <= 1 % dos envios atrasados > 10 ms, espalhamento da latencia < 1 quadro, tau0 estimado em >= 50 % das "
           "janelas):", ""]
@@ -389,15 +452,24 @@ def render(ctx: C.Ctx, r: dict) -> list[str]:
           "no proprio gemeo: o que sobra alem dela e fisica.",
           "- Replay em tempo real: as janelas perdidas (teleporte nao visto / visao insuficiente) sao excluidas e "
           "contadas; use `repeat=2` para reportar a repetibilidade."]
+    if pre_s > 0.0:
+        L += ["- Pre-rolagem (`+preroll`): o simulador chega a t0 com o estado que a SUA dinamica produziu sob o prefixo "
+              "real de comandos, e a trajetoria e re-ancorada em t0; a condicao inicial deixa de ser imposta pelo "
+              "teleporte. O que sobra de gap e fisica e atuacao. O tau0 do teleporte continua nao identificavel no "
+              "grSim (robo em repouso no teleporte: estimativa saturada em 0); com a re-ancoragem em t0 o erro de tau0 "
+              "vira um deslocamento de tempo comum a toda a janela (efeito de segunda ordem), nao um erro de pose."]
     return L
 
 
 def run(root: Path | None = None, out: Path | None = None, *, sims: str = ",".join(DEFAULT_SIMS),
         delay: str = "both", repeat: int = 1, h_ref: int | None = None, save_cache: bool = True,
         endpoints: str | None = None, from_cache: str | None = None, max_events: int | None = None,
-        quiet: bool = False, **kw) -> dict:
+        preroll: float = 0.0, preroll_only: bool = False, quiet: bool = False, **kw) -> dict:
     if delay not in ("both", "none", "theta"):
         raise ValueError("delay must be both | none | theta")
+    preroll = float(preroll)
+    if preroll < 0.0:
+        raise ValueError("preroll must be >= 0 (seconds)")
     ctx = C.make_context(root, out)
     if from_cache:
         paths = [p.strip() for p in str(from_cache).split(",") if p.strip()]
@@ -405,7 +477,8 @@ def run(root: Path | None = None, out: Path | None = None, *, sims: str = ",".jo
     else:
         names = [s.strip() for s in str(sims).split(",") if s.strip()]
         r = compute(ctx, names, delay=delay, repeat=int(repeat), h_ref=h_ref, save_cache=bool(save_cache),
-                    endpoints_path=endpoints, max_events=max_events)
+                    endpoints_path=endpoints, max_events=max_events, preroll=preroll,
+                    preroll_only=bool(int(preroll_only)) if not isinstance(preroll_only, bool) else preroll_only)
     r["validity"] = {n: instrument_validity(M)[0] for n, M in r["models"].items()}
     L = render(ctx, r)
     p = ctx.write_text(NAME, L)

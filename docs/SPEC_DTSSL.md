@@ -45,7 +45,7 @@ digitaltwin/
 │   ├── __init__.py  paths.py  config.py  units.py  geometry.py  kinematics.py  cli.py
 │   ├── data/      schema.py resample.py loader.py validate.py splits.py recordio.py extract.py rotate.py  _proto/ (RCLog betterproto)
 │   ├── models/    params.py base.py fopdt.py ideal.py constvel.py rsim.py
-│   ├── sim/       entities.py ball.py world.py rollout.py backends.py world_plant.py protocol_plant.py
+│   ├── sim/       entities.py ball.py world.py rollout.py backends.py world_plant.py protocol_plant.py preroll.py
 │   ├── eval/      metrics.py stats.py verdict.py report.py
 │   ├── analysis/  common.py + um módulo por script do artigo (run(root, out) + main())
 │   ├── bridge/    proto/ (pb2 gerados + .proto fonte + build_proto.py) vision.py control.py simcontrol.py server.py fake_strategy.py recorder.py
@@ -132,15 +132,16 @@ class World(ABC):
     def robot_pose(self, team, rid) -> tuple[float, float, float]                    # pose direto do backend (θ contínuo quando possível)
 class TwinWorld(World)            # backend "fopdt"/"ideal": um Plant por robô + ball.py + colisões círculo-círculo/paredes + kick/dribbler + watchdog
 class WorldPlant(Plant)           # dtssl.sim.world_plant: um World de 1 robô visto como Plant do harness (reset/prime_delay/step);
-                                  #   make_harness_plant("fopdt"|"ideal"|"mujoco-velocity"|"mujoco-rollers"|"mujoco-rollers-delay"|"world:<backend>"|"proto:<sim>[+delay]")
-class ProtocolPlant(Plant)        # dtssl.sim.protocol_plant: simulador EXTERNO via ssl-simulation-protocol (grSim, ER-Force, dtssl serve) como Plant
+                                  #   make_harness_plant("fopdt"|"ideal"|"mujoco-velocity"|"mujoco-rollers"|"mujoco-rollers-delay"|"world:<backend>"|"proto:<sim>[+delay]"; qualquer um deles "+preroll")
+class ProtocolPlant(Plant)        # dtssl.sim.protocol_plant: simulador EXTERNO via ssl-simulation-protocol (grSim, ER-Force, dtssl serve) como Plant; pre_roll=S (s) = prefixo real antes da janela + re-ancoragem em t0
+class PreRollPlant                # dtssl.sim.preroll: o mesmo procedimento em processo para qualquer Plant (referência do auto-teste e coluna de controle fopdt+preroll)
                                   #   do harness; Endpoint de config/external_sims.json; free_run_window(win_cmds, pose0, velb0, dt, prev_cmds)
                                   #   (gancho em lote de free_run: teleporte + comandos a dt de parede + visão alinhada por âncora/tau0);
                                   #   delay=None | "theta" (Td do θ oficial aplicado no envio); stats (ProtocolStats) para o artefato
 ```
 Backends registrados em `dtssl.sim.backends`: `"fopdt"` (default, θ oficial), `"ideal"`, `"mujoco-velocity"` (rota a), `"mujoco-rollers"` (rota b). `make_world(name, **opts) -> World`.
 Qualquer backend pode ser avaliado no harness do artigo (mesmas janelas re-ancoradas, mesma métrica) via `WorldPlant`; `mujoco-rollers-delay` = rota b + atraso de transporte `Td` por DOF do θ oficial aplicado ao comando (análogo da ablação de atraso do rSim).
-Simuladores externos entram pelo mesmo caminho via `ProtocolPlant` (`proto:grsim`, `proto:erforce+delay`; `dtssl analysis run protocol_holdout`): `free_run` usa `plant.free_run_window` quando a planta o oferece (janela inteira em lote, tempo real), senão o `reset/prime_delay/step` de sempre. Janelas que o simulador não reproduziu (teleporte não visto) voltam como NaN e são excluídas e contadas pela análise. O que cada simulador faz com a velocidade do teleporte (grSim: ignora, parte do repouso; ER-Force: só a linear) está em `config/external_sims.json` e em `tools/external_sims/README.md`.
+Simuladores externos entram pelo mesmo caminho via `ProtocolPlant` (`proto:grsim`, `proto:erforce+delay`; `dtssl analysis run protocol_holdout`): `free_run` usa `plant.free_run_window` quando a planta o oferece (janela inteira em lote, tempo real), senão o `reset/prime_delay/step` de sempre. Janelas que o simulador não reproduziu (teleporte não visto) voltam como NaN e são excluídas e contadas pela análise. O que cada simulador faz com a velocidade do teleporte (grSim: ignora, parte do repouso; ER-Force: só a linear) está em `config/external_sims.json` e em `tools/external_sims/README.md`. A pré-rolagem (`+preroll`, `dtssl.sim.preroll`, C2b2) remove essa desvantagem sem tocar no simulador: teleporte P amostras antes de t0, prefixo real de comandos transmitido, trajetória re-ancorada em SE(2) em t0; `pre_roll=0` é o comportamento anterior bit a bit.
 
 ### 4.3 `dtssl.sim.rollout` e `dtssl.eval` — mantêm as assinaturas atuais de `phase0_replay.rollout/metrics` (`free_run`, `rollout_segment`, `Window`, `WindowRollout`, `build_error_table`, `evaluate`, `make_figures`, `markdown_report`), com dois consertos: `rollout_segment` deriva `idx_min` da planta passada (não do JSON) e `build_error_table` recebe `robot_radius`/`params` explicitamente. Cache de rollouts serializado em `.npz` (não pickle).
 
@@ -165,7 +166,7 @@ Simuladores externos entram pelo mesmo caminho via `ProtocolPlant` (`proto:grsim
 - `mujoco_world.py`: `MuJoCoWorld(World)` para ambas as rotas; `step(dt)` faz `n_sub = round(dt/model.opt.timestep)` substeps; expõe `mj_model/mj_data` para viewer; `render_offscreen()` opcional. Testes: bola desacelera, robô rota-a segue FOPDT com erro < 1 mm/passo sem contato, rota-b anda em linha reta ±2 % com comando vx.
 
 ### 4.7 CLI (`dtssl` = `dtssl.cli:main`)
-`dtssl serve [--backend fopdt] [--config config/bridge.json] [--teams blue,yellow] [--n 6]` · `dtssl gui` · `dtssl replay <label> <event> [--theta config/twin_params.json] [--plant fopdt|ideal|mujoco-velocity|mujoco-rollers|mujoco-rollers-delay|world:<backend>|proto:<sim>[+delay]] [--out results/]` · `dtssl gate twin-vs-ideal|twin-vs-rsim [--mode A|B]` · `dtssl analysis <name>` · `dtssl fig <name>` · `dtssl etl extract <log.gz> <out>` / `split` / `rotate` · `dtssl mjcf --route a|b [--visual primitive|cad] [--view --demo] --out models/mjcf/` · `dtssl proto-build` · `dtssl release`.
+`dtssl serve [--backend fopdt] [--config config/bridge.json] [--teams blue,yellow] [--n 6]` · `dtssl gui` · `dtssl replay <label> <event> [--theta config/twin_params.json] [--plant fopdt|ideal|mujoco-velocity|mujoco-rollers|mujoco-rollers-delay|world:<backend>|proto:<sim>[+delay]][+preroll] [--out results/]` · `dtssl gate twin-vs-ideal|twin-vs-rsim [--mode A|B]` · `dtssl analysis <name>` · `dtssl fig <name>` · `dtssl etl extract <log.gz> <out>` / `split` / `rotate` · `dtssl mjcf --route a|b [--visual primitive|cad] [--view --demo] --out models/mjcf/` · `dtssl proto-build` · `dtssl release`.
 
 ## 5. Testes e reprodutibilidade
 - `pytest -m "not requires_data and not requires_mujoco and not requires_gui"` deve passar em CI sem dataset. `conftest.py` registra marcadores e `skip` automático. `requires_net` = sockets UDP em loopback (servidor em processo), sem simulador externo; o replay via protocolo contra grSim/ER-Force não tem teste automático — é experimento (`protocol_holdout`, `REQUIRES = ("data", "net")`), validado pelo auto-teste `dtssl serve` ↔ `ProtocolPlant` ao nível do mm.

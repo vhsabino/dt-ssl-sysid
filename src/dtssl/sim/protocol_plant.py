@@ -28,6 +28,10 @@ baseline); ``delay="theta"`` applies the identified per-DOF transport delay ``Td
 (``ud[j] = u[j - ceil(Td/dt)]``, primed with the commands before the window), the analogue of the
 ``mujoco-rollers-delay`` / rSim + Td ablation.
 
+Pre-roll (``pre_roll`` > 0, off by default): the teleport happens ``P`` samples before ``t0`` and the recorded
+command prefix is streamed first, so the simulator reaches ``t0`` with its *own* state (grSim cannot take the
+initial velocity, ER-Force cannot take the yaw rate); the poses are re-anchored at ``t0`` (:mod:`dtssl.sim.preroll`).
+
 Everything about the simulator is declared in an :class:`Endpoint` (``config/external_sims.json``).  The
 statistics of a run (anchor failures, ``tau0`` estimates, frame gaps, command timing jitter, measured vision
 period) are kept in :attr:`ProtocolPlant.stats` for the result artefact.  Real-time by construction:
@@ -59,6 +63,7 @@ from dtssl.bridge.proto import (
 )
 from dtssl.models.base import Plant, Pose, Vel
 from dtssl.models.params import DofParam, load_twin_params
+from dtssl.sim.preroll import back_extrapolate, body_to_world, preroll_samples, reanchor_se2
 
 log = logging.getLogger(__name__)
 
@@ -314,13 +319,11 @@ def estimate_tau0(p_anchor: Pose, pose0: Pose, velw0: tuple[float, float, float]
     return float(min(max(d / v2, 0.0), period))
 
 
-def interpolate_poses(frames: list[Frame], anchor: int, tau0: float, capture_scale: float, dt: float, h_max: int,
-                      pose0: Pose, frame_period: float | None = None) -> tuple[np.ndarray, int]:
-    """``pose_sim`` (h_max + 1, 3) at ``h dt`` after the teleport from the detected frames (frames at the same
-    tick are averaged; theta unwrapped from ``pose0``).  The time base is ``t_capture`` (scaled by
-    ``capture_scale``) or, when ``frame_period`` is given, the per-camera frame counter (for simulators that
-    stamp wall-clock time, whose catch-up ticks would distort the capture stamps).  Returns
-    ``(pose_sim, n_frames_used)``."""
+def _frame_series(frames: list[Frame], anchor: int, tau0: float, capture_scale: float,
+                  frame_period: float | None) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """``(t, x, y, theta_raw)`` of the frames from ``anchor`` on, on the simulated clock since the teleport
+    (frames at the same tick are averaged in x, y).  Shared by :func:`interpolate_poses` and
+    :func:`interpolate_at`."""
     fa = frames[anchor]
     t_a = fa.t_capture
     ts: list[float] = []
@@ -348,22 +351,52 @@ def interpolate_poses(frames: list[Frame], anchor: int, tau0: float, capture_sca
         ys.append(f.pose[1])
         ths.append(f.pose[2])
         ns.append(1)
+    return np.asarray(ts, dtype=float), np.asarray(xs, dtype=float), np.asarray(ys, dtype=float), np.asarray(ths, dtype=float)
+
+
+def interpolate_poses(frames: list[Frame], anchor: int, tau0: float, capture_scale: float, dt: float, h_max: int,
+                      pose0: Pose, frame_period: float | None = None) -> tuple[np.ndarray, int]:
+    """``pose_sim`` (h_max + 1, 3) at ``h dt`` after the teleport from the detected frames (frames at the same
+    tick are averaged; theta unwrapped from ``pose0``).  The time base is ``t_capture`` (scaled by
+    ``capture_scale``) or, when ``frame_period`` is given, the per-camera frame counter (for simulators that
+    stamp wall-clock time, whose catch-up ticks would distort the capture stamps).  Returns
+    ``(pose_sim, n_frames_used)``."""
+    t_arr, x_arr, y_arr, th_raw = _frame_series(frames, anchor, tau0, capture_scale, frame_period)
     pose_sim = np.full((h_max + 1, 3), np.nan)
     pose_sim[0] = pose0
-    if len(ts) < 2:
-        return pose_sim, len(ts)
-    t_arr = np.asarray(ts)
+    if len(t_arr) < 2:
+        return pose_sim, len(t_arr)
     order = np.argsort(t_arr)
     t_arr = t_arr[order]
-    x_arr = np.asarray(xs)[order]
-    y_arr = np.asarray(ys)[order]
-    th_arr = unwrap_series(np.asarray(ths)[order], pose0[2])
+    x_arr = x_arr[order]
+    y_arr = y_arr[order]
+    th_arr = unwrap_series(th_raw[order], pose0[2])
     want = dt * np.arange(1, h_max + 1)
     ok = (want >= t_arr[0] - 1e-9) & (want <= t_arr[-1] + 1e-9)
     pose_sim[1:, 0] = np.where(ok, np.interp(want, t_arr, x_arr), np.nan)
     pose_sim[1:, 1] = np.where(ok, np.interp(want, t_arr, y_arr), np.nan)
     pose_sim[1:, 2] = np.where(ok, np.interp(want, t_arr, th_arr), np.nan)
-    return pose_sim, len(ts)
+    return pose_sim, len(t_arr)
+
+
+def interpolate_at(frames: list[Frame], anchor: int, tau0: float, capture_scale: float, times: np.ndarray,
+                   th_start: float, frame_period: float | None = None) -> tuple[np.ndarray, int]:
+    """Poses (len(times), 3) at arbitrary simulated ``times`` since the teleport (same frame series and
+    interpolation as :func:`interpolate_poses`; theta unwrapped from ``th_start``; NaN outside the frames).
+    Used by the pre-roll path, whose window starts ``P dt`` after the teleport."""
+    t_arr, x_arr, y_arr, th_raw = _frame_series(frames, anchor, tau0, capture_scale, frame_period)
+    want = np.asarray(times, dtype=float)
+    out = np.full((len(want), 3), np.nan)
+    if len(t_arr) < 2:
+        return out, len(t_arr)
+    order = np.argsort(t_arr)
+    t_arr = t_arr[order]
+    th_arr = unwrap_series(th_raw[order], th_start)
+    ok = (want >= t_arr[0] - 1e-9) & (want <= t_arr[-1] + 1e-9)
+    out[:, 0] = np.where(ok, np.interp(want, t_arr, x_arr[order]), np.nan)
+    out[:, 1] = np.where(ok, np.interp(want, t_arr, y_arr[order]), np.nan)
+    out[:, 2] = np.where(ok, np.interp(want, t_arr, th_arr), np.nan)
+    return out, len(t_arr)
 
 
 # --------------------------------------------------------------------------------------
@@ -392,6 +425,10 @@ class ProtocolStats:
     decode_errors: int = 0
     controls_sent: int = 0
     teleports: int = 0
+    preroll_windows: int = 0               # windows replayed with a pre-roll (P > 0)
+    preroll_samples: list[int] = field(default_factory=list)   # P per window (0 = plain teleport)
+    preroll_short: int = 0                 # pre-rolled windows whose prefix was shorter than requested
+    reanchor_failures: int = 0             # pre-roll: no vision frame around t0 (window lost)
     _jit_sum: float = 0.0
     _jit_n: int = 0
 
@@ -400,6 +437,8 @@ class ProtocolStats:
         d["tau0_median"] = float(np.median(self.tau0)) if self.tau0 else None
         d["frames_used_median"] = float(np.median(self.frames_used)) if self.frames_used else None
         d["send_phase_median"] = float(np.median(self.send_phase)) if self.send_phase else None
+        d["preroll_samples_median"] = float(np.median(self.preroll_samples)) if self.preroll_samples else None
+        d.pop("preroll_samples")
         d.pop("frames_used")
         d.pop("tau0")
         d.pop("send_phase")
@@ -407,12 +446,15 @@ class ProtocolStats:
 
 
 class ProtocolPlant(Plant):
-    """See the module docstring.  ``params`` (theta) is only used by the ``delay="theta"`` tap."""
+    """See the module docstring.  ``params`` (theta) is only used by the ``delay="theta"`` tap.
+
+    ``pre_roll`` (seconds, default 0 = the C2b behaviour) drives the simulator through the recorded command
+    prefix before each window and re-anchors the trajectory at ``t0`` (:mod:`dtssl.sim.preroll`)."""
 
     def __init__(self, endpoint: Endpoint | str, *, delay: str | None = None,
                  params: dict[str, DofParam] | None = None, dt: float = DEFAULT_DT, tail_s: float = 0.25,
                  lead_s: float = 0.05, tol_pos: float = 0.05, tol_ang: float = 0.15, probe_s: float = 0.6,
-                 auto_open: bool = True):
+                 auto_open: bool = True, pre_roll: float = 0.0):
         self.ep = load_endpoint(endpoint) if isinstance(endpoint, str) else endpoint
         if delay not in (None, "theta"):
             raise ValueError("delay must be None or 'theta'")
@@ -425,6 +467,9 @@ class ProtocolPlant(Plant):
         self.lead_s = float(lead_s)
         self.tol_pos, self.tol_ang = float(tol_pos), float(tol_ang)
         self.probe_s = float(probe_s)
+        if pre_roll < 0.0:
+            raise ValueError("pre_roll must be >= 0 (seconds)")
+        self.pre_roll = float(pre_roll)             # s of recorded prefix driven before each window (0 = off)
         self.stats = ProtocolStats()
         self.rx: VisionReceiver | None = None
         self.tx: socket.socket | None = None
@@ -642,16 +687,35 @@ class ProtocolPlant(Plant):
 
     # ------------------------------------------------------------------ batch window (harness path)
     def free_run_window(self, win_cmds, pose0: Pose, velb0: Vel, dt: float, prev_cmds=None) -> np.ndarray:
-        """Teleport, stream the window, collect the vision, align: ``pose_sim`` (H + 1, 3)."""
+        """Teleport, stream the window, collect the vision, align: ``pose_sim`` (H + 1, 3).
+
+        With ``pre_roll`` > 0 the teleport happens ``P`` samples before ``t0`` and the recorded prefix is streamed
+        first; the poses are then re-anchored at ``t0`` (:mod:`dtssl.sim.preroll`)."""
         if self.rx is None:
             self.open()
         assert self.rx is not None
         dt = float(dt)
-        ud = self._delayed_stream(win_cmds, prev_cmds, dt)
-        H = len(ud)
+        u = np.asarray(win_cmds, dtype=float).reshape(-1, 3)
+        prev = (np.asarray(prev_cmds, dtype=float).reshape(-1, 3) if prev_cmds is not None
+                else np.zeros((0, 3)))
+        H = len(u)
+        P = preroll_samples(self.pre_roll, dt, len(prev))
         x0, y0, th0 = (float(v) for v in pose0)
-        c, s = math.cos(th0), math.sin(th0)
-        velw0 = (c * velb0[0] - s * velb0[1], s * velb0[0] + c * velb0[1], float(velb0[2]))
+        velw0 = body_to_world((x0, y0, th0), velb0)
+        if P > 0:
+            prefix, before = prev[-P:], prev[:-P]
+            ud = self._delayed_stream(np.vstack([prefix, u]), before, dt)     # window part == no pre-roll
+            pose_tele = back_extrapolate((x0, y0, th0), velw0, P * dt)
+            velb_tele = (float(prefix[0, 0]), float(prefix[0, 1]), float(prefix[0, 2]))
+            velw_tele = body_to_world(pose_tele, velb_tele)
+            self.stats.preroll_windows += 1
+            if P < int(round(self.pre_roll / dt)):
+                self.stats.preroll_short += 1
+        else:
+            ud = self._delayed_stream(u, prev, dt)
+            pose_tele, velw_tele = (x0, y0, th0), velw0
+        self.stats.preroll_samples.append(int(P))
+        n_send = len(ud)                                     # P + H
         wps = self._wall_per_sim
         self._drain_tx()
         # send phase: the simulator applies a datagram at its next physics tick; vision frames arrive right
@@ -666,18 +730,18 @@ class ProtocolPlant(Plant):
         T0 = _clock()
         if last is not None:
             self.stats.send_phase.append(((T0 - last.t_recv) / self._period_wall) % 1.0)
-        before = self.rx.latest()                    # every frame up to this one was captured before the teleport
-        self._send_simcontrol(self.teleport_msg((x0, y0, th0), velw0))
+        before_f = self.rx.latest()                  # every frame up to this one was captured before the teleport
+        self._send_simcontrol(self.teleport_msg(pose_tele, velw_tele))
         self.stats.teleports += 1
         self._send_control(ud[0])
         jit = []
-        for k in range(1, H):
+        for k in range(1, n_send):
             t_k = T0 + k * dt * wps
             self._sleep_until(t_k)
             jit.append(_clock() - t_k)
             self._send_control(ud[k])
-        t_end = T0 + (H * dt + self.tail_s) * wps
-        k = H
+        t_end = T0 + (n_send * dt + self.tail_s) * wps
+        k = n_send
         while _clock() < t_end:                              # keep the last command alive during the tail
             t_k = T0 + k * dt * wps
             self._sleep_until(min(t_k, t_end))
@@ -691,40 +755,52 @@ class ProtocolPlant(Plant):
             self.stats._jit_n += len(jit)
             self.stats.send_jitter_mean = self.stats._jit_sum / self.stats._jit_n
         self._drain_tx()
-        # frames captured after the teleport: skip those still in flight when it was sent (vision delay)
         # frames captured after the teleport: everything received up to the teleport is out by frame number
         # (robust to a stalled receiver); frames still in flight at the teleport (vision delay) show the old
         # pose and are skipped by the anchor's pose check
         frames = self.rx.since(T0 - self._period_wall)
-        if before is not None:
-            frames = [f for f in frames if f.camera_id != before.camera_id or f.frame_number > before.frame_number]
+        if before_f is not None:
+            frames = [f for f in frames if f.camera_id != before_f.camera_id or f.frame_number > before_f.frame_number]
         self.stats.vision_gaps = self.rx.gaps
         self.stats.decode_errors = self.rx.decode_errors
         self.stats.windows += 1
         period_sim = 1.0 / self._rate_sim
-        anchor = find_anchor(frames[:ANCHOR_SEARCH_FRAMES], (x0, y0, th0), velw0, period_sim, self.tol_pos,
+        anchor = find_anchor(frames[:ANCHOR_SEARCH_FRAMES], pose_tele, velw_tele, period_sim, self.tol_pos,
                              self.tol_ang)
         pose_sim = np.full((H + 1, 3), np.nan)
         pose_sim[0] = (x0, y0, th0)
         if anchor is None:
             self.stats.anchor_failures += 1
-            log.warning("%s: teleport not seen in %d frames (window at %.2f, %.2f)", self.ep.name, len(frames), x0, y0)
+            log.warning("%s: teleport not seen in %d frames (window at %.2f, %.2f)", self.ep.name, len(frames),
+                        pose_tele[0], pose_tele[1])
             self._set_state(pose_sim, velb0)
             return pose_sim
-        tau = estimate_tau0(frames[anchor].pose, (x0, y0, th0), velw0, period_sim)
+        tau = estimate_tau0(frames[anchor].pose, pose_tele, velw_tele, period_sim)
         if tau is not None:
-            raw = estimate_tau0(frames[anchor].pose, (x0, y0, th0), velw0, 10.0 * period_sim)
+            raw = estimate_tau0(frames[anchor].pose, pose_tele, velw_tele, 10.0 * period_sim)
             if raw is not None and raw > 1.5 * period_sim:      # the anchor is not the first post-teleport frame
                 self.stats.anchor_late += 1
                 log.debug("%s: anchor %.1f frames after the teleport (window at %.2f, %.2f)", self.ep.name,
-                          raw / period_sim, x0, y0)
+                          raw / period_sim, pose_tele[0], pose_tele[1])
             self._tau0_hist.append(tau)
             self.stats.tau0_estimated += 1
         else:
             tau = float(np.median(self._tau0_hist)) if self._tau0_hist else 0.5 * period_sim
         self.stats.tau0.append(float(tau))
-        pose_sim, n_used = interpolate_poses(frames, anchor, tau, self._capture_scale, dt, H, (x0, y0, th0),
-                                             frame_period=period_sim if self.ep.vision_rate else None)
+        frame_period = period_sim if self.ep.vision_rate else None
+        if P == 0:
+            pose_sim, n_used = interpolate_poses(frames, anchor, tau, self._capture_scale, dt, H, (x0, y0, th0),
+                                                 frame_period=frame_period)
+        else:
+            times = P * dt + dt * np.arange(0, H + 1)          # the window, on the clock of the teleport
+            raw_poses, n_used = interpolate_at(frames, anchor, tau, self._capture_scale, times, pose_tele[2],
+                                               frame_period=frame_period)
+            if np.isfinite(raw_poses[0]).all():
+                pose_sim = reanchor_se2(raw_poses, (x0, y0, th0))
+            else:
+                self.stats.reanchor_failures += 1
+                log.warning("%s: no vision around t0 after a %d-sample pre-roll (window at %.2f, %.2f)",
+                            self.ep.name, P, x0, y0)
         self.stats.frames_used.append(n_used)
         if np.isnan(pose_sim[1:]).any():
             self.stats.short_windows += 1
@@ -836,7 +912,8 @@ def main(argv=None) -> int:
 
 
 __all__ = ["Endpoint", "load_endpoints", "load_endpoint", "Frame", "VisionReceiver", "ProtocolPlant",
-           "ProtocolStats", "find_anchor", "estimate_tau0", "interpolate_poses", "unwrap_series", "probe"]
+           "ProtocolStats", "find_anchor", "estimate_tau0", "interpolate_poses", "interpolate_at", "unwrap_series",
+           "probe"]
 
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(main())

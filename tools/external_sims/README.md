@@ -68,6 +68,19 @@ dtssl analysis run protocol_holdout --kw sims=grsim delay=both repeat=1
 dtssl analysis run protocol_holdout --kw from_cache=results/_cache_protocol_grsim_*.npz,results/_cache_protocol_erforce_*.npz
 ```
 
+### 3.1 C2b2: pré-rolagem (pré-registro `docs/PREREGISTRO_C2B2_PREROLAGEM_20260916.md`)
+
+```bash
+tools/external_sims/run_protocol_holdout.sh --delay none --preroll 0.5          # grsim, grsim+preroll, erforce, erforce+preroll (~40 min)
+tools/external_sims/run_protocol_holdout.sh --sims grsim --smoke --preroll 0.5 --out /tmp/c2b2_smoke   # fumaça (~3 min), NAO e resultado
+# equivalente manual, com o simulador de pé:
+dtssl analysis run protocol_holdout --kw sims=grsim delay=none preroll=0.5
+```
+
+`+preroll`: teleporte P amostras antes de t0, prefixo real de comandos transmitido, trajetória re-ancorada em t0
+(§4: a condição inicial deixa de ser imposta pelo teleporte). Caches `_cache_protocol_<sim>[_delay][_preroll]_<stamp>.npz`;
+o `.stats.json` guarda `pre_roll_s`, e o `from_cache` mescla variantes cruas e com pré-rolagem numa tabela só.
+
 Saída: `results/protocol_holdout_<stamp>.{md,json,csv}` (tabelas de `e_pos`/`e_ang` por horizonte, por evento em
 `h_ref` com Wilcoxon/rank-biserial, diagnóstico do replay, repetibilidade, custo) e os rollouts de cada variante em
 `results/_cache_protocol_<sim>[_delay]_<stamp>[_r<k>].npz` + `.stats.json` (ignorados pelo git; `from_cache`
@@ -84,5 +97,6 @@ reanalisa offline, sem simulador). Depois: entrada no `results/CHANGELOG.md` e c
 | robô | FOPDT θ oficial | perfil `config/Parsian.ini` (default): R 0,09 m, r 0,027 m, a_max 4 m/s², v_max 5 m/s | especificação ER-Force default (`robotSetDefault`), 11 robôs por time |
 
 Por isso o artefato traz a coluna `fopdt_v0=0` (o gêmeo com os estados zerados em t0, a mesma desvantagem do
-grSim): separa "física da liga vs FOPDT" de "condição inicial". O alinhamento por âncora (primeiro quadro em que o
+grSim): separa "física da liga vs FOPDT" de "condição inicial". A pré-rolagem (§3.1) é o outro caminho: em vez de impor a
+condição inicial, deixa o simulador chegar a t0 pela sua própria dinâmica sob o prefixo real de comandos. O alinhamento por âncora (primeiro quadro em que o
 teleporte aparece + `tau0` pela projeção do deslocamento em v0) remove o atraso de visão, não o de comando.

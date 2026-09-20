@@ -3,7 +3,7 @@
 Built-in subcommands (core dependencies only):
 
     dtssl info                                   version, repo root, dataset, backends, extras
-    dtssl replay <label> <event> [--theta P] [--plant fopdt|ideal|mujoco-velocity|mujoco-rollers[-delay]|proto:<sim>[+delay]] [--out DIR]
+    dtssl replay <label> <event> [--theta P] [--plant fopdt|ideal|mujoco-velocity|mujoco-rollers[-delay]|proto:<sim>[+delay]][+preroll] [--out DIR]
     dtssl gate twin-vs-ideal [--stride S] [--h-max H]      hold-out gate (SE(2) multi-horizon)
     dtssl gate twin-vs-rsim  [--mode A|B] ...              (needs robosim)
     dtssl cache-convert <pkl> <npz>              legacy pickle rollout cache -> .npz
@@ -84,7 +84,8 @@ def build_parser(with_optional: bool = True) -> tuple[argparse.ArgumentParser, d
     p.add_argument("--theta", type=Path, default=None, help="theta JSON (default config/twin_params.json)")
     p.add_argument("--plant", default="fopdt",
                    help="fopdt | ideal | mujoco-velocity | mujoco-rollers | mujoco-rollers-delay | world:<backend> | "
-                        "proto:<sim>[+delay] (external simulator of config/external_sims.json, real time)")
+                        "proto:<sim>[+delay] (external simulator of config/external_sims.json, real time); any of them "
+                        "+preroll (recorded prefix driven before each window, re-anchored at t0; dtssl.sim.preroll)")
     p.add_argument("--dataset", default=None, help="dataset id under data/extracted (default: canonical)")
     p.add_argument("--h-max", type=int, default=None, help="rollout horizon in samples (default 90)")
     p.add_argument("--stride", type=int, default=None, help="window stride in samples (default 15)")

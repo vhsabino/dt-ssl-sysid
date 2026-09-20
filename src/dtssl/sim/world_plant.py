@@ -154,29 +154,54 @@ BACKEND_PLANTS: dict[str, tuple[str, str | None]] = {
 }
 
 
-def make_harness_plant(name: str, params: dict[str, DofParam] | None = None, **world_opts) -> Plant:
+DEFAULT_PREROLL_S = 0.5     # s of recorded prefix for the ``+preroll`` tag (docs/PREREGISTRO_C2B2_PREROLAGEM_20260916.md)
+
+
+def _split_tags(spec: str) -> tuple[str, set[str]]:
+    base, *tags = spec.split("+")
+    bad = set(tags) - {"delay", "preroll"}
+    if bad:
+        raise KeyError(f"unknown plant tag(s) {sorted(bad)} in {spec!r}; tags are +delay and +preroll")
+    return base, set(tags)
+
+
+def make_harness_plant(name: str, params: dict[str, DofParam] | None = None, pre_roll: float = DEFAULT_PREROLL_S,
+                       **world_opts) -> Plant:
     """``fopdt`` / ``ideal`` -> analytic plants; ``mujoco-velocity`` / ``mujoco-rollers`` /
     ``mujoco-rollers-delay`` -> :class:`WorldPlant`; ``world:<backend>`` -> any registered backend;
     ``proto:<sim>`` / ``proto:<sim>+delay`` -> an external simulator of ``config/external_sims.json`` over the
-    ssl-simulation-protocol (``dtssl.sim.protocol_plant``), raw or with the identified Td on the commands."""
+    ssl-simulation-protocol (``dtssl.sim.protocol_plant``), raw or with the identified Td on the commands.
+    The tag ``+preroll`` (any of the above, e.g. ``fopdt+preroll``, ``proto:grsim+delay+preroll``) drives the
+    plant through ``pre_roll`` seconds of the recorded command prefix before each window and re-anchors at
+    ``t0`` (``dtssl.sim.preroll``; the external simulators do it over the protocol)."""
     from dtssl.models import AnalyticFOPDTPlant, IdealKinematicPlant
 
-    if name == "fopdt":
-        return AnalyticFOPDTPlant(params or load_twin_params())
-    if name == "ideal":
-        return IdealKinematicPlant()
-    if name in BACKEND_PLANTS:
-        backend, delay = BACKEND_PLANTS[name]
-        return WorldPlant(backend, params=params, delay=delay, world_opts=world_opts or None)
-    if name.startswith("world:"):
-        return WorldPlant(name[len("world:"):], params=params, world_opts=world_opts or None)
-    if name.startswith("proto:"):        # external simulator over the ssl-simulation-protocol (C2b)
+    base, tags = _split_tags(name)
+    if base.startswith("proto:"):        # external simulator over the ssl-simulation-protocol (C2b)
         from dtssl.sim.protocol_plant import ProtocolPlant
 
-        sim, _, tag = name[len("proto:"):].partition("+")
-        return ProtocolPlant(sim, delay="theta" if tag == "delay" else None, params=params, **world_opts)
-    raise KeyError(f"unknown plant {name!r}; choose fopdt | ideal | {' | '.join(BACKEND_PLANTS)} | world:<backend> "
-                   "| proto:<sim>[+delay]")
+        sim = base[len("proto:"):]
+        return ProtocolPlant(sim, delay="theta" if "delay" in tags else None, params=params,
+                             pre_roll=pre_roll if "preroll" in tags else 0.0, **world_opts)
+    if "delay" in tags:
+        raise KeyError(f"{name!r}: +delay is only a tag of proto:<sim> (use mujoco-rollers-delay for MuJoCo)")
+    if base == "fopdt":
+        plant: Plant = AnalyticFOPDTPlant(params or load_twin_params())
+    elif base == "ideal":
+        plant = IdealKinematicPlant()
+    elif base in BACKEND_PLANTS:
+        backend, delay = BACKEND_PLANTS[base]
+        plant = WorldPlant(backend, params=params, delay=delay, world_opts=world_opts or None)
+    elif base.startswith("world:"):
+        plant = WorldPlant(base[len("world:"):], params=params, world_opts=world_opts or None)
+    else:
+        raise KeyError(f"unknown plant {name!r}; choose fopdt | ideal | {' | '.join(BACKEND_PLANTS)} | world:<backend> "
+                       "| proto:<sim>[+delay] (any of them [+preroll])")
+    if "preroll" in tags:
+        from dtssl.sim.preroll import PreRollPlant
+
+        return PreRollPlant(plant, pre_roll)     # type: ignore[return-value]
+    return plant
 
 
 def plant_names() -> Sequence[str]:

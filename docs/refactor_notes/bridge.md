@@ -108,6 +108,21 @@ janelas re-ancoradas e com a mesma métrica do gêmeo (`dtssl analysis run proto
   desvantagem (`fopdt_v0=0`) ao lado do gêmeo do artigo. Scripts WSL2 (instalação com sudo só no `apt`,
   `simctl.sh`, experimento de ponta a ponta): `tools/external_sims/README.md`.
 
+### Pré-rolagem (C2b2, 16/09/2026; código pronto, experimento pré-registrado e ainda não rodado)
+
+`ProtocolPlant(pre_roll=S)` (tag `+preroll` em `make_harness_plant`, opção `preroll=S` do `protocol_holdout`,
+`run_protocol_holdout.sh --preroll S`) remove a desvantagem da condição inicial sem tocar no simulador: o robô é
+teleportado `P = min(round(S/dt), prefixo)` amostras antes de `t0`, o prefixo real de comandos (`prev_cmds`, o
+mesmo que o tap de atraso já recebe) é transmitido antes da janela, e a trajetória é **re-ancorada em SE(2)** na
+pose real de `t0` (`dtssl.sim.preroll.reanchor_se2`). Em `t0` o simulador está no estado que a sua própria
+dinâmica produziu. `dtssl.sim.preroll.PreRollPlant` faz o mesmo em processo para qualquer `Plant` passo a passo:
+é a referência do auto-teste do caminho de protocolo (`tests/test_protocol_plant.py`, erro máximo < 3 mm por
+janela contra `dtssl serve`) e a coluna de controle `fopdt+preroll` do artefato. `pre_roll=0` (default) é o
+comportamento do C2b, bit a bit; a interpolação da janela passa por `interpolate_at` (mesma série de quadros de
+`interpolate_poses`, tempos arbitrários desde o teleporte). Diagnóstico novo em `ProtocolStats`:
+`preroll_windows`, `preroll_samples_median`, `preroll_short`, `reanchor_failures`. Critérios e hipóteses:
+`docs/PREREGISTRO_C2B2_PREROLAGEM_20260916.md`.
+
 ## Verificação
 
 - `python3 -m pytest -q`: **217 passed, 1 skipped** (o skip é de outro módulo, dependente de dataset); só os arquivos deste agente: 53 passed em ~2,5 s.

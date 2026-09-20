@@ -207,3 +207,143 @@ def test_protocol_replay_of_the_twin_reproduces_the_analytic_plant():
             plant.close()
         srv.stop()
         th.join(timeout=2.0)
+
+
+# ---------------------------------------------------------------- pre-roll (dtssl.sim.preroll + the protocol path)
+def test_preroll_helpers_samples_back_extrapolation_and_reanchoring():
+    from dtssl.sim.preroll import back_extrapolate, body_to_world, preroll_samples, reanchor_se2
+
+    assert preroll_samples(0.5, TS, 16) == 16 and preroll_samples(0.5, TS, 100) == 30
+    assert preroll_samples(0.0, TS, 100) == 0 and preroll_samples(0.5, TS, 0) == 0
+    vw = body_to_world((0.0, 0.0, math.pi / 2), (1.0, 0.0, 0.3))
+    np.testing.assert_allclose(vw, (0.0, 1.0, 0.3), atol=1e-12)
+    np.testing.assert_allclose(back_extrapolate((1.0, 2.0, 0.5), (0.4, -0.2, 0.1), 0.5), (0.8, 2.1, 0.45), atol=1e-12)
+    # re-anchoring: a rigid transform that maps raw[0] onto pose0 and keeps relative displacements (body frame)
+    raw = np.array([[1.0, 1.0, 0.0], [2.0, 1.0, 0.0], [2.0, 2.0, math.pi / 2], [np.nan, np.nan, np.nan]])
+    out = reanchor_se2(raw, (0.0, 0.0, math.pi / 2))
+    np.testing.assert_allclose(out[0], (0.0, 0.0, math.pi / 2), atol=1e-12)
+    np.testing.assert_allclose(out[1], (0.0, 1.0, math.pi / 2), atol=1e-12)          # +x in raw -> +y after the rotation
+    np.testing.assert_allclose(out[2], (-1.0, 1.0, math.pi), atol=1e-12)
+    assert np.isnan(out[3]).all()
+    with pytest.raises(ValueError):
+        reanchor_se2(np.array([[np.nan, 0.0, 0.0], [0.0, 0.0, 0.0]]), (0.0, 0.0, 0.0))
+
+
+def test_preroll_plant_is_the_inner_plant_when_disabled_and_reanchors_when_enabled():
+    from dtssl.sim.preroll import PreRollPlant
+    from dtssl.sim.rollout import free_run
+
+    theta = load_twin_params()
+    cmd = np.tile([0.6, 0.2, 0.3], (30, 1))
+    prev = np.tile([0.6, 0.2, 0.3], (40, 1))
+    a = free_run(AnalyticFOPDTPlant(theta), cmd, (0.5, -0.2, 0.3), (0.6, 0.2, 0.3), TS, prev_cmds=prev)
+    b = free_run(PreRollPlant(AnalyticFOPDTPlant(theta), 0.0), cmd, (0.5, -0.2, 0.3), (0.6, 0.2, 0.3), TS, prev_cmds=prev)
+    np.testing.assert_array_equal(a, b)                                           # off = bit for bit the inner plant
+    p = PreRollPlant(AnalyticFOPDTPlant(theta), 0.5)
+    c = free_run(p, cmd, (0.5, -0.2, 0.3), (0.6, 0.2, 0.3), TS, prev_cmds=prev)
+    assert p.samples_used == [30]
+    np.testing.assert_allclose(c[0], (0.5, -0.2, 0.3))                            # re-anchored at the true pose
+    # a steady prefix equal to the window command: the pre-rolled state is the steady state of the commanded
+    # velocity, close to (but not the same as) the harness's imposed velb0 = command
+    d = np.hypot(*(a[:, :2] - c[:, :2]).T)
+    assert 0.0 < d.max() < 0.02, d.max()
+    # too short a prefix: the pre-roll uses what there is and records it
+    q = PreRollPlant(AnalyticFOPDTPlant(theta), 0.5)
+    free_run(q, cmd, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), TS, prev_cmds=prev[:5])
+    assert q.samples_used == [5]
+
+
+def test_interpolate_at_matches_interpolate_poses_on_the_window_clock():
+    from dtssl.sim.protocol_plant import interpolate_at
+
+    v, w = (0.8, -0.3), 0.7
+    pose0 = (0.2, -0.1, 3.0)
+    times = np.arange(0.0, 1.5, TS)
+    poses = [(pose0[0] + v[0] * t, pose0[1] + v[1] * t, math.atan2(math.sin(pose0[2] + w * t), math.cos(pose0[2] + w * t)))
+             for t in times]
+    fr = _frames(times, poses)
+    ps, n = interpolate_poses(fr, 0, 0.0, 1.0, TS, 20, pose0)
+    want = TS * np.arange(0, 21)
+    pa, m = interpolate_at(fr, 0, 0.0, 1.0, want, pose0[2])
+    assert n == m
+    np.testing.assert_allclose(pa[1:], ps[1:], atol=1e-9)
+    np.testing.assert_allclose(pa[0], pose0, atol=1e-9)
+    # the pre-roll window: 30 samples after the teleport, still on the frames
+    pb, _ = interpolate_at(fr, 0, 0.0, 1.0, 30 * TS + want, pose0[2])
+    np.testing.assert_allclose(pb[:, 0], pose0[0] + v[0] * (30 * TS + want), atol=1e-9)
+    np.testing.assert_allclose(pb[:, 2], pose0[2] + w * (30 * TS + want), atol=1e-9)   # unwrapped past pi
+    pc, _ = interpolate_at(fr, 0, 0.0, 1.0, np.array([-0.1, 5.0]), pose0[2])
+    assert np.isnan(pc).all()                                                           # outside the frames
+
+
+def test_plant_spec_tags_route_to_the_preroll_wrapper():
+    from dtssl.sim.preroll import PreRollPlant
+    from dtssl.sim.world_plant import make_harness_plant
+
+    assert isinstance(make_harness_plant("fopdt+preroll"), PreRollPlant)
+    assert isinstance(make_harness_plant("fopdt+preroll", pre_roll=0.25), PreRollPlant)
+    assert isinstance(make_harness_plant("fopdt"), AnalyticFOPDTPlant)
+    with pytest.raises(KeyError):
+        make_harness_plant("fopdt+delay")
+    with pytest.raises(KeyError):
+        make_harness_plant("proto:grsim+bogus")
+    p = ProtocolPlant(Endpoint(name="x"), auto_open=False, pre_roll=0.5)
+    assert p.pre_roll == 0.5
+    with pytest.raises(ValueError):
+        ProtocolPlant(Endpoint(name="x"), auto_open=False, pre_roll=-1.0)
+
+
+@pytest.mark.requires_net
+def test_protocol_preroll_replay_of_the_twin_reproduces_the_in_process_preroll():
+    """dtssl serve (fopdt, Td = 0) + ProtocolPlant(pre_roll=0.5, delay='theta') == PreRollPlant(AnalyticFOPDTPlant)
+    on the same windows: the protocol mechanics of the pre-roll (teleport P samples early, prefix streamed,
+    re-anchoring at t0 from the vision) reproduce the deterministic in-process reference at the mm level."""
+    from dtssl.bridge.config import BridgeConfig
+    from dtssl.bridge.server import SimServer
+    from dtssl.sim.backends import make_world
+    from dtssl.sim.preroll import PreRollPlant
+    from dtssl.sim.rollout import rollout_segment
+
+    theta = load_twin_params()
+    theta_nodelay = {d: DofParam(K=p.K, tau=p.tau, Td=0.0) for d, p in theta.items()}
+    world = make_world("fopdt", n_blue=1, n_yellow=0, params=theta_nodelay, watchdog_clock="sim")
+    vport = _free_port()
+    cfg = BridgeConfig.load().with_overrides(vision_ip="127.0.0.1", vision_port=vport, blue_port=0, yellow_port=0,
+                                             simcontrol_port=0, bind_ip="127.0.0.1")
+    srv = SimServer(world, cfg)
+    srv.start()
+    th = srv.run_in_thread()
+    plant = None
+    try:
+        ep = Endpoint(name="test", host="127.0.0.1", port_blue=srv.control.port("blue"),
+                      port_simcontrol=srv.simcontrol.port, vision_ip="127.0.0.1", vision_port=vport, unicast=True,
+                      team="blue", robot_id=0, vision_rate=60.0, clear_others=False)
+        plant = ProtocolPlant(ep, delay="theta", params=theta, probe_s=0.5, pre_roll=0.5)
+        st = plant.stats
+        seg = _synth_segment(AnalyticFOPDTPlant(theta), N=200)
+        h_max, stride, lookback = 30, 30, 30
+        ref = rollout_segment(seg, PreRollPlant(AnalyticFOPDTPlant(theta), 0.5), h_max=h_max, stride=stride,
+                              horizons=[6, 12, 30], lookback=lookback)
+        ro = rollout_segment(seg, plant, h_max=h_max, stride=stride, horizons=[6, 12, 30], lookback=lookback)
+        assert ro.n_total == ref.n_total >= 4
+        assert st.anchor_failures == 0 and st.reanchor_failures == 0 and st.short_windows == 0, st.as_dict()
+        assert st.preroll_windows == ro.n_total and max(st.preroll_samples) == 30, st.as_dict()
+        assert st.controls_sent >= ro.n_total * (h_max + 30)
+        errs = []
+        for wa, wb in zip(ro.windows, ref.windows, strict=True):
+            assert np.isfinite(wa.pose_sim).all()
+            d = np.hypot(wa.pose_sim[:, 0] - wb.pose_sim[:, 0], wa.pose_sim[:, 1] - wb.pose_sim[:, 1])
+            dth = np.abs(np.arctan2(np.sin(wa.pose_sim[:, 2] - wb.pose_sim[:, 2]),
+                                    np.cos(wa.pose_sim[:, 2] - wb.pose_sim[:, 2])))
+            errs.append((d.max(), dth.max()))
+        errs = np.array(errs)
+        tol_pos, tol_ang = (0.03, 0.05) if sys.platform == "win32" else (3e-3, 1e-2)   # see the plain test above
+        assert errs[:, 0].max() < tol_pos, errs
+        assert errs[:, 1].max() < tol_ang, errs
+        d = st.as_dict()
+        assert d["preroll_samples_median"] == 30 and "preroll_samples" not in d
+    finally:
+        if plant is not None:
+            plant.close()
+        srv.stop()
+        th.join(timeout=2.0)
