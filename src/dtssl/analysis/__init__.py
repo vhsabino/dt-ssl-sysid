@@ -32,10 +32,12 @@ claim" table, results/CHANGELOG.md, docs/PLANO_V2_EXECUTADO.md, docs/PLANO_V3_EX
 | identifiability_insilico | C1: in-silico identifiability, regime x noise x deadzone, known theta (2026-09) | new |
 | closed_loop_stats | C4: closed-loop session of the real strategy on the twin vs competition logs, P1-P5 (2026-09) | new |
 | protocol_holdout | C2b: league simulators (grSim, ER-Force) replayed through the ssl-simulation-protocol on the hold-out (2026-09) | new |
+| coupled_mimo_check | WP2: coupled (MIMO) first-order check vs per-DOF on the hold-out, pre-registered (2026-09) | new |
 | regenerate_bin_distribution | bin distribution with the CAD radius (D9) | scripts/regenerate_bin_distribution.py |
 | holdout_report | honest hold-out report, twin vs rSim (needs robosim) | phase0_replay/holdout_report.py |
 | loader_report | loader sanity + duration distribution (H_max) | phase0_replay/report.py |
 | session_report | recorded twin session: contract, command stats vs competition, harness round trip (2026-09) | new |
+| journal_tables | journal extension: LaTeX tables written from the artefacts (2026-09) | new |
 | fig_main_result | Fig. 2 (main figure) | scripts/fig_main_result.py |
 | fig_omega_stepresponse_en | Fig. 1 (yaw step response) | scripts/fig_omega_stepresponse_en.py |
 | fig_fit_holdout_vxvy | hold-out fit figure of vx/vy (+ CSV vs MATLAB) | scripts/fig_fit_holdout_vxvy.py |
@@ -43,6 +45,9 @@ claim" table, results/CHANGELOG.md, docs/PLANO_V2_EXECUTADO.md, docs/PLANO_V3_EX
 | fig_trajectory_by_label | best-case trajectory overlay per label | scripts/fig_trajectory_by_label.py |
 | fig_twin_vs_rsim_epos_en | twin vs rSim e_pos panel (transcribed numbers) | scripts/fig_twin_vs_rsim_epos_en.py |
 | fig_spec_main_result | visual contract of Fig. 2 (internal) | scripts/fig_spec_main_result.py |
+| fig_journal_identifiability | journal figure: yaw-gain bias by excitation regime (C1/C1b) | new |
+| fig_journal_league_sims | journal figure: model vs grSim / ER-Force, raw and pre-rolled, every session (C2b/C2b2) | new |
+| fig_journal_closed_loop | journal figure: strategy commands on the twin vs competition logs (C4) | new |
 | meeting_overlay | meeting overlay real/twin/rSim (internal; needs robosim) | phase0_replay/meeting_overlay.py |
 | percurso_completo | whole-segment free-run overlays (needs robosim) | phase0_replay/percurso_completo.py |
 | percurso_square | whole-segment free-run of the square events (needs robosim) | phase0_replay/percurso_square.py |
@@ -83,10 +88,12 @@ _ALL: dict[str, str] = {
     "identifiability_insilico": "dtssl.analysis.identifiability_insilico",
     "closed_loop_stats": "dtssl.analysis.closed_loop_stats",
     "protocol_holdout": "dtssl.analysis.protocol_holdout",
+    "coupled_mimo_check": "dtssl.analysis.coupled_mimo_check",
     # reports
     "metrics_report": "dtssl.analysis.metrics_report",
     "holdout_report": "dtssl.analysis.holdout_report",
     "loader_report": "dtssl.analysis.loader_report",
+    "journal_tables": "dtssl.analysis.journal_tables",
     # figures
     "fig_main_result": "dtssl.analysis.fig_main_result",
     "fig_omega_stepresponse_en": "dtssl.analysis.fig_omega_stepresponse_en",
@@ -95,6 +102,9 @@ _ALL: dict[str, str] = {
     "fig_trajectory_by_label": "dtssl.analysis.fig_trajectory_by_label",
     "fig_twin_vs_rsim_epos_en": "dtssl.analysis.fig_twin_vs_rsim_epos_en",
     "fig_spec_main_result": "dtssl.analysis.fig_spec_main_result",
+    "fig_journal_identifiability": "dtssl.analysis.fig_journal_identifiability",
+    "fig_journal_league_sims": "dtssl.analysis.fig_journal_league_sims",
+    "fig_journal_closed_loop": "dtssl.analysis.fig_journal_closed_loop",
     "meeting_overlay": "dtssl.analysis.meeting_overlay",
     "percurso_completo": "dtssl.analysis.percurso_completo",
     "percurso_square": "dtssl.analysis.percurso_square",
@@ -104,7 +114,7 @@ REGISTRY: dict[str, str] = {n: m for n, m in _ALL.items() if importlib.util.find
 
 #: names by kind (``dtssl analysis`` runs analyses + reports; ``dtssl fig`` the figures).
 _FIG_EXTRA = ("meeting_overlay", "percurso_completo", "percurso_square")
-_REPORT = ("metrics_report", "holdout_report", "loader_report", "session_report")
+_REPORT = ("metrics_report", "holdout_report", "loader_report", "session_report", "journal_tables")
 FIGURES: tuple[str, ...] = tuple(n for n in REGISTRY if n.startswith("fig_") or n in _FIG_EXTRA)
 REPORTS: tuple[str, ...] = tuple(n for n in REGISTRY if n in _REPORT)
 ANALYSES: tuple[str, ...] = tuple(n for n in REGISTRY if n not in FIGURES and n not in REPORTS)

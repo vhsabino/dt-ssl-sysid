@@ -36,7 +36,9 @@ Proveniência de cada número do projeto: `results/CHANGELOG.md`.
 | `PREREGISTRO_IDENTIFICABILIDADE_INSILICO_C1B_20260907.md` / `…_C1B_V2_…` | **pré-registros** do C1b (gerador físico; v1 falhou pela célula de referência e foi mantida; v2 re-registrada). |
 | `PREREGISTRO_C4_MALHA_FECHADA_20260908.md` | **pré-registro** do C4 (sessão em malha fechada × competição, critérios P1–P5). |
 | `PREREGISTRO_C2B_SIMULADORES_LIGA_20260910.md` | **pré-registro** do C2b (grSim/ER-Force no hold-out via ssl-simulation-protocol: H1–H3 e critério V de validade do instrumento) — executado por `dtssl analysis run protocol_holdout` (10/09). |
-| `PREREGISTRO_C2B2_PREROLAGEM_20260916.md` | **pré-registro** do C2b2 (pré-rolagem no replay via protocolo: o simulador chega a t0 pela própria dinâmica sob o prefixo real de comandos, trajetória re-ancorada em t0; H1' a H4' e V'); código pronto (`dtssl.sim.preroll`, `preroll=` do `protocol_holdout`), **experimento ainda não executado**. |
+| `PREREGISTRO_C2B2_PREROLAGEM_20260916.md` | **pré-registro** do C2b2 (pré-rolagem no replay via protocolo: o simulador chega a t0 pela própria dinâmica sob o prefixo real de comandos, trajetória re-ancorada em t0; H1' a H4' e V'); código em `dtssl.sim.preroll` e `preroll=` do `protocol_holdout`; executado em duas sessões, 18/09 (`protocol_holdout_20260918_1326`, registro tardio no CHANGELOG em 23/09) e 20/09 (`protocol_holdout_20260920_1143`). |
+| `PREREGISTRO_MIMO_CHECK_20260923.md` | **pré-registro** da checagem MIMO (acoplamento entre canais nos logs de competição: M1 primária, M2 mecanismo, M3 harness, controles C- e C+; estimador de mínimos quadrados separáveis em erro de saída) para o artigo de periódico; módulo `dtssl.analysis.coupled_mimo_check` pronto e testado em sintético, **experimento ainda não executado sobre dados reais**. |
+| `journal/MAPEAMENTO_ARTIGO.md` | mapa do artigo de periódico (extensão do SBR/LARS 2026 para a Digital Engineering, VSI:DTE_DigiTwin2026): seção, conteúdo, artefato, número, tabela ou figura gerada e estado; discrepâncias encontradas e decisões pendentes. Esqueleto `elsarticle` em `../latex_journal/`. |
 | `INVENTARIO_RL_2026-07-24.md` | inventário do repo `planning-rl-greybox` (WSL2): experimento de gap de dinâmica com SAC+FSCAPS — fora de escopo nesta rodada. |
 | `RSIM_EXPLORATION.md` | viabilidade do `RSimReplay` (rSoccer/rSim) — bloqueios encontrados (16/06). |
 | `TASKS_CLAUDE_CODE.md` | pendências que exigiam execução para o paper (07/08); parte executada em 09–10/08 (ver CHANGELOG). |
@@ -75,5 +77,8 @@ Proveniência de cada número do projeto: `results/CHANGELOG.md`.
 `results/CHANGELOG.md` (proveniência), `results/*.md` (relatórios gerados: `identificacao_omega_20260724.md`,
 `qc_rotate_*`, `reidentificacao_20260724.md`, gates e ablações de 08/2026), `slr/protocolo_slr.md`
 (+ `CANDIDATOS_CITACAO.md`, `EXTRACAO_CITAVEIS.md`), `paper/outline_artigo.md` (outline IMRaD de junho),
-`latex/` (artigo; bibliografia única `latex/refs/references.bib`), `matlab/legacy/README.md`,
+`latex/` (artigo do SBR, build de 10/08; bibliografia única `latex/refs/references.bib`), `paper/sbr2026_accepted/`
+(fonte aceito, cópia do OneDrive) e `paper/sbr2026_camera_ready/` (patch do camera-ready, `CAMERA_READY_NOTES.md`),
+`latex_journal/` (artigo de periódico, `elsarticle`; tabelas e figuras geradas por `dtssl analysis run journal_tables` e
+`dtssl fig fig_journal_*`), `matlab/legacy/README.md`,
 `legacy/README.md`, `tools/ssl_unification/README.md`, `tools/external_sims/README.md` (grSim/ER-Force no WSL2 e o experimento C2b), `tools/apply_refactor_manifest.json`.
