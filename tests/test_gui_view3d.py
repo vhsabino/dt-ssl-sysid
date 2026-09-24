@@ -179,6 +179,76 @@ def _pump(app, n=3):
         app.processEvents()
 
 
+def test_arcball_point_maps_the_widget_to_the_unit_sphere():
+    c = S.arcball_point(200, 150, 400, 300)
+    np.testing.assert_allclose(c, [0.0, 0.0, 1.0])                       # centre: towards the viewer
+    r = S.arcball_point(350, 150, 400, 300)                              # right edge of the sphere (radius 150 px)
+    np.testing.assert_allclose(r, [1.0, 0.0, 0.0], atol=1e-12)
+    u = S.arcball_point(200, 75, 400, 300)                               # up = -y pixels
+    assert u[1] > 0 and u[2] > 0 and np.linalg.norm(u) == pytest.approx(1.0)
+    out = S.arcball_point(0, 0, 400, 300)                                # outside: projected on the rim
+    assert np.linalg.norm(out) == pytest.approx(1.0) and out[2] == 0.0
+
+
+def test_axis_angle_and_rotation_between_are_proper_rotations():
+    T = S.axis_angle((0.0, 0.0, 2.0), math.pi / 2)
+    np.testing.assert_allclose(T[:3, :3] @ [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], atol=1e-12)
+    np.testing.assert_allclose(S.axis_angle((0.0, 0.0, 0.0), 1.0), np.eye(4))
+    R = S.rotation_between([1.0, 0.0, 0.0], [0.0, 1.0, 0.0])
+    np.testing.assert_allclose(R[:3, :3] @ [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], atol=1e-12)
+    np.testing.assert_allclose(R[:3, :3] @ R[:3, :3].T, np.eye(3), atol=1e-12)
+    assert np.linalg.det(R[:3, :3]) == pytest.approx(1.0)
+    np.testing.assert_allclose(S.rotation_between([0, 0, 1], [0, 0, 1]), np.eye(4))
+
+
+def test_arcball_drag_turns_the_part_about_the_screen_axis():
+    ab = S.Arcball(centre=(0.0, 0.0, 0.07))
+    assert not ab.dragging and not ab.drag(0, 0, 400, 300, [1, 0, 0], [0, 0, 1], [0, -1, 0])
+    # camera at -y looking at +y: right = +x, up = +z, toward = -y; a horizontal drag to the right turns the
+    # part about the screen "up" axis (= world z), positive (counter-clockwise seen from above)
+    ab.begin(200, 150, 400, 300)
+    assert ab.dragging
+    assert ab.drag(200 + 150 * math.sin(math.radians(30)), 150, 400, 300, [1, 0, 0], [0, 0, 1], [0, -1, 0])
+    ab.end()
+    Rz = S.axis_angle((0, 0, 1), math.radians(30))
+    np.testing.assert_allclose(ab.R, Rz, atol=1e-9)
+    # the transform rotates about the centre: the centre itself does not move
+    T = ab.transform()
+    np.testing.assert_allclose(T @ [0.0, 0.0, 0.07, 1.0], [0.0, 0.0, 0.07, 1.0], atol=1e-12)
+    p = T @ [0.1, 0.0, 0.07, 1.0]
+    np.testing.assert_allclose(p[:2], [0.1 * math.cos(math.radians(30)), 0.1 * math.sin(math.radians(30))], atol=1e-9)
+    ab.spin((0, 0, 1), -math.radians(30))
+    np.testing.assert_allclose(ab.R, np.eye(4), atol=1e-9)
+    ab.reset()
+    np.testing.assert_allclose(ab.transform(), np.eye(4))
+
+
+def test_wheel_angles_integrate_the_record_speeds():
+    wa = S.WheelAngles(4)
+    np.testing.assert_allclose(wa.advance(1.0, (10.0, -10.0, 0.0, 1.0)), 0.0)         # first sample: no dt
+    a = wa.advance(1.1, (10.0, -10.0, 0.0, 1.0))
+    np.testing.assert_allclose(a, [1.0, 2 * math.pi - 1.0, 0.0, 0.1], atol=1e-9)
+    np.testing.assert_allclose(wa.advance(1.0, (10.0,) * 4), a)                       # not monotonic: ignored
+    np.testing.assert_allclose(wa.advance(1.1, None), a)                              # no speeds: hold
+    wa.reset()
+    np.testing.assert_allclose(wa.angles, 0.0)
+
+
+def test_robot_part_transforms_and_arrow_segments():
+    meshes = S.RobotMeshes.build(WHEEL, RobotSpec(), cad=False)
+    T = S.axis_angle((0, 0, 1), math.pi / 2)
+    ch, wh, body = S.robot_part_transforms(T, meshes, WHEEL, [0.0, 0.0, 0.0, 0.0])
+    np.testing.assert_allclose(body, T)
+    np.testing.assert_allclose(ch, T @ S.translate(0.0, 0.0, meshes.z_chassis))
+    assert len(wh) == 4
+    phi = float(WHEEL.angles[0])
+    c = wh[0] @ [0.0, 0.0, 0.0, 1.0]                                                   # wheel 0 centre, turned by T
+    np.testing.assert_allclose(c[:3], [-WHEEL.R * math.sin(phi), WHEEL.R * math.cos(phi), WHEEL.r], atol=1e-12)
+    segs = S.arrow_segments(1.0, 0.0, 0.2, 0.1)
+    assert segs.shape == (6, 3) and segs[1].tolist() == [0.1, 0.0, 0.2]
+    assert S.arrow_segments(0.0, 0.0, 0.2, 0.1).shape == (0, 3)
+
+
 @pytest.mark.requires_gui
 def test_view3d_builds_and_accepts_frames_without_a_context(qapp):
     from dtssl.gui.view3d import View3D

@@ -1,7 +1,11 @@
 """*Robot* tab of ``dtssl gui``: one robot in the spotlight, with its telemetry.
 
-Left: a top-view spotlight of the selected robot (chassis, dribbler face, the four wheels coloured by their
-speed, commanded and resulting body-velocity arrows, the ball when the sensor sees it) and the state table
+Header: the robot selector (every present robot of both teams, with previous / next), which drives the GUI
+selection (``robot_requested``) exactly like the field click or ``,``/``.``. Left: the selected robot in 3D
+(:class:`dtssl.gui.robot_view3d.RobotView3D`: CAD meshes turned freely with the mouse, wheels spinning at
+the record's speeds) or, at the flip of a switch and whenever GL is unavailable, the 2D top-view spotlight
+(chassis, dribbler face, the four wheels coloured by their speed, commanded and resulting body-velocity arrows,
+the ball when the sensor sees it); below it the state table
 (pose, body velocities commanded / resulting, command age, watchdog, dribbler, ball sensor, kicks). Middle:
 the four wheel speeds as bars (commanded vs resulting, rad/s) and their last seconds as curves. Right: the
 "hardware" block: battery and capacitor, ball sensor, and, when a real robot is reporting over the radio
@@ -19,9 +23,11 @@ import math
 import numpy as np
 import pyqtgraph as pg
 from PySide6 import QtCore, QtGui, QtWidgets
+from PySide6.QtCore import Signal
 
 from dtssl.bridge.telemetry import N_WHEELS, RobotTelemetry
 from dtssl.gui.plots import RingBuffer, _flush, _safe_axes
+from dtssl.gui.robot_view3d import RobotView3D
 
 TEAM_COLORS = {"blue": QtGui.QColor(41, 121, 255), "yellow": QtGui.QColor(255, 214, 0)}
 CMD_COLOR = QtGui.QColor(255, 170, 0)
@@ -272,26 +278,64 @@ class _Gauge(QtWidgets.QWidget):
 class RobotTab(QtWidgets.QWidget):
     """The tab. Feed it with :meth:`update_record` at the display rate; it redraws only while visible."""
 
-    def __init__(self, wheel_angles_deg=DEFAULT_WHEEL_ANGLES_DEG, units: dict | None = None, parent=None):
+    robot_requested = Signal(object)          # (team, id) chosen in the tab's selector
+
+    def __init__(self, wheel_angles_deg=DEFAULT_WHEEL_ANGLES_DEG, units: dict | None = None, view3d: bool = True,
+                 spec=None, wheel=None, cad: bool = True, hq: bool = True, parent=None):
         super().__init__(parent)
         self.units = dict(units or {})
         self.twin: RobotTelemetry | None = None
         self.real: RobotTelemetry | None = None
         self._key: tuple[str, int] | None = None
+        self._keys: list[tuple[str, int]] = []
         root = QtWidgets.QHBoxLayout(self)
-        # ---- left: spotlight + state
+        # ---- left: selector, 3D / 2D view + state
         left = QtWidgets.QVBoxLayout()
+        head = QtWidgets.QHBoxLayout()
         self.header = QtWidgets.QLabel("nenhum robo selecionado")
         f = self.header.font()
         f.setPointSize(f.pointSize() + 3)
         f.setBold(True)
         self.header.setFont(f)
+        self.prev_btn = QtWidgets.QToolButton()
+        self.prev_btn.setText("<")
+        self.prev_btn.setToolTip("robo anterior (,)")
+        self.next_btn = QtWidgets.QToolButton()
+        self.next_btn.setText(">")
+        self.next_btn.setToolTip("proximo robo (.)")
+        self.robot_box = QtWidgets.QComboBox()
+        self.robot_box.setToolTip("robo mostrado nesta aba (a selecao vale para toda a GUI)")
+        self.robot_box.setMinimumWidth(110)
+        self.prev_btn.clicked.connect(lambda: self._cycle(-1))
+        self.next_btn.clicked.connect(lambda: self._cycle(+1))
+        self.robot_box.currentIndexChanged.connect(self._on_box)
+        head.addWidget(self.header, 1)
+        head.addWidget(self.prev_btn)
+        head.addWidget(self.robot_box)
+        head.addWidget(self.next_btn)
+        self.view_box = QtWidgets.QComboBox()
+        self.view_box.addItems(["3D", "2D"])
+        self.view_box.setToolTip("vista do robo: 3D (CAD, girar com o mouse) ou 2D (vista de cima)")
+        head.addWidget(self.view_box)
+        left.addLayout(head)
         self.source = QtWidgets.QLabel("fonte: gemeo (calculado do estado do mundo e da cinematica inversa)")
         self.source.setWordWrap(True)
         self.spotlight = RobotSpotlight(wheel_angles_deg)
-        left.addWidget(self.header)
+        self.view3d: RobotView3D | None = RobotView3D(spec=spec, wheel=wheel, cad=cad, hq=hq) if view3d else None
+        self.stack = QtWidgets.QStackedWidget()
+        if self.view3d is not None and self.view3d.available:
+            self.stack.addWidget(self.view3d)
+            self.stack.addWidget(self.spotlight)
+        else:
+            self.stack.addWidget(self.spotlight)
+            if self.view3d is not None:
+                self.stack.addWidget(self.view3d)
+            self.view_box.setCurrentIndex(1)
+            self.view_box.setEnabled(False)
+            self.view_box.setToolTip("vista 3D indisponivel" + (f": {self.view3d.error}" if self.view3d else " (--no-3d)"))
+        self.view_box.currentIndexChanged.connect(self.set_view_mode)
         left.addWidget(self.source)
-        left.addWidget(self.spotlight, 1)
+        left.addWidget(self.stack, 1)
         self.state_form = QtWidgets.QFormLayout()
         self.state_labels: dict[str, QtWidgets.QLabel] = {}
         for key, title in (("pose", "pose x, y, theta"), ("v_cmd", "v comando (vx, vy, w)"),
@@ -353,12 +397,68 @@ class RobotTab(QtWidgets.QWidget):
         right.addWidget(rb, 1)
         root.addLayout(right, 3)
 
+    # ------------------------------------------------------------------ selection
+    @property
+    def view_mode(self) -> str:
+        """``"3d"`` or ``"2d"``: which view the stack shows."""
+        return "3d" if self.view3d is not None and self.stack.currentWidget() is self.view3d else "2d"
+
+    def set_view_mode(self, mode) -> None:
+        mode = ("2d" if mode == 1 else "3d") if isinstance(mode, int) else str(mode).lower()
+        if mode == "3d" and self.view3d is not None and self.view3d.available:
+            self.stack.setCurrentWidget(self.view3d)
+        else:
+            self.stack.setCurrentWidget(self.spotlight)
+        want = 0 if self.view_mode == "3d" else 1
+        if self.view_box.currentIndex() != want:
+            self.view_box.blockSignals(True)
+            self.view_box.setCurrentIndex(want)
+            self.view_box.blockSignals(False)
+        self.redraw()
+
+    def set_robots(self, keys) -> None:
+        """The robots offered by the selector (every present robot, both teams)."""
+        keys = [(str(k[0]), int(k[1])) for k in keys]
+        if keys == self._keys:
+            return
+        self._keys = keys
+        self.robot_box.blockSignals(True)
+        self.robot_box.clear()
+        for k in keys:
+            self.robot_box.addItem(f"{k[0]} {k[1]}", k)
+        if self._key in keys:
+            self.robot_box.setCurrentIndex(keys.index(self._key))
+        self.robot_box.blockSignals(False)
+
+    def _on_box(self, i: int) -> None:
+        key = self.robot_box.itemData(i)
+        if key is not None and tuple(key) != self._key:
+            self.robot_requested.emit(tuple(key))
+
+    def _cycle(self, step: int) -> None:
+        if not self._keys:
+            return
+        i = (self._keys.index(self._key) + step) % len(self._keys) if self._key in self._keys else 0
+        self.robot_requested.emit(self._keys[i])
+
     # ------------------------------------------------------------------ data in
     def set_selected(self, key: tuple[str, int] | None) -> None:
         if key != self._key:
             self._key = key
             self.wheel_plot.clear_data()
+            if self.view3d is not None:
+                self.view3d.reset_motion()
             self.header.setText(f"robo {key[1]} ({key[0]})" if key is not None else "nenhum robo selecionado")
+        if key in self._keys and self.robot_box.currentIndex() != self._keys.index(key):
+            self.robot_box.blockSignals(True)
+            self.robot_box.setCurrentIndex(self._keys.index(key))
+            self.robot_box.blockSignals(False)
+
+    def reset_motion(self) -> None:
+        """Backend change / new session: wheel curve and integrated wheel angles start over."""
+        self.wheel_plot.clear_data()
+        if self.view3d is not None:
+            self.view3d.reset_motion()
 
     def set_receiver_state(self, text: str) -> None:
         self.real_status.setText(text)
@@ -368,13 +468,18 @@ class RobotTab(QtWidgets.QWidget):
         self.twin, self.real = twin, real
         if twin is not None:
             self.wheel_plot.append(twin.t, twin.wheel_cmd, twin.wheel_meas)
+        if self.view3d is not None:
+            self.view3d.set_record(twin, real)              # integrates the wheel angles; draws only if visible
         if not self.isVisible():
             return
-        self.redraw()
+        self.redraw(skip_3d=True)
 
-    def redraw(self) -> None:
+    def redraw(self, skip_3d: bool = False) -> None:
         tw, rl = self.twin, self.real
-        self.spotlight.set_record(tw)
+        if self.view_mode == "2d":
+            self.spotlight.set_record(tw)
+        elif self.view3d is not None and not skip_3d:
+            self.view3d.redraw()
         L = self.state_labels
         if tw is None:
             for lab in L.values():
@@ -428,4 +533,4 @@ class RobotTab(QtWidgets.QWidget):
                     self.real_table.item(i, j).setText("-" if arr is None else f"{arr[i]:.2f}")
 
 
-__all__ = ["RobotTab", "RobotSpotlight", "WheelBars", "WheelPlot", "WHEEL_MAX_RAD_S"]
+__all__ = ["RobotTab", "RobotSpotlight", "RobotView3D", "WheelBars", "WheelPlot", "WHEEL_MAX_RAD_S"]

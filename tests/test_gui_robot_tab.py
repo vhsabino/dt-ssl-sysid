@@ -6,6 +6,7 @@ import math
 import os
 import time
 
+import numpy as np
 import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -107,6 +108,95 @@ def test_tab_renders_twin_and_real_records(qapp):
     assert L["kicks"].text() == "99"
 
 
+def test_tab_selector_and_view_switch(qapp):
+    tab = RobotTab()
+    got: list = []
+    tab.robot_requested.connect(got.append)
+    keys = [("blue", 0), ("blue", 1), ("yellow", 0), ("yellow", 2)]
+    tab.set_robots(keys)
+    assert tab.robot_box.count() == 4 and tab.robot_box.itemText(3) == "yellow 2"
+    tab.set_selected(("yellow", 0))
+    assert tab.robot_box.currentIndex() == 2 and got == []                # syncing the box emits nothing
+    tab.robot_box.setCurrentIndex(3)
+    assert got == [("yellow", 2)]                                        # the box asks the GUI to select
+    tab.set_selected(("yellow", 2))
+    tab.next_btn.click()
+    tab.prev_btn.click()
+    assert got[1:] == [("blue", 0), ("yellow", 0)]                       # wraps around, both teams
+    tab.set_robots(keys)                                                 # same list: no rebuild, index kept
+    assert tab.robot_box.currentIndex() == 3
+    # 3D by default when GL imports; the 2D spotlight one switch away
+    assert tab.view3d is not None
+    if tab.view3d.available:
+        assert tab.view_mode == "3d" and tab.view_box.isEnabled()
+        tab.set_view_mode("2d")
+        assert tab.view_mode == "2d" and tab.view_box.currentIndex() == 1
+        tab.view_box.setCurrentIndex(0)
+        assert tab.view_mode == "3d"
+    else:
+        assert tab.view_mode == "2d" and not tab.view_box.isEnabled()
+    tab2 = RobotTab(view3d=False)
+    assert tab2.view3d is None and tab2.view_mode == "2d" and not tab2.view_box.isEnabled()
+
+
+def test_robot_view3d_records_rotation_and_presets(qapp):
+    from dtssl.gui import scene3d as S
+    from dtssl.gui.robot_view3d import RobotView3D, wheel_rgba
+
+    v = RobotView3D(hq=False)
+    if not v.available:
+        pytest.skip(f"no PyOpenGL: {v.error}")
+    v.resize(400, 300)
+    v.show()
+    qapp.processEvents()
+    assert v.camera()["distance"] == S.ROBOT_VIEW_DISTANCE and v.frames == 1     # showEvent draws once
+    v.set_record(_twin(t=1.0), None)
+    v.set_record(_twin(t=1.1), None)
+    assert v.frames == 3 and v._plate_key == ("yellow", 2) and v.plate is not None
+    np.testing.assert_allclose(v._angles.angles, [0.9, 2 * math.pi - 1.9, 2.9, 2 * math.pi - 3.9], atol=1e-9)
+    assert v.ball.visible() and v.wheels[0].opts["color"] == pytest.approx(wheel_rgba(9.0))
+    assert "gemeo" in v.info.text() and "+9" in v.info.text()
+    # real wheel speeds when chosen and present; twin otherwise
+    real = RobotTelemetry(source="real", team="yellow", id=2, t=5.0, wheel_meas=(100.0, 0.0, 0.0, 0.0))
+    v.set_wheel_source("real")
+    assert v.source_box.currentIndex() == 1
+    v.set_record(_twin(t=1.2), real)
+    assert "real" in v.info.text() and v.wheels[0].opts["color"] == pytest.approx(wheel_rgba(100.0))
+    v.set_record(_twin(t=1.3), None)
+    assert "gemeo" in v.info.text()
+    # arcball drag turns the part, presets reset it, keyboard nudges it
+    v.set_view("iso")
+    np.testing.assert_allclose(v.arcball.R, np.eye(4))
+    v.drag(200, 150, 260, 150)
+    assert not np.allclose(v.arcball.R, np.eye(4))
+    v.set_view("topo")
+    assert v.camera()["elevation"] == S.ROBOT_VIEW_PRESETS["topo"][0] and np.allclose(v.arcball.R, np.eye(4))
+    v.rotate((0, 0, 1), math.radians(10))
+    assert v.arcball.R[0, 0] == pytest.approx(math.cos(math.radians(10)))
+    v.reset_view()
+    assert np.allclose(v.arcball.R, np.eye(4)) and v.camera()["azimuth"] == S.ROBOT_VIEW_PRESETS["iso"][1]
+    v.set_auto_rotate(True)
+    assert v.act_auto.isChecked() and v._timer.isActive()
+    v._auto_step()
+    assert not np.allclose(v.arcball.R, np.eye(4))
+    v.set_auto_rotate(False)
+    assert not v._timer.isActive()
+    # no record: nothing drawn but the part; hidden: cheap
+    v.set_record(None, None)
+    assert not v.ball.visible() and v.info.text() == ""
+    v.hide()
+    qapp.processEvents()
+    n = v.frames
+    v.set_record(_twin(t=2.0), None)
+    assert v.frames == n
+    v.set_hq(True)
+    assert v.hq and v._meshes is not None and not v._meshes.lod
+    v.set_cad(False)
+    assert not v.cad
+    assert wheel_rgba(None) == (0.62, 0.62, 0.66, 1.0) and wheel_rgba(-1e9)[2] == pytest.approx(1.0)
+    v.close()
+
+
 def test_mainwindow_has_the_robot_tab_and_fills_it_from_the_world(qapp):
     win = MainWindow(mode="bridge", team="yellow", bridge_config=NET_CFG, use_pygame=False, autostart=False,
                      view3d=False, realtime=False)
@@ -126,11 +216,20 @@ def test_mainwindow_has_the_robot_tab_and_fills_it_from_the_world(qapp):
         assert tw is not None and tw.source == "twin" and tw.team == key[0] and tw.id == key[1]
         assert tw.cmd_vx == 1.0 and tw.wheel_cmd is not None and tw.hardware_illustrative and tw.battery is not None
         assert win.robot_tab.state_labels["v_cmd"].text().startswith("1.000 m/s")
-        # selection follows the controller
+        # selection follows the controller, and the tab's own selector drives the controller (both teams)
         other = [k for k in c.robot_keys("yellow") if k != key][0]
         c.select(other)
         qapp.processEvents()
         assert win.robot_tab.header.text() == f"robo {other[1]} ({other[0]})"
+        tab_keys = [win.robot_tab.robot_box.itemData(i) for i in range(win.robot_tab.robot_box.count())]
+        assert tab_keys == c.robot_keys() and ("blue", 0) in tab_keys and other in tab_keys
+        assert win.robot_tab.robot_box.currentIndex() == tab_keys.index(other)
+        win.robot_tab.robot_box.setCurrentIndex(tab_keys.index(("blue", 0)))
+        assert c.selected == ("blue", 0) and win.view3d is None
+        assert win.robot_tab.header.text() == "robo 0 (blue)"
+        win.robot_tab.next_btn.click()
+        assert c.selected == ("blue", 1)
+        c.select(other)
         # a receiver attached later feeds the real side of the tab
         rx = TelemetryReceiver(ip="127.0.0.1", port=0, team="yellow")
         win.telemetry_rx = rx

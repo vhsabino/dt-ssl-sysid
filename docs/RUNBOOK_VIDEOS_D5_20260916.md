@@ -78,7 +78,12 @@ terminal da direita nesse modo: a barra de status da GUI mostra Hz e pacotes.
 
 Aba **Robot** (19/09, pedido da orientadora): o robô selecionado em destaque com as rodas pela cinemática inversa,
 comando × resultante, watchdog, sensor de bola e o bloco de hardware (bateria e capacitor de um modelo ilustrativo, rotulado;
-valores reais quando `GUI_ARGS=--telemetry` e há robôs reais reportando pelo rádio). Selecione o robô com `,`/`.` ou pelo clique no campo 2D.
+valores reais quando `GUI_ARGS=--telemetry` e há robôs reais reportando pelo rádio). Desde 24/09 o robô aparece em **3D**
+(CAD, rodas girando e coloridas pela velocidade, bola no dribbler, setas de comando e resultante): arraste com o botão
+esquerdo para girar em qualquer eixo, como uma peça no CAD; roda do mouse aproxima; duplo clique ou `R` reinicia;
+`Auto` põe o robô a girar sozinho (bom para o vídeo); `frente`/`topo`/`baixo` são os presets. Escolha o robô no combo da
+própria aba (os dois times) ou com `<`/`>`, além de `,`/`.` e do clique no campo 2D. A troca `3D`/`2D` no cabeçalho volta à
+vista de cima; sem GL (ou com `GUI_ARGS=--no-3d`) a aba fica no 2D sozinha. Se o 3D pesar no WSLg, desligue `HQ`.
 
 Aba 3D no WSLg (visto em 18/09): o log encheu de `OpenGL.error.Error: Attempt to retrieve context when no valid context`
 a cada repintura da aba 3D, e a aba ficou vazia (o resto da GUI e o servidor seguem, o pyqtgraph engole a exceção). Causa:

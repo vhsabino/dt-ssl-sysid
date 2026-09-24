@@ -3,7 +3,9 @@
 Layout: toolbar (mode Debug/Bridge/Replay, backend, team/robot, publish, real-time, speed,
 reset, fit), a second toolbar for Replay (dataset/label/event, load, play/pause, scrub),
 a tab widget in the centre with the :class:`~dtssl.gui.field_view.FieldView` (2D, interactive) and the
-:class:`~dtssl.gui.view3d.View3D` (CAD meshes, ``pyqtgraph.opengl``), docks with the
+:class:`~dtssl.gui.view3d.View3D` (CAD meshes, ``pyqtgraph.opengl``) and the
+:class:`~dtssl.gui.robot_tab.RobotTab` (the selected robot in 3D, turnable like a CAD part, with its
+telemetry; its own robot selector), docks with the
 :class:`~dtssl.gui.plots.VelocityPlots`, the :class:`~dtssl.gui.params_panel.ParamsPanel` and a
 message log, and a status bar (actual Hz, backend, joystick, packets/s per port, watchdog).
 
@@ -127,8 +129,11 @@ class MainWindow(QtWidgets.QMainWindow):
                 log.warning("robot geometry unavailable (%s); default wheel angles", e)
             self._hw = SyntheticHardware(self._telemetry_cfg)
             angles = self._geom.wheel_angles_deg if self._geom is not None else (60.0, 135.0, 225.0, 300.0)
-            self.robot_tab = RobotTab(wheel_angles_deg=angles, units=self._telemetry_cfg["real"].get("units"))
+            self.robot_tab = RobotTab(wheel_angles_deg=angles, units=self._telemetry_cfg["real"].get("units"),
+                                      view3d=view3d, spec=w.spec, cad=cad)
+            self.robot_tab.set_robots(c.robot_keys())
             self.robot_tab.set_selected(c.selected)
+            self.robot_tab.robot_requested.connect(lambda key: c.select(tuple(key)))
             self.tabs.addTab(self.robot_tab, "Robot")
             want_rx = bool(self._telemetry_cfg["real"].get("enabled", False)) if telemetry is None else bool(telemetry)
             if want_rx:
@@ -409,7 +414,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if self._hw is not None:
             self._hw.reset()
         if self.robot_tab is not None:
-            self.robot_tab.wheel_plot.clear_data()
+            self.robot_tab.reset_motion()
         self._refresh_robot_combo()
         self.log(f"backend: {name} ({getattr(w, 'name', type(w).__name__)})")
 
@@ -427,6 +432,8 @@ class MainWindow(QtWidgets.QMainWindow):
         if c.selected in keys:
             self.robot_box.setCurrentIndex(keys.index(c.selected))
         self.robot_box.blockSignals(False)
+        if self.robot_tab is not None:
+            self.robot_tab.set_robots(c.robot_keys())
 
     def _on_robot_box(self, i: int) -> None:
         key = self.robot_box.itemData(i)

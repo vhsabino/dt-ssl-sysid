@@ -237,6 +237,38 @@ medido para o mesmo robô), sem mudar nada além de ligar o receptor. Flags: `--
 hardware ilustrativo, parser do Feedback cru/embrulhado/comando/lixo, receptor com socket em loopback, config) e
 `tests/test_gui_robot_tab.py` (5: widgets pintam, registros gêmeo e real na aba, `MainWindow` com e sem a aba, flags).
 
+### Vista 3D do robô selecionado e seletor na própria aba (24/09/2026)
+
+Pedido do Victor em 24/09: ver o robô selecionado em 3D, girável em qualquer eixo como uma peça num CAD, com as rodas
+se mexendo, e escolher o robô na própria aba. O lado esquerdo da aba passa a ser `RobotView3D` (`gui/robot_view3d.py`,
+`pyqtgraph.opengl`), com o *spotlight* 2D uma troca ao lado (`3D`/`2D` no cabeçalho; a aba cai no 2D sozinha quando
+não há GL ou com `--no-3d`):
+
+- **Peça, não câmera**: a câmera fica parada e o robô gira. O arrasto esquerdo é um *arcball* (`scene3d.Arcball`,
+  esfera de Shoemake): o par de pontos do arrasto vira dois vetores na esfera, expressos nos eixos da câmera
+  (`right/up/toward`, lidos da `viewMatrix` do `GLViewWidget`), e a rotação entre eles pré-multiplica a matriz da
+  peça, em torno do centro do robô (z = 0,07 m). Qualquer eixo, sem trava de gimbal, como no SolidWorks/Fusion. Roda
+  do mouse aproxima, botão do meio arrasta, duplo clique ou `R` reinicia, `F` reajusta a distância, setas giram 5°,
+  `Auto` liga a mesa giratória. Presets `iso`, `frente` (dribbler para o observador), `lado`, `topo`, `baixo` (rodas).
+- **Rodas girando pelo registro**: `scene3d.WheelAngles` integra os ângulos com `wheel_meas` do `RobotTelemetry`
+  (rad/s) e o `t` do registro; cada roda é colorida pela sua velocidade (vermelho para frente, azul para trás, cinza
+  parada, saturando em 120 rad/s). `rodas: gêmeo` usa a cinemática inversa do gêmeo; `rodas: real` usa o `Feedback` do
+  rádio quando há registro fresco (senão volta ao gêmeo). Bola no dribbler quando o sensor a vê; setas de velocidade de
+  corpo comandada (laranja) e resultante (ciano) por cima da tampa; tríade do frame de corpo (x vermelho = dribbler).
+- **Iluminação**: o `shaded` do pyqtgraph ilumina por trás da peça (uma peça sozinha fica quase preta): `RobotView3D`
+  registra `dtssl_headlight`, o *vertex shader* do próprio `shaded` (segue a versão do pyqtgraph) com um *fragment*
+  de luz frontal e 35 % de ambiente; se algo falhar, cai no `shaded`. Malhas CAD em resolução cheia por default (é
+  um robô só; `HQ` desliga se pesar no WSLg), placa SSL com o id do robô.
+- **Seletor na aba**: combo com todos os robôs presentes dos dois times mais `<`/`>`; emite `robot_requested` e o
+  `MainWindow` chama `controller.select`, então vale para toda a GUI (campo 2D, aba 3D, plots), igual ao clique no
+  campo e às teclas `,`/`.`. A troca de backend zera os ângulos das rodas (`RobotTab.reset_motion`).
+
+Nada disso toca a simulação nem os dados; é só desenho a partir do `RobotTelemetry`. Testes: `tests/test_gui_view3d.py`
+(+5 puros: mapa do arcball, rotações próprias, arrasto = rotação em torno do eixo da tela, integração das rodas,
+transformadas da peça e setas) e `tests/test_gui_robot_tab.py` (+2: seletor e troca 3D/2D; `RobotView3D` com registros,
+fonte real, arrasto, presets, teclado, auto-rotação, oculta = barata; e o `MainWindow` selecionando pelo combo da aba).
+Verificado renderizando de verdade sob `xvfb` + Mesa (llvmpipe) no sandbox: `docs/img/gui_robot_tab_3d.png`.
+
 ## Correção 03/09/2026 — `ZeroDivisionError` do pyqtgraph ao trocar de robô
 
 Sintoma (Windows, pyqtgraph 0.14.0, modo Debug): ao selecionar um robô, o console repete

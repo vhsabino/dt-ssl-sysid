@@ -332,6 +332,145 @@ def goal_frames(f: FieldGeometry, height: float = 0.16) -> np.ndarray:
 
 
 # --------------------------------------------------------------------------------------
+# Single-robot view (Robot tab): arcball rotation of the part, wheel angles from wheel speeds
+# --------------------------------------------------------------------------------------
+ROBOT_VIEW_PRESETS: dict[str, tuple[float, float]] = {   # (elevation, azimuth) of the camera, degrees
+    "iso": (24.0, -50.0),
+    "frente": (8.0, 0.0),
+    "lado": (8.0, 90.0),
+    "topo": (89.0, -90.0),
+    "baixo": (-89.0, -90.0),
+}
+ROBOT_VIEW_DISTANCE = 0.46          # camera distance (m) for a 0.18 m robot
+AXIS_RGBA = {"x": (0.95, 0.30, 0.30, 1.0), "y": (0.35, 0.85, 0.35, 1.0), "z": (0.35, 0.55, 1.0, 1.0)}
+
+
+def arcball_point(x: float, y: float, w: float, h: float) -> np.ndarray:
+    """Widget pixel ``(x, y)`` (y down) -> unit vector on Shoemake's arcball sphere, in screen axes
+    ``(right, up, toward the viewer)``; points outside the sphere are projected onto its rim."""
+    s = min(w, h) / 2.0
+    px = (x - w / 2.0) / s
+    py = (h / 2.0 - y) / s
+    r2 = px * px + py * py
+    if r2 > 1.0:
+        n = math.sqrt(r2)
+        return np.array([px / n, py / n, 0.0])
+    return np.array([px, py, math.sqrt(1.0 - r2)])
+
+
+def axis_angle(axis, angle: float) -> np.ndarray:
+    """4x4 rotation of ``angle`` rad about ``axis`` (Rodrigues); identity for a null axis."""
+    a = np.asarray(axis, dtype=float)
+    n = float(np.linalg.norm(a))
+    T = np.eye(4)
+    if n < 1e-12 or abs(angle) < 1e-12:
+        return T
+    a = a / n
+    K = np.array([[0.0, -a[2], a[1]], [a[2], 0.0, -a[0]], [-a[1], a[0], 0.0]])
+    T[:3, :3] = np.eye(3) + math.sin(angle) * K + (1.0 - math.cos(angle)) * (K @ K)
+    return T
+
+
+def rotation_between(v0, v1) -> np.ndarray:
+    """4x4 rotation taking unit vector ``v0`` onto ``v1`` (the arcball step)."""
+    v0 = np.asarray(v0, dtype=float)
+    v1 = np.asarray(v1, dtype=float)
+    axis = np.cross(v0, v1)
+    dot = float(np.clip(np.dot(v0, v1), -1.0, 1.0))
+    return axis_angle(axis, math.acos(dot))
+
+
+class Arcball:
+    """Free rotation of the part (CAD style): ``R`` is the world-from-part 4x4 the drawn items are
+    premultiplied by, about ``centre``. :meth:`begin` on mouse press, :meth:`drag` on every move; the drag
+    is mapped from screen axes to world axes with the camera's ``right/up/toward`` unit vectors so the part
+    turns about the axis the mouse describes on the screen, whatever the camera orientation."""
+
+    def __init__(self, centre=(0.0, 0.0, 0.0)):
+        self.centre = np.asarray(centre, dtype=float)
+        self.R = np.eye(4)
+        self._p0: np.ndarray | None = None
+
+    def reset(self) -> None:
+        self.R = np.eye(4)
+        self._p0 = None
+
+    def begin(self, x: float, y: float, w: float, h: float) -> None:
+        self._p0 = arcball_point(x, y, w, h)
+
+    def end(self) -> None:
+        self._p0 = None
+
+    @property
+    def dragging(self) -> bool:
+        return self._p0 is not None
+
+    def drag(self, x: float, y: float, w: float, h: float, right, up, toward) -> bool:
+        """Apply the rotation between the pressed point and ``(x, y)``; returns False when not dragging."""
+        if self._p0 is None:
+            return False
+        p1 = arcball_point(x, y, w, h)
+        B = np.column_stack([np.asarray(right, float), np.asarray(up, float), np.asarray(toward, float)])
+        v0, v1 = B @ self._p0, B @ p1
+        self.R = rotation_between(v0, v1) @ self.R
+        self._p0 = p1
+        return True
+
+    def spin(self, axis, angle: float) -> None:
+        """Turn the part by ``angle`` about a world ``axis`` (auto-rotate / keyboard)."""
+        self.R = axis_angle(axis, angle) @ self.R
+
+    def transform(self) -> np.ndarray:
+        """World-from-part 4x4 including the rotation centre."""
+        c = self.centre
+        return translate(*c) @ self.R @ translate(*(-c))
+
+
+class WheelAngles:
+    """Integrates the four wheel angles from the wheel speeds of the telemetry record (rad/s)."""
+
+    def __init__(self, n: int = 4):
+        self.angles = np.zeros(n)
+        self._t: float | None = None
+
+    def reset(self) -> None:
+        self.angles[:] = 0.0
+        self._t = None
+
+    def advance(self, t: float, speeds) -> np.ndarray:
+        if self._t is not None and speeds is not None and t > self._t:
+            dt = min(t - self._t, 0.5)
+            self.angles = (self.angles + np.asarray(speeds, dtype=float)[: len(self.angles)] * dt) % (2.0 * math.pi)
+        if self._t is None or t >= self._t:
+            self._t = t
+        return self.angles
+
+
+def robot_part_transforms(model_T: np.ndarray, meshes: RobotMeshes, wheel: WheelGeometry,
+                          angles) -> tuple[np.ndarray, list[np.ndarray], np.ndarray]:
+    """``(chassis_T, wheel_Ts, body_T)`` of one robot drawn at the origin of its body frame and turned by
+    ``model_T`` (the :class:`Arcball` transform)."""
+    body_T = model_T @ robot_transform(0.0, 0.0, 0.0)
+    chassis_T = model_T @ robot_transform(0.0, 0.0, 0.0, meshes.z_chassis)
+    wheel_Ts = [model_T @ wheel_transform(0.0, 0.0, 0.0, wheel, i, float(angles[i])) for i in range(len(wheel.angles))]
+    return chassis_T, wheel_Ts, body_T
+
+
+def arrow_segments(vx: float, vy: float, z: float, scale: float, head: float = 0.02) -> np.ndarray:
+    """A planar arrow from the origin along ``(vx, vy) * scale`` at height ``z`` as ``mode='lines'``
+    segments (shaft + two head strokes); empty array for a null vector."""
+    ex, ey = vx * scale, vy * scale
+    n = math.hypot(ex, ey)
+    if n < 1e-4:
+        return np.zeros((0, 3))
+    a = math.atan2(ey, ex)
+    segs = [[0.0, 0.0, z], [ex, ey, z]]
+    for da in (math.pi * 0.8, -math.pi * 0.8):
+        segs += [[ex, ey, z], [ex + head * math.cos(a + da), ey + head * math.sin(a + da), z]]
+    return np.asarray(segs, dtype=float)
+
+
+# --------------------------------------------------------------------------------------
 # Scene bookkeeping (what the widget updates each frame)
 # --------------------------------------------------------------------------------------
 @dataclass
@@ -375,4 +514,6 @@ __all__ = [
     "WheelSpin", "floor_quads", "quad_mesh", "circle_points", "field_segments", "goal_frames", "RobotPose",
     "SceneFrame", "compute_frame", "CAMERA_PRESETS", "CHASSIS_RGBA", "WHEEL_RGBA", "PRIMITIVE_RGBA",
     "FLOOR_RGBA", "BOUNDARY_RGBA", "LINE_RGBA", "BALL_RGBA", "SELECT_RGBA", "PLATE_Z_OVER_TOP", "LINE_Z",
+    "ROBOT_VIEW_PRESETS", "ROBOT_VIEW_DISTANCE", "AXIS_RGBA", "arcball_point", "axis_angle", "rotation_between",
+    "Arcball", "WheelAngles", "robot_part_transforms", "arrow_segments",
 ]
