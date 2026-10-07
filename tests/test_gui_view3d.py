@@ -43,6 +43,23 @@ def test_cad_meshes_match_the_physics_assets():
     assert r == pytest.approx(meta["wheel"]["outer_radius"], abs=1e-6)
 
 
+def test_mechanism_meshes_match_the_physics_assets():
+    """Kicker and dribbler (Inventor assembly) share the chassis frame: the dribbler spans the mouth at the
+    front (+x), the kicker lies on the body x axis behind it; the LOD pair is a decimation of the same parts."""
+    meta = S.cad_meta()
+    full, lod = S.mechanism_meshes(lod=False), S.mechanism_meshes(lod=True)
+    assert set(full) == set(lod) == {"kicker", "dribbler"}
+    for key in full:
+        assert full[key].n_faces == meta[key]["faces"] and lod[key].n_faces == meta[f"{key}_lod"]["faces"]
+        assert 2 * lod[key].n_faces < full[key].n_faces
+        np.testing.assert_allclose(lod[key].bbox()[1], full[key].bbox()[1], atol=0.002)
+    lo, hi = full["dribbler"].bbox()
+    assert 0.07 < hi[0] < 0.085 and lo[0] > 0.04 and abs(hi[1] + lo[1]) < 0.004      # across the mouth, centred
+    lo, hi = full["kicker"].bbox()
+    assert hi[0] < 0.0765 and abs(hi[1] + lo[1]) < 0.002 and hi[1] - lo[1] < 0.06      # behind the front face
+    assert all(m.bbox()[0][2] + WHEEL.r > 0.0 for m in full.values())                  # nothing below the floor
+
+
 def test_primitive_meshes_are_closed_surfaces():
     for m in (S.d_prism_mesh(0.09, 0.075, 0.008, 0.15), S.cylinder_mesh(0.03, 0.009), S.cylinder_mesh_z(0.02, 0.001)):
         assert _euler_characteristic(m) == 2                          # genus 0: V - E + F = 2
@@ -69,6 +86,8 @@ def test_robot_meshes_build_all_variants():
     assert 3 * lod.chassis.n_faces < cad.chassis.n_faces and 4 * lod.wheel.n_faces < cad.wheel.n_faces
     assert not prim.cad and prim.z_chassis == 0.0 and prim.z_top == pytest.approx(RobotSpec().height)
     assert lod.chassis.n_faces > 10 * prim.chassis.n_faces
+    assert set(cad.mechanisms) == set(lod.mechanisms) == {"kicker", "dribbler"} and prim.mechanisms == {}
+    assert all(lod.mechanisms[k].n_faces < cad.mechanisms[k].n_faces for k in cad.mechanisms)
 
 
 def test_robot_transform_maps_body_points_to_world():

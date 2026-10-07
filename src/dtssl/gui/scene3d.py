@@ -4,8 +4,10 @@ Everything the :mod:`dtssl.gui.view3d` widget draws is prepared by this module f
 can be unit-tested without a GL context:
 
 * :func:`parse_obj` reads the CAD meshes shipped in ``dtssl.physics.assets`` (the same OBJ files the
-  MuJoCo ``visual="cad"`` mode uses, see ``tools/usd_to_mjcf_meshes.py``); :class:`RobotMeshes` also
-  offers the primitive fallback (D-shaped prism + wheel cylinders) when the CAD is not wanted.
+  MuJoCo ``visual="cad"`` mode uses, see ``tools/usd_to_mjcf_meshes.py``; the kicker and dribbler come from
+  ``tools/inventor_export_mechanisms.m`` and are fixed to the chassis, :func:`mechanism_meshes`);
+  :class:`RobotMeshes` also offers the primitive fallback (D-shaped prism + wheel cylinders) when the CAD is
+  not wanted.
 * :func:`robot_transform` / :func:`wheel_transform` give the 4x4 matrices of the chassis and of each
   wheel for a pose ``(x, y, theta)`` and the wheel spin angles; :class:`WheelSpin` integrates the spin
   from the body velocity through the inverse kinematics ``omega_i r = -sin(phi_i) vx + cos(phi_i) vy + R w``
@@ -28,6 +30,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from dtssl.physics.mjcf import (
+    CAD_MECHANISMS,
     GREEN_RGBA,
     ID_DOT_POS,
     ID_PATTERN,
@@ -51,6 +54,7 @@ PLATE_RADIUS = 0.025
 DOT_RADIUS = 0.02
 CHASSIS_RGBA = (0.26, 0.26, 0.29, 1.0)
 WHEEL_RGBA = (0.62, 0.62, 0.66, 1.0)
+MECHANISM_RGBA = {key: rgba for key, _, rgba in CAD_MECHANISMS}      # kicker (steel), dribbler (dark)
 PRIMITIVE_RGBA = (0.24, 0.24, 0.27, 1.0)
 FLOOR_RGBA = (0.13, 0.47, 0.20, 1.0)
 BOUNDARY_RGBA = (0.10, 0.36, 0.16, 1.0)
@@ -100,6 +104,20 @@ def cad_meshes(lod: bool = False) -> tuple[Mesh, Mesh, dict]:
     assets = mesh_assets()
     ck, wk = ("chassis_lod", "wheel_lod") if lod and "chassis_lod" in meta else ("chassis", "wheel")
     return parse_obj(assets[meta[ck]["file"]]), parse_obj(assets[meta[wk]["file"]]), meta
+
+
+def mechanism_meshes(lod: bool = False) -> dict[str, Mesh]:
+    """``{"kicker": Mesh, "dribbler": Mesh}`` from ``dtssl.physics.assets`` (same frame as the chassis OBJ: z
+    origin on the wheel-axle plane, so they are drawn with the chassis transform). ``lod=True`` picks the
+    decimated ``ssl_*_lod.obj`` when present. Mechanisms missing from ``meshes.json`` are left out."""
+    meta = cad_meta()
+    assets = mesh_assets()
+    out: dict[str, Mesh] = {}
+    for key, _, _ in CAD_MECHANISMS:
+        k = f"{key}_lod" if lod and f"{key}_lod" in meta else key
+        if k in meta:
+            out[key] = parse_obj(assets[meta[k]["file"]])
+    return out
 
 
 def d_prism_mesh(radius: float, front: float, z0: float, z1: float, n_arc: int = 40) -> Mesh:
@@ -186,6 +204,7 @@ class RobotMeshes:
     z_chassis: float                # z offset of the chassis mesh (0 for primitives, wheel.r for the CAD)
     cad: bool
     lod: bool = False
+    mechanisms: dict[str, Mesh] = field(default_factory=dict)   # kicker/dribbler, drawn with the chassis transform
 
     @classmethod
     def build(cls, wheel: WheelGeometry, spec: RobotSpec, cad: bool = True, lod: bool = True) -> RobotMeshes:
@@ -193,7 +212,7 @@ class RobotMeshes:
             chassis, wh, meta = cad_meshes(lod=lod)
             # the plate sits on the full-resolution cover height (the LOD bbox differs by a few mm)
             return cls(chassis, wh, wheel.r + float(meta["chassis"]["z_top_above_axle"]), wheel.r, True,
-                       lod and "chassis_lod" in meta)
+                       lod and "chassis_lod" in meta, mechanism_meshes(lod=lod))
         chassis = d_prism_mesh(spec.radius, spec.dribbler_offset, 0.008, spec.height)
         wh = cylinder_mesh(wheel.r * 0.92, wheel.hub_half_width)
         return cls(chassis, wh, spec.height, 0.0, False)
@@ -509,7 +528,8 @@ def compute_frame(poses: dict[tuple[str, int], RobotPose], ball_xyz: tuple[float
 
 
 __all__ = [
-    "Mesh", "parse_obj", "cad_meshes", "d_prism_mesh", "cylinder_mesh", "disc_mesh", "merge_meshes",
+    "Mesh", "parse_obj", "cad_meshes", "mechanism_meshes", "MECHANISM_RGBA", "d_prism_mesh", "cylinder_mesh",
+    "disc_mesh", "merge_meshes",
     "id_plate_mesh", "RobotMeshes", "rot_z", "rot_x", "translate", "robot_transform", "wheel_transform",
     "WheelSpin", "floor_quads", "quad_mesh", "circle_points", "field_segments", "goal_frames", "RobotPose",
     "SceneFrame", "compute_frame", "CAMERA_PRESETS", "CHASSIS_RGBA", "WHEEL_RGBA", "PRIMITIVE_RGBA",

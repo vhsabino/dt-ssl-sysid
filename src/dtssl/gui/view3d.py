@@ -42,7 +42,8 @@ def _qmatrix(m: np.ndarray) -> QtGui.QMatrix4x4:
 
 
 class _RobotItems:
-    """GL items of one robot: chassis, 4 wheels, id plate (+ selection ring)."""
+    """GL items of one robot: chassis, 4 wheels, kicker and dribbler (CAD only, fixed to the chassis), id plate
+    (+ selection ring)."""
 
     def __init__(self, view, key: tuple[str, int], meshes: S.RobotMeshes, spec: RobotSpec):
         team, rid = key
@@ -52,12 +53,14 @@ class _RobotItems:
         self.chassis = gl.GLMeshItem(vertexes=meshes.chassis.vertices, faces=meshes.chassis.faces, color=col, **opts)
         self.wheels = [gl.GLMeshItem(vertexes=meshes.wheel.vertices, faces=meshes.wheel.faces, color=S.WHEEL_RGBA,
                                      **opts) for _ in range(4)]
+        self.mechanisms = [gl.GLMeshItem(vertexes=m.vertices, faces=m.faces, color=S.MECHANISM_RGBA[k], **opts)
+                           for k, m in meshes.mechanisms.items()]
         plate = S.id_plate_mesh(team, rid, meshes.z_top + S.PLATE_Z_OVER_TOP)
         self.plate = gl.GLMeshItem(vertexes=plate.vertices, faces=plate.faces, faceColors=plate.colors, **opts)
         ring = S.circle_points(0.0, 0.0, spec.radius + 0.012, 48, 0.004)
         self.ring = gl.GLLinePlotItem(pos=ring, color=S.SELECT_RGBA, width=2.0, antialias=True, mode="line_strip")
         self.ring.setVisible(False)
-        self.items = [self.chassis, *self.wheels, self.plate, self.ring]
+        self.items = [self.chassis, *self.wheels, *self.mechanisms, self.plate, self.ring]
         for it in self.items:
             view.addItem(it)
         self._visible = True
@@ -71,7 +74,10 @@ class _RobotItems:
                 self.ring.setVisible(False)
 
     def apply(self, chassis_T: np.ndarray, wheel_Ts: list[np.ndarray], body_T: np.ndarray, selected: bool) -> None:
-        self.chassis.setTransform(_qmatrix(chassis_T))
+        qc = _qmatrix(chassis_T)
+        self.chassis.setTransform(qc)
+        for it in self.mechanisms:
+            it.setTransform(qc)
         for it, T in zip(self.wheels, wheel_Ts, strict=True):
             it.setTransform(_qmatrix(T))
         self.plate.setTransform(_qmatrix(body_T))

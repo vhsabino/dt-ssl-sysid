@@ -257,6 +257,9 @@ class RobotView3D(QtWidgets.QWidget):
         self.chassis = gl.GLMeshItem(vertexes=meshes.chassis.vertices, faces=meshes.chassis.faces, color=col, **opts)
         self.wheels = [gl.GLMeshItem(vertexes=meshes.wheel.vertices, faces=meshes.wheel.faces, color=S.WHEEL_RGBA,
                                      **opts) for _ in self.wheel.angles]
+        # kicker and dribbler (CAD only): fixed to the chassis, drawn with its transform
+        self.mechanisms = [gl.GLMeshItem(vertexes=m.vertices, faces=m.faces, color=S.MECHANISM_RGBA[k], **opts)
+                           for k, m in meshes.mechanisms.items()]
         self.plate = None
         self._plate_key: tuple[str, int] | None = None
         md = gl.MeshData.sphere(rows=10, cols=16, radius=self.ball_radius)
@@ -273,7 +276,8 @@ class RobotView3D(QtWidgets.QWidget):
         self.arrow_cmd = gl.GLLinePlotItem(pos=np.zeros((0, 3)), color=CMD_RGBA, width=3.0, antialias=True, mode="lines")
         self.arrow_meas = gl.GLLinePlotItem(pos=np.zeros((0, 3)), color=MEAS_RGBA, width=3.0, antialias=True,
                                             mode="lines")
-        self._items = [self.grid, *self.axes, self.chassis, *self.wheels, self.ball, self.arrow_cmd, self.arrow_meas]
+        self._items = [self.grid, *self.axes, self.chassis, *self.wheels, *self.mechanisms, self.ball, self.arrow_cmd,
+                       self.arrow_meas]
         for it in self._items:
             self.view.addItem(it)
         self._angles.reset()
@@ -435,7 +439,10 @@ class RobotView3D(QtWidgets.QWidget):
         meshes = self._robot_meshes()
         T = self.arcball.transform()
         chassis_T, wheel_Ts, body_T = S.robot_part_transforms(T, meshes, self.wheel, self._angles.angles)
-        self.chassis.setTransform(_qmatrix(chassis_T))
+        qc = _qmatrix(chassis_T)
+        self.chassis.setTransform(qc)
+        for it in self.mechanisms:
+            it.setTransform(qc)
         for it, wt in zip(self.wheels, wheel_Ts, strict=True):
             it.setTransform(_qmatrix(wt))
         qb = _qmatrix(body_T)
