@@ -294,6 +294,38 @@ omega)` tinge as cores do CAD para o vermelho (frente) ou azul (ré) em 32 níve
 (`test_cad_meshes_match_the_physics_assets` confere as 13 cores do chassi, `test_mechanism_meshes_match_the_physics_assets`,
 `test_robot_meshes_build_all_variants` confere cores por face nas três variantes e a altura da placa).
 
+## Elenco de 11 robôs, reservas no banco e substituição por Shift+clique (07/10/2026)
+
+Pedido do Victor em 07/10: 11 robôs por time, com os inativos fora das bordas para não atrapalhar, e colisão nas
+traves e bordas no modo debug. O lado do mundo está em `docs/refactor_notes/bridge.md` (seção de 07/10: `park_spot`,
+`Scene.default(n_active=...)`, gols sólidos no `TwinWorld`); aqui só o que a GUI faz com isso.
+
+- **Defaults**: `Controller(n_blue=ROSTER_SIZE, n_yellow=ROSTER_SIZE, n_active=ACTIVE_ROBOTS)` e `MainWindow` idem;
+  `dtssl gui --n-blue 11 --n-yellow 11 --n-active 6` é o novo padrão (Divisão B: 6 em campo, 5 no banco de cada
+  time). `--n-blue 6 --n-yellow 6` reproduz a configuração antiga sem ninguém no banco. Vale para todos os
+  backends (`_make_world` passa `n_active`), e a troca de backend ou o `reset` recoloca cada um na vaga.
+- **Campo 2D** (`field_view.py`): as reservas são desenhadas na vaga, além da parede de −y, com opacidade
+  `PARKED_OPACITY = 0,45` (`RobotItem.set_present`), sem marcador de bola; `fit_field` reserva `PARK_MARGIN_MM = 500`
+  abaixo da arena para o banco caber. `robot_at(pt, present_only=True)` ignora o banco, então Ctrl+clique e as
+  setas de seleção só alcançam quem está em jogo. **Shift+clique** é a substituição: sobre um robô em jogo emite
+  `robot_park_requested(team, id)` (vai para o banco); sobre o campo vazio emite `robot_enter_requested(x, y)` e o
+  controlador traz o **menor id do banco** do time do joystick (`--team`) para aquele ponto, de frente para o gol
+  adversário (θ = 0 azul, π amarelo), e o seleciona. Clique simples (teleporte), direito (bola), Ctrl (seleção), roda
+  e arrasto continuam iguais. `Controller.park_robot(key)` e `enter_robot(x, y, team=None)` são os ganchos (falham
+  em Replay e devolvem `False`/`None`); `robot_keys(team, present=True)` ganhou o filtro.
+- **Aba 3D** (`scene3d.py`, `view3d.py`): um avental escuro de `APRON_WIDTH = 0,6 m` (`apron_quads`, `APRON_RGBA`)
+  em volta da arena mostra onde o banco fica; as reservas são desenhadas com as rodas paradas (`compute_frame`
+  só integra `WheelSpin` para robôs presentes; `show_absent=False` as esconde) e o anel de seleção não aparece em
+  robô no banco. Custo: 22 robôs desenhados em vez de 12 (os LOD continuam o default); se pesar, `--n-blue 6
+  --n-yellow 6` ou `--no-cad`.
+- **Visão e bridge**: nada muda no que sai pela rede, `robots_of` só devolve os presentes; a aba Robot e o combo
+  de robô listam só os presentes. No modo Bridge a substituição pelo clique também vale (é `set_present` no mundo,
+  o mesmo caminho do `TeleportRobot{present}` do simcontrol).
+- Testes: `tests/test_gui_window.py` (reserva visível esmaecida na vaga e ignorada por `robot_at`; sinais de
+  Shift+clique; `test_controller_roster_substitutions`: 22 robôs, 12 presentes, 10 no banco no próprio lado,
+  `enter_robot`/`park_robot`, banco amarelo esvazia depois de 5 entradas, `reset_scene` restaura) e
+  `tests/test_gui_view3d.py` (reserva desenhada com rodas paradas, avental).
+
 ## Correção 03/09/2026 — `ZeroDivisionError` do pyqtgraph ao trocar de robô
 
 Sintoma (Windows, pyqtgraph 0.14.0, modo Debug): ao selecionar um robô, o console repete

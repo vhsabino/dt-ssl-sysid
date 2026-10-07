@@ -136,3 +136,42 @@ comportamento do C2b, bit a bit; a interpolação da janela passa por `interpola
 - GUI: `SimServer.stats`, `world.plants`, `world.commands`, `world.set_plant_params`, `world.teleport_*`, `world.set_present` são os ganchos previstos; `SimServer(step_mode=True).tick()` para dirigir pelo `QTimer`.
 - Backend MuJoCo: `SimServer` só exige a interface `World` (+ `ball()`/`spec`/`field`); `teleport_robot(..., vx, vy, w)` e `teleport_ball(..., rolling)` são extensões opcionais (o simcontrol faz fallback por `TypeError`).
 - Se `protobuf` do usuário for < 4.21, `pip install -U protobuf`; se regenerar os protos com protoc ≥ 26, subir o mínimo em `pyproject.toml` (ver docstring de `build_proto.py`).
+
+## Elenco de 11 robôs, reservas fora da arena e gols sólidos no mundo analítico (07/10/2026)
+
+Pedido do Victor em 07/10: confirmar a divisão do campo, pôr 11 robôs por time para funcionar com os inativos fora das
+bordas, e dar colisão às traves e às bordas no modo debug, para robôs e bola. O campo é o da **Divisão B**
+(`config/field_divB.json`: 9 × 6 m, gol de 1,0 × 0,18 m, *boundary* de 0,3 m; `FieldGeometry` já tinha esses
+defaults e nada mudou nele). Divisão B joga com 6 em campo, então o elenco de 11 entra com 6 ativos e 5 reservas.
+
+- **Elenco** (`sim/entities.py`): `ROSTER_SIZE = 11`, `ACTIVE_ROBOTS = 6`, `PARK_GAP = 0,25 m` e
+  `park_spot(team, rid, field_length_m, field_width_m, boundary_width_m, gap)`: a vaga de banco fica **além da
+  parede de −y** (centro em y = −(W/2 + bw + gap) = −3,55 m), cada time no seu lado (azul em x < 0, amarelo em
+  x > 0), enfileirada por id a partir do meio (x = ±gap·(1 + id)), de frente para o campo (θ = π/2).
+  `Scene.default(n_blue, n_yellow, field_length_m, field_width_m, n_active=None, boundary_width_m=0,3)`: os ids
+  menores que `n_active` recebem a formação de sempre, calculada com `n_active` robôs (a formação de 6 é idêntica à
+  anterior), e os demais nascem `RobotSpawn(present=False)` na vaga. `n_active=None` mantém todos em campo.
+- **`TwinWorld(..., boundary=True, goals=True, n_active=None)`**. Robô ausente: a planta é criada na vaga, não é
+  passada em `step`, não participa de contato nenhum e não sai em `robots_of` (logo a visão não o publica), mas
+  continua no `WorldState` para a GUI desenhá-lo esmaecido. `set_present(False)` leva o robô à vaga (e solta a
+  bola se a segurava); `set_present(True)` traz de volta pela parede mais próxima, grampeado dentro da arena;
+  `teleport_robot(..., present=False)` ignora as coordenadas e estaciona; `reset` respeita o `present` do spawn.
+  Novo `park_spot(team, rid)` no mundo para quem precisar da vaga com a geometria carregada.
+- **Gols sólidos** (`sim/collisions.py`): `goal_segments(field)` devolve os 6 segmentos de linha de centro dos gols
+  (por gol, duas laterais com a trave na frente, da linha de gol até o fundo, e o fundo), coincidindo com as caixas
+  do MJCF (`GOAL_WALL_THICKNESS = 0,02 m`); `clamp_to_goals(x, y, radius, field)` empurra o robô para fora das
+  cápsulas (ponto mais próximo do segmento, 2 passadas para os cantos); `goal_ball_contact(ball, field)` empurra
+  a bola e reflete a velocidade com `restitution_wall` (a mesma das paredes), a não ser que a bola esteja acima de
+  `GOAL_WALL_HEIGHT = 0,16 m` (chip passa por cima). Ordem do passo: plantas → push-out robô-robô → paredes
+  (`clamp_to_walls`, se `boundary`) → gols (`clamp_to_goals`, se `goals`) → chute/dribbler → bola em substeps com
+  paredes e gols a cada substep. `boundary=False` desliga paredes para robô e bola (a bola segue em frente).
+- **Harness intacto**: `WorldPlant` passa `goals=False` aos backends analíticos (o harness nunca teve gols; paredes
+  como antes), então os rollouts e as métricas do artigo não mudam; os backends MuJoCo já tinham gols e paredes no
+  MJCF e não recebem nada novo.
+- **`MuJoCoWorld`** usa a mesma `park_spot` (antes estacionava numa fileira no canto +x/−y), guarda `park_theta` e
+  grampeia a reentrada em `set_present(True)` com `clamp_to_walls` quando há *boundary*; `n_active` também existe.
+- Testes: `tests/test_world_twin.py` (+4: reserva estacionada, não simulada nem publicada, reentrada pela parede;
+  elenco padrão com 12 presentes e 10 no banco; robôs param no fundo e na lateral do gol e a bola chutada no gol
+  volta sem atravessar o fundo; `boundary=False` deixa robô e bola saírem), `tests/test_physics_world.py`
+  (vaga e reentrada no MuJoCo), `tests/test_bridge_proto.py` segue igual (spawn `present=False` agora nasce na
+  vaga). SPEC §4.2 e §5 atualizadas.
