@@ -23,8 +23,10 @@ Two routes share the same field / ball / API (registered in :mod:`dtssl.sim.back
   actuators through a Python PI loop in firmware units (``wheel_control="pi"``).
 
 Common: kick (ball velocity set along the heading when the ball is in the dribbler zone,
-chip adds a vertical component), dribbler (weak spring-damper pulling the ball to the dribbler
-pocket through ``xfrc_applied``), watchdog (command zeroed after ``watchdog_s`` without a new
+chip adds a vertical component), dribbler (``dribbler="spring"``, default: weak spring-damper pulling the ball
+to the dribbler pocket through ``xfrc_applied``; ``dribbler="bar"``: the physical sprung spinning bar of
+``dtssl.physics.mjcf.DribblerOptions``, driven by the command's ``dribbler_rpm`` through its velocity actuator,
+the ball held by friction and geometry alone), watchdog (command zeroed after ``watchdog_s`` without a new
 one; ``watchdog_clock`` = "wall" | "sim" | callable, as in ``TwinWorld``), teleports, hot-swap
 of theta (route a). ``step(dt)`` runs ``n_sub = round(dt / timestep)`` substeps with
 ``model.opt.timestep = dt / n_sub`` so the simulated time is exact for any ``dt``.
@@ -57,6 +59,7 @@ from dtssl.physics.mjcf import (
     BALL_BODY,
     BALL_JOINT,
     BallSpec,
+    DribblerOptions,
     RouteAOptions,
     RouteBOptions,
     SolverOptions,
@@ -126,6 +129,13 @@ class _Robot:
     sub_dofs: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=int))   # wheel + roller dofs
     wheel_target: np.ndarray = field(default_factory=lambda: np.zeros(4))
     pi_integ: np.ndarray = field(default_factory=lambda: np.zeros(4))
+    # dribbler="bar"
+    bar_act: int = -1
+    bar_dofadr: int = -1
+    slide_dofadr: int = -1
+    bar_geom: int = -1
+    touching: bool = False                 # bar-ball contact in the last substep
+    touch_t: float = -math.inf             # sim time of the last bar-ball contact
     # commands
     cmd: RobotCmd = field(default_factory=RobotCmd)
     wd_armed: bool = False
@@ -154,6 +164,7 @@ class MuJoCoWorld(World):
                  dribbler_stiffness: float = 40.0, dribbler_damping: float = 1.5,
                  dribbler_capture_dist: float = 0.16, dribbler_capture_half_angle: float = 0.6,
                  boundary: bool = True, chassis: str = "mesh", visual: str = "primitive",
+                 dribbler: str = "spring", dribbler_opt: DribblerOptions | None = None,
                  limits_path: str | Path | None = None, twin_params_path: str | Path | None = None,
                  **unknown):
         if unknown:
@@ -197,6 +208,10 @@ class MuJoCoWorld(World):
         self.boundary = bool(boundary)
         self.chassis = chassis
         self.visual = mjcf.normalize_visual(visual)      # 'primitive' | 'cad' (drawing only, SPEC §4.6)
+        self.dribbler = mjcf.normalize_dribbler(dribbler)  # 'spring' | 'bar' (physical mechanism)
+        self.dribbler_opt = dribbler_opt if dribbler_opt is not None or self.dribbler != "bar" \
+            else DribblerOptions.from_cad()
+        self.bar_hold_s = 0.05                           # has_ball debounce of the bar-ball contact (s)
         # --- command processing ----------------------------------------------------------
         self.saturate = bool(saturate)
         dz_enabled, dz_value = mjcf.load_deadzone(limits_path)
@@ -219,7 +234,9 @@ class MuJoCoWorld(World):
         self._ball_qadr = 0
         self._ball_dofadr = 0
         self._ball_body = 0
-        self._chassis_geoms: set[int] = set()
+        self._ball_geom = 0
+        self._f6 = np.zeros(6)                                   # scratch for mj_contactForce
+        self._chassis_geoms: set[int] = set()            # robot geoms counted in `contacts` (shell + mouth)
         self._h_model = float(self.solver.timestep)
         self._gain_ref = None
         self._last_dt = self.ts
@@ -268,7 +285,7 @@ class MuJoCoWorld(World):
         return mjcf.build_world_xml(scene, self.route, fld=self._field, spec=self._spec, wheel=self.wheel,
                                     ball=self.ball_spec, solver=self.solver, route_a=self.route_a,
                                     route_b=self.route_b, boundary=self.boundary, chassis=self.chassis,
-                                    visual=self.visual)
+                                    visual=self.visual, dribbler=self.dribbler, dribbler_opt=self.dribbler_opt)
 
     # ------------------------------------------------------------------ World API
     @property
@@ -311,6 +328,7 @@ class MuJoCoWorld(World):
             self._ball_qadr = int(jb.qposadr[0])
             self._ball_dofadr = int(jb.dofadr[0])
             self._ball_body = int(m.body(BALL_BODY).id)
+            self._ball_geom = int(m.geom("ball_geom").id)
             park_x0 = self._field.half_length + self._field.boundary_width + 0.6
             park_y = -(self._field.half_width + self._field.boundary_width + 0.6)
             for i, sp in enumerate(spawns):
@@ -319,6 +337,13 @@ class MuJoCoWorld(World):
                 rob = _Robot(key=key, name=name, present=bool(sp.present), body_id=int(m.body(name).id),
                              park=(park_x0 + 0.25 * i, park_y))
                 self._chassis_geoms.add(int(m.geom(f"{name}_chassis").id))
+                if self.dribbler == "bar":
+                    rob.bar_act = int(m.actuator(f"{name}_act_dribbler").id)
+                    rob.bar_dofadr = int(m.joint(f"{name}_dribbler").dofadr[0])
+                    rob.slide_dofadr = int(m.joint(f"{name}_dribbler_slide").dofadr[0])
+                    rob.bar_geom = int(m.geom(f"{name}_dribbler_bar_geom").id)
+                    for g in ("mouth_shell", "mouth_cheek_l", "mouth_cheek_r", "mouth_plate", "dribbler_bar_geom"):
+                        self._chassis_geoms.add(int(m.geom(f"{name}_{g}").id))
                 if self.route == "a":
                     for k, suf in enumerate(("x", "y", "yaw")):
                         j = m.joint(f"{name}_{suf}")
@@ -398,6 +423,14 @@ class MuJoCoWorld(World):
                     self._pi_torques(active, h)
                 mj.mj_step(m, d)
             self._count_contacts()
+            if self.dribbler == "bar":
+                # dribbling = the bar touched the ball within `bar_hold_s` (the contact chatters a little while the
+                # ball is held, the flag must not)
+                for rob in active:
+                    rob.touching = self._bar_touching(rob)
+                    if rob.touching:
+                        rob.touch_t = self.t + dt
+                    rob.dribbling = (self.t + dt - rob.touch_t) <= self.bar_hold_s
             self._last_dt = dt
             self.t += dt
             self.frame += 1
@@ -538,6 +571,19 @@ class MuJoCoWorld(World):
             rob = self.robots.get((team, int(rid)))
             return bool(rob is not None and rob.present and self._in_front(rob))
 
+    def dribbler_state(self, team: Team, rid: int) -> tuple[float, float, bool]:
+        """``dribbler="bar"``: ``(bar speed rad/s, slide position m (0 = forward stop, negative = pushed back by
+        the ball), bar touching the ball in the last substep)``; zeros otherwise. ``RobotState.has_ball`` keeps the
+        geometric infrared rule (ball within ``ball_contact_dist`` of the dribbler) in both dribbler modes; the
+        internal ``dribbling`` flag is the contact debounced over ``bar_hold_s``."""
+        with self._lock:
+            rob = self.robots.get((team, int(rid)))
+            if rob is None or rob.bar_dofadr < 0:
+                return 0.0, 0.0, False
+            d = self.data
+            q = self.model.jnt_qposadr[self.model.dof_jntid[rob.slide_dofadr]]
+            return float(d.qvel[rob.bar_dofadr]), float(d.qpos[q]), bool(rob.touching)
+
     def effective_command(self, team: Team, rid: int) -> RobotCmd:
         with self._lock:
             rob = self.robots.get((team, int(rid)))
@@ -675,18 +721,68 @@ class MuJoCoWorld(World):
                 self.kicks += 1
                 cmd.kick_speed = 0.0                      # consumed once
                 continue
-            if cmd.dribbler_rpm > 0.0 and bz_floor < 0.02:
+            if self.dribbler == "bar":
+                # bar speed target from the command (rpm of the motor side -> rad/s at the bar); the ball is
+                # then held by the contacts alone, `dribbling` is refreshed from them after the substeps
+                opt = self.dribbler_opt
+                rpm = min(max(cmd.dribbler_rpm, 0.0), spec.dribbler_rpm_max)
+                d.ctrl[rob.bar_act] = rpm * 2.0 * math.pi / 60.0 / max(opt.gear_ratio, 1e-9)
+                rob.dribbling = (self.t - rob.touch_t) <= self.bar_hold_s
+            elif cmd.dribbler_rpm > 0.0 and bz_floor < 0.02:
                 dx, dy = bx - x, by - y
                 ang = math.atan2(dy, dx) - th
                 ang = math.atan2(math.sin(ang), math.cos(ang))
                 if math.hypot(dx, dy) <= self.dribbler_capture_dist and abs(ang) <= self.dribbler_capture_half_angle:
                     rob.dribbling = True
 
+    def _bar_contacts(self, rob: _Robot) -> list[int]:
+        d = self.data
+        n = int(d.ncon)
+        if n == 0 or rob.bar_geom < 0:
+            return []
+        g1, g2 = d.contact.geom1[:n], d.contact.geom2[:n]
+        pair = {rob.bar_geom, self._ball_geom}
+        return [i for i, (a, b) in enumerate(zip(g1, g2, strict=True)) if {int(a), int(b)} == pair]
+
+    def _bar_touching(self, rob: _Robot) -> bool:
+        return bool(self._bar_contacts(rob))
+
+    def _bar_normal_force(self, rob: _Robot) -> float:
+        """Normal force (N) of the bar-ball contact(s) solved in the last substep, 0 when not touching."""
+        ids = self._bar_contacts(rob)
+        if not ids:
+            return 0.0
+        f6 = self._f6
+        total = 0.0
+        for i in ids:
+            self._mj.mj_contactForce(self.model, self.data, i, f6)
+            total += max(float(f6[0]), 0.0)
+        return total
+
     def _dribbler_forces(self, active: list[_Robot]) -> None:
-        """Spring-damper pulling the ball to the dribbler pocket (``xfrc_applied`` on the ball)."""
+        """Spring-damper pulling the ball to the dribbler pocket (``xfrc_applied`` on the ball). With the physical
+        bar (``dribbler="bar"``) the contacts do the holding and the only applied force is the centring action of
+        the helical bar (``DribblerOptions.helix``), lateral in the robot frame, proportional to the bar normal
+        force of the previous substep."""
         d = self.data
         f = d.xfrc_applied[self._ball_body]
         f[:] = 0.0
+        if self.dribbler == "bar":
+            opt = self.dribbler_opt
+            if opt.helix <= 0.0:
+                return
+            bx, by = (float(v) for v in d.qpos[self._ball_qadr:self._ball_qadr + 2])
+            for rob in active:
+                n = self._bar_normal_force(rob)
+                if n <= 0.0:
+                    continue
+                x, y, th = self._robot_pose(rob)
+                c, s = math.cos(th), math.sin(th)
+                yb = -s * (bx - x) + c * (by - y)                     # ball offset across the mouth
+                fy = -opt.helix * n * min(max(yb / opt.helix_width, -1.0), 1.0)
+                f[0] += -s * fy
+                f[1] += c * fy
+            return
         holders = [r for r in active if r.dribbling]
         if not holders:
             return
@@ -736,6 +832,10 @@ class MuJoCoWorld(World):
             v = rob.root_dofadr
             d.qvel[v:v + 6] = (vx, vy, 0.0, 0.0, 0.0, w)
             d.qvel[rob.sub_dofs] = 0.0
+        if rob.bar_dofadr >= 0:                       # the bar stops spinning and the module rests at its stop
+            d.qvel[rob.bar_dofadr] = 0.0
+            d.qvel[rob.slide_dofadr] = 0.0
+            rob.touching, rob.touch_t = False, -math.inf
 
     def _robot_pose(self, rob: _Robot) -> tuple[float, float, float]:
         d = self.data
