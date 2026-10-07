@@ -1,6 +1,6 @@
 """``MainWindow`` of ``dtssl gui`` and the ``main(argv)`` entry point.
 
-Layout: toolbar (mode Debug/Bridge/Replay, backend, team/robot, publish, real-time, speed,
+Layout: toolbar (mode Debug/Bridge/Replay, backend, field Div B/Div A, team/robot, publish, real-time, speed,
 reset, fit), a second toolbar for Replay (dataset/label/event, load, play/pause, scrub),
 a tab widget in the centre with the :class:`~dtssl.gui.field_view.FieldView` (2D, interactive) and the
 :class:`~dtssl.gui.view3d.View3D` (CAD meshes, ``pyqtgraph.opengl``) and the
@@ -24,6 +24,7 @@ from pathlib import Path
 from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6.QtCore import Qt
 
+from dtssl.config import FieldPreset, field_presets, load_field_preset
 from dtssl.gui.controller import MODES, Controller, Frame
 from dtssl.gui.field_view import FieldView
 from dtssl.gui.params_panel import ParamsPanel
@@ -31,9 +32,13 @@ from dtssl.gui.plots import VelocityPlots
 from dtssl.gui.replay import SPEEDS, ReplaySession, list_datasets, list_events, list_labels
 from dtssl.gui.robot_tab import RobotTab
 from dtssl.gui.view3d import View3D
-from dtssl.sim.entities import ACTIVE_ROBOTS, ROSTER_SIZE
+from dtssl.sim.entities import ROSTER_SIZE
 
 log = logging.getLogger(__name__)
+
+#: the recorded events (RoboCIn logs) were played on Division B fields: Replay always draws that field, whatever
+#: the local world's field is (the field selector is disabled in Replay)
+REPLAY_FIELD = "divB"
 
 QT_KEY_NAMES: dict[int, str] = {
     Qt.Key_W: "w", Qt.Key_A: "a", Qt.Key_S: "s", Qt.Key_D: "d", Qt.Key_Q: "q", Qt.Key_E: "e",
@@ -92,7 +97,7 @@ def install_excepthook(logger: logging.Logger) -> None:
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, backend: str = "fopdt", mode: str = "debug", team: str = "yellow", *,
                  bridge_config=None, joy_map=None, n_blue: int = ROSTER_SIZE, n_yellow: int = ROSTER_SIZE,
-                 n_active: int | None = ACTIVE_ROBOTS, publish: bool = False,
+                 n_active: int | None = None, field: FieldPreset | str | Path | None = None, publish: bool = False,
                  realtime: bool | None = None, params=None, world_opts: dict | None = None,
                  use_pygame: bool | None = None, autostart: bool = True, view3d: bool = True,
                  cad: bool = True, robot_tab: bool = True, telemetry: bool | None = None,
@@ -101,7 +106,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setWindowTitle("dtssl gui — SSL digital twin")
         self.controller = Controller(backend=backend, mode=mode, team=team, bridge_config=bridge_config,
                                      joy_map=joy_map, n_blue=n_blue, n_yellow=n_yellow, n_active=n_active,
-                                     publish=publish,
+                                     field=field, publish=publish,
                                      realtime=realtime, params=params, world_opts=world_opts,
                                      use_pygame=use_pygame, parent=self)
         c = self.controller
@@ -241,6 +246,18 @@ class MainWindow(QtWidgets.QMainWindow):
         self.backend_box.setCurrentText(self.controller.backend)
         self.backend_box.currentTextChanged.connect(self._on_backend_box)
         tb.addWidget(self.backend_box)
+        tb.addWidget(QtWidgets.QLabel(" field "))
+        self.field_box = QtWidgets.QComboBox()
+        self.field_box.setToolTip("SSL division of the field: Div B (9 x 6 m, 6 robots per team on the field) or "
+                                  "Div A (12 x 9 m, 11 per team). Rebuilds the world; Replay always draws Div B.")
+        presets = field_presets()
+        if self.controller.field_preset.name not in [p.name for p in presets]:
+            presets.append(self.controller.field_preset)              # a custom --field JSON
+        for p in presets:
+            self.field_box.addItem(p.label, p.name)
+        self._sync_field_box()
+        self.field_box.currentIndexChanged.connect(self._on_field_box)
+        tb.addWidget(self.field_box)
         tb.addWidget(QtWidgets.QLabel(" team "))
         self.team_box = QtWidgets.QComboBox()
         self.team_box.addItems(["blue", "yellow"])
@@ -334,6 +351,7 @@ class MainWindow(QtWidgets.QMainWindow):
         c.stats_ready.connect(self._on_stats)
         c.mode_changed.connect(self._sync_mode_ui)
         c.backend_changed.connect(self._on_backend_changed)
+        c.field_changed.connect(self._on_field_changed)
         c.selection_changed.connect(self._on_selection_changed)
         c.replay_loaded.connect(self._on_replay_loaded)
         c.replay_changed.connect(self._on_replay_changed)
@@ -396,6 +414,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.replay_toolbar.setVisible(replay)
         self.publish_cb.setEnabled(mode == "debug")
         self.realtime_cb.setEnabled(mode == "bridge")
+        self.field_box.setEnabled(not replay)                 # recorded events: Division B field, see REPLAY_FIELD
+        self._apply_drawn_field()
         self.plots.set_mode("fixed" if replay else "sliding")
         self.field_view.clear_trails()
         self.field_view.set_ball_visible(not replay)
@@ -410,11 +430,53 @@ class MainWindow(QtWidgets.QMainWindow):
             self.controller.set_backend(name)
             self.backend_box.setCurrentText(self.controller.backend)
 
+    def drawn_field(self):
+        """The field the views draw: the local world's, or Division B in Replay (the events were recorded there)."""
+        if self.controller.mode == "replay":
+            return load_field_preset(REPLAY_FIELD).field
+        return self.controller.world.field
+
+    def _apply_drawn_field(self) -> None:
+        f = self.drawn_field()
+        if self.field_view.field != f:
+            self.field_view.set_field(f)
+        if self.view3d is not None and self.view3d.field != f:
+            self.view3d.set_field(f)
+
+    def _sync_field_box(self) -> None:
+        name = self.controller.field_preset.name
+        i = self.field_box.findData(name)
+        if i < 0:
+            self.field_box.addItem(self.controller.field_preset.label, name)
+            i = self.field_box.count() - 1
+        self.field_box.blockSignals(True)
+        self.field_box.setCurrentIndex(i)
+        self.field_box.blockSignals(False)
+
+    def _on_field_box(self, i: int) -> None:
+        name = self.field_box.itemData(i)
+        if name is not None and name != self.controller.field_preset.name:
+            self.controller.set_field(name)
+        self._sync_field_box()                                 # back to the actual preset if the switch failed
+
+    def _on_field_changed(self, name: str) -> None:
+        c = self.controller
+        self._sync_field_box()
+        self._apply_drawn_field()
+        self.field_view.clear_trails()
+        self.plots.clear()
+        if self._hw is not None:
+            self._hw.reset()
+        if self.robot_tab is not None:
+            self.robot_tab.reset_motion()
+        self._refresh_robot_combo()
+        f = c.world.field
+        self.log(f"field: {c.field_preset.label} ({f.length:g} x {f.width:g} m): {len(c.robot_keys())} robots on the "
+                 f"field ({c.n_active} per team), {len(c.robot_keys(present=False))} parked")
+
     def _on_backend_changed(self, name: str) -> None:
         w = self.controller.world
-        self.field_view.set_field(w.field)
-        if self.view3d is not None:
-            self.view3d.set_field(w.field)
+        self._apply_drawn_field()
         self.plots.clear()
         if self._hw is not None:
             self._hw.reset()
@@ -674,7 +736,8 @@ def run(args) -> int:
         params = load_twin_params(args.theta)
     win = MainWindow(backend=args.backend, mode=args.mode, team=args.team, bridge_config=args.config,
                      joy_map=args.joy_map, n_blue=args.n_blue, n_yellow=args.n_yellow,
-                     n_active=getattr(args, "n_active", ACTIVE_ROBOTS), publish=args.publish,
+                     n_active=getattr(args, "n_active", None), field=getattr(args, "field", None),
+                     publish=args.publish,
                      realtime=(False if getattr(args, "no_realtime", False) else None), params=params,
                      world_opts=world_opts, use_pygame=(False if getattr(args, "no_joystick", False) else None),
                      view3d=not getattr(args, "no_3d", False), cad=not getattr(args, "no_cad", False),
@@ -695,4 +758,4 @@ def main(argv: Sequence[str] | None = None) -> int:
     return run(args)
 
 
-__all__ = ["MainWindow", "run", "main", "install_excepthook", "QT_KEY_NAMES"]
+__all__ = ["MainWindow", "run", "main", "install_excepthook", "QT_KEY_NAMES", "REPLAY_FIELD"]

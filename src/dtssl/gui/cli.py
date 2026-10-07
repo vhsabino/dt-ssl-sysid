@@ -14,7 +14,7 @@ import importlib.util
 import sys
 from pathlib import Path
 
-from dtssl.sim.entities import ACTIVE_ROBOTS, ROSTER_SIZE
+from dtssl.sim.entities import ROSTER_SIZE
 
 GUI_MODULES = ("PySide6", "pyqtgraph")
 
@@ -28,9 +28,14 @@ def add_gui_arguments(p: argparse.ArgumentParser) -> None:
                    help="joystick map JSON or preset (gamecontroller, dualsense-raw-linux, dualsense-raw-windows)")
     p.add_argument("--n-blue", type=int, default=ROSTER_SIZE, help="robots of the blue roster (ids 0..n-1)")
     p.add_argument("--n-yellow", type=int, default=ROSTER_SIZE, help="robots of the yellow roster")
-    p.add_argument("--n-active", type=int, default=ACTIVE_ROBOTS,
-                   help="robots per team on the field at start (Division B: 6); the rest wait parked outside the "
-                        "walls (Shift+click on the field brings one in, Shift+click on a robot takes it out)")
+    p.add_argument("--field", default="divB", metavar="divB|divA|FILE",
+                   help="field at start: SSL division preset (divB = 9 x 6 m, 6 robots per team on the field; "
+                        "divA = 12 x 9 m, 11 per team) or a field JSON in mm like config/field_divB.json; the toolbar "
+                        "switches it live (Debug and Bridge; Replay always draws Div B)")
+    p.add_argument("--n-active", type=int, default=None,
+                   help="robots per team on the field at start (default: the division of --field, 6 for Div B and 11 "
+                        "for Div A); the rest wait parked outside the walls (Shift+click on the field brings one in, "
+                        "Shift+click on a robot takes it out)")
     p.add_argument("--publish", action="store_true", help="Debug: publish vision through a step-mode SimServer")
     p.add_argument("--no-realtime", action="store_true", help="Bridge: tick the SimServer from the GUI timer")
     p.add_argument("--no-joystick", action="store_true", help="do not probe pygame (keyboard only)")

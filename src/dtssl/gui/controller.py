@@ -15,6 +15,10 @@ Modes (``set_mode``):
 
 Views subscribe to ``frame_ready`` (30 Hz, :class:`Frame`), ``sample_ready`` (60 Hz, plot data
 of the selected robot), ``stats_ready`` (2 Hz, status bar) and ``message``.
+
+The field is a :class:`~dtssl.config.FieldPreset` (``divB`` by default, ``divA`` or a field JSON): ``set_field``
+rebuilds the world on the new geometry, like ``set_backend`` does, and the number of robots per team on the
+field follows the division (6 in B, 11 in A) unless ``n_active`` pins it.
 """
 from __future__ import annotations
 
@@ -29,6 +33,7 @@ from pathlib import Path
 from PySide6 import QtCore
 from PySide6.QtCore import Signal
 
+from dtssl.config import FieldPreset, load_field_preset
 from dtssl.gui.joystick import (
     EVENT_NEXT_ROBOT,
     EVENT_PREV_ROBOT,
@@ -42,7 +47,7 @@ from dtssl.gui.keyboard import KeyboardProvider
 from dtssl.gui.replay import ReplaySession, horizons_from_config
 from dtssl.models.params import DofParam, load_twin_params
 from dtssl.sim.backends import available, make_world
-from dtssl.sim.entities import ACTIVE_ROBOTS, ROSTER_SIZE, BallState, RobotCmd, RobotState, Scene, WorldState
+from dtssl.sim.entities import ROSTER_SIZE, BallState, RobotCmd, RobotState, Scene, WorldState
 from dtssl.sim.world import World
 
 log = logging.getLogger(__name__)
@@ -87,6 +92,7 @@ class Controller(QtCore.QObject):
     stats_ready = Signal(dict)
     mode_changed = Signal(str)
     backend_changed = Signal(str)
+    field_changed = Signal(str)                     # FieldPreset.name (world rebuilt on the new geometry)
     selection_changed = Signal(object)              # Key | None
     replay_loaded = Signal(object)                  # ReplaySession
     replay_changed = Signal(object)                 # ReplaySession (recompute / seek)
@@ -96,7 +102,8 @@ class Controller(QtCore.QObject):
 
     def __init__(self, backend: str = "fopdt", mode: str = "debug", team: str = "yellow", *,
                  bridge_config: str | Path | dict | None = None, joy_map: JoyMap | str | Path | None = None,
-                 n_blue: int = ROSTER_SIZE, n_yellow: int = ROSTER_SIZE, n_active: int | None = ACTIVE_ROBOTS,
+                 n_blue: int = ROSTER_SIZE, n_yellow: int = ROSTER_SIZE, n_active: int | None = None,
+                 field: FieldPreset | str | Path | None = None,
                  publish: bool = False, realtime: bool | None = None,
                  params: dict[str, DofParam] | None = None, world_opts: dict | None = None,
                  use_pygame: bool | None = None, parent=None):
@@ -104,7 +111,8 @@ class Controller(QtCore.QObject):
         self.backend = backend
         self.team = team
         self.n_blue, self.n_yellow = int(n_blue), int(n_yellow)
-        self.n_active = None if n_active is None else int(n_active)   # per team on the field; the rest parked
+        self.field_preset: FieldPreset = field if isinstance(field, FieldPreset) else load_field_preset(field)
+        self.n_active_pinned = None if n_active is None else int(n_active)   # --n-active: overrides the division
         self.publish = bool(publish)
         self.world_opts = dict(world_opts or {})
         self.params: dict[str, DofParam] = params or load_twin_params()
@@ -170,6 +178,7 @@ class Controller(QtCore.QObject):
         opts.setdefault("n_blue", self.n_blue)
         opts.setdefault("n_yellow", self.n_yellow)
         opts.setdefault("n_active", self.n_active)
+        opts.setdefault("field", self.field_preset.field)
         if backend != "ideal":
             opts.setdefault("params", self.params)
         world = make_world(backend, **opts)
@@ -194,6 +203,16 @@ class Controller(QtCore.QObject):
     @property
     def ts(self) -> float:
         return float(getattr(self.world, "ts", 1.0 / 60.0))
+
+    @property
+    def n_active(self) -> int:
+        """Robots per team on the field at a reset: ``n_active`` given to the constructor, else the division of the
+        current field (6 in Division B, 11 in Division A); the rest of the roster waits parked."""
+        return self.field_preset.robots_per_team if self.n_active_pinned is None else self.n_active_pinned
+
+    @property
+    def field_name(self) -> str:
+        return self.field_preset.name
 
     @property
     def server_running(self) -> bool:
@@ -315,6 +334,39 @@ class Controller(QtCore.QObject):
             self.replay.recompute(self.params)
             self.replay_changed.emit(self.replay)
         self.backend_changed.emit(backend)
+        self.selection_changed.emit(self.selected)
+
+    def set_field(self, field: FieldPreset | str | Path) -> None:
+        """Rebuild the world on another field (preset name, JSON path or :class:`FieldPreset`): the roster is
+        re-spawned with the division's robots on the field, θ is kept and a running server is restarted (it
+        publishes the new geometry). Replay keeps its own session; the local world is rebuilt anyway."""
+        try:
+            preset = field if isinstance(field, FieldPreset) else load_field_preset(field)
+        except Exception as e:  # noqa: BLE001 - missing or invalid field JSON
+            self.message.emit(f"field {Path(str(field)).stem} failed: {e}")
+            return
+        if preset == self.field_preset:
+            return
+        was_server = self.server_running
+        self.stop_server()
+        old, old_preset = self.world, self.field_preset
+        self.field_preset = preset
+        try:
+            self.world = self._make_world(self.backend)
+        except Exception as e:  # noqa: BLE001 - keep the old world on any failure
+            self.message.emit(f"field {preset.label} failed: {e}")
+            self.field_preset, self.world = old_preset, old
+            if was_server:
+                self._start_server(step_mode=(self.mode == "debug") or not self.realtime)
+            return
+        try:
+            old.close()
+        except Exception:  # noqa: BLE001
+            pass
+        self._select_default()
+        if was_server:
+            self._start_server(step_mode=(self.mode == "debug") or not self.realtime)
+        self.field_changed.emit(preset.name)
         self.selection_changed.emit(self.selected)
 
     def reset_scene(self) -> None:

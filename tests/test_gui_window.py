@@ -427,6 +427,86 @@ def test_controller_roster_substitutions(qapp):
     c.shutdown()
 
 
+def test_controller_field_switch_follows_the_division(qapp, tmp_path):
+    """Div B (default): 6 per team on the field; Div A: the whole 11-robot roster. ``n_active`` pins the number."""
+    from dtssl.sim.collisions import GOAL_WALL_THICKNESS
+
+    c = Controller(backend="fopdt", mode="debug", team="blue", use_pygame=False)
+    seen: list[str] = []
+    c.field_changed.connect(seen.append)
+    assert c.field_name == "divB" and c.n_active == 6 and c.world.field.length == 9.0
+    c.set_field("divA")
+    f = c.world.field
+    assert seen == ["divA"] and c.field_name == "divA" and c.n_active == 11
+    assert (f.length, f.width, f.goal_width) == (12.0, 9.0, 1.8)
+    assert len(c.robot_keys()) == 22 and not c.robot_keys(present=False)       # nobody on the bench
+    assert c.selected == ("blue", 0)
+    ws = c.latest_state()
+    assert all(abs(r.x) < f.half_length and abs(r.y) < f.half_width for r in ws.robots.values())
+    xs = {round(abs(x), 3) for seg in c.world.goal_segs for x in (seg[0], seg[2])}
+    assert 6.0 in xs and round(6.0 + f.goal_depth - GOAL_WALL_THICKNESS / 2, 3) in xs   # goals on the new field
+    c.set_field("Division A")                                                   # same preset: no rebuild
+    assert seen == ["divA"]
+    c.teleport_selected(5.0, 4.0)
+    c.reset_scene()                                                             # the reset keeps the division's roster
+    assert len(c.robot_keys()) == 22 and c.latest_state().robots[("blue", 0)].x == pytest.approx(-3.0)
+    c.set_field("B")
+    f = c.world.field
+    assert seen == ["divA", "divB"] and c.n_active == 6 and f.length == 9.0
+    assert len(c.robot_keys()) == 12 and len(c.robot_keys(present=False)) == 10
+    assert all(c.latest_state().robots[k].y < -(f.half_width + f.boundary_width) for k in c.robot_keys(present=False))
+    # a broken preset leaves the world untouched and reports
+    msgs: list[str] = []
+    c.message.connect(msgs.append)
+    c.set_field(tmp_path / "no_such_field.json")
+    assert c.field_name == "divB" and c.world.field.length == 9.0 and seen == ["divA", "divB"]
+    assert msgs and msgs[-1].startswith("field no_such_field failed")
+    c.shutdown()
+    # --n-active pins the robots on the field whatever the division
+    c = Controller(backend="fopdt", mode="debug", team="yellow", n_active=3, field="divA", use_pygame=False)
+    assert c.field_name == "divA" and c.n_active == 3
+    assert len(c.robot_keys()) == 6 and len(c.robot_keys(present=False)) == 16
+    c.set_field("divB")
+    assert c.n_active == 3 and len(c.robot_keys()) == 6
+    c.shutdown()
+
+
+def test_window_field_box_switches_the_world_and_replay_draws_div_b(qapp):
+    from dtssl.gui.app import REPLAY_FIELD, MainWindow
+
+    win = MainWindow(backend="fopdt", mode="debug", team="blue", use_pygame=False, autostart=False, view3d=False,
+                     robot_tab=False)
+    c = win.controller
+    box = win.field_box
+    assert [box.itemText(i) for i in range(box.count())] == ["Div B", "Div A"] and box.currentText() == "Div B"
+    assert box.isEnabled() and win.robot_box.count() == 6 and win.field_view.field.length == 9.0
+    box.setCurrentIndex(1)                                     # the user picks Division A
+    c._on_render()
+    qapp.processEvents()
+    assert c.field_name == "divA" and c.world.field.length == 12.0
+    assert win.field_view.field == c.world.field and win.robot_box.count() == 11
+    assert len(win.field_view.robots) == 22 and all(it.present for it in win.field_view.robots.values())
+    c.set_mode("replay")                                       # recorded events: Division B drawn, selector off
+    qapp.processEvents()
+    assert REPLAY_FIELD == "divB" and not box.isEnabled()
+    assert win.field_view.field.length == 9.0 and c.world.field.length == 12.0
+    c.set_mode("debug")
+    qapp.processEvents()
+    assert box.isEnabled() and win.field_view.field.length == 12.0 and box.currentText() == "Div A"
+    box.setCurrentIndex(0)
+    c._on_render()
+    qapp.processEvents()
+    assert c.field_name == "divB" and win.field_view.field.length == 9.0 and win.robot_box.count() == 6
+    assert sum(not it.present for it in win.field_view.robots.values()) == 10
+    win.close()
+    # --field divA from the command line: the window starts on Division A with the 22 robots in play
+    win = MainWindow(backend="fopdt", mode="debug", team="blue", field="divA", use_pygame=False, autostart=False,
+                     view3d=False, robot_tab=False)
+    assert win.field_box.currentText() == "Div A" and win.robot_box.count() == 11
+    assert win.field_view.field.length == 12.0 and len(win.controller.robot_keys()) == 22
+    win.close()
+
+
 @pytest.mark.requires_net
 def test_controller_bridge_mode_thread_and_step(qapp):
     c = Controller(backend="fopdt", mode="bridge", team="blue", n_blue=1, n_yellow=1, bridge_config=NET_CFG,
@@ -502,3 +582,6 @@ def test_cli_registers_gui_command():
     args = gui_parser().parse_args(["--backend", "ideal", "--mode", "bridge", "--team", "blue",
                                     "--joy-map", "dualsense-raw-linux"])
     assert (args.backend, args.mode, args.team, args.joy_map) == ("ideal", "bridge", "blue", "dualsense-raw-linux")
+    assert (args.field, args.n_active, args.n_blue) == ("divB", None, 11)     # roster by division unless pinned
+    args = gui_parser().parse_args(["--field", "divA", "--n-active", "8"])
+    assert (args.field, args.n_active) == ("divA", 8)
