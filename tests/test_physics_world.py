@@ -223,8 +223,16 @@ def test_registry_state_teleport(name):
     w.teleport_robot("yellow", 0, 0.0, 0.0, 0.0, present=False)
     ws = w.step()
     assert not ws.robots[("yellow", 0)].present and ws.robots_of("yellow") == []
+    from dtssl.sim.entities import park_spot
+
+    f = w.field
+    px, py, pth = park_spot("yellow", 0, f.length, f.width, f.boundary_width)
+    r = ws.robots[("yellow", 0)]
+    assert (r.x, r.y) == pytest.approx((px, py), abs=1e-3) and py < -(f.half_width + f.boundary_width)
+    assert abs(r.theta - pth) < 1e-2                             # parked outside the -y wall, as TwinWorld does
     w.set_present("yellow", 0, True)
-    assert w.step().robots[("yellow", 0)].present
+    r = w.step().robots[("yellow", 0)]
+    assert r.present and r.y > -(f.half_width + f.boundary_width) and abs(r.x - px) < 1e-2
     assert w.field.length == 9.0 and w.spec.radius == 0.09
     w.close()
 

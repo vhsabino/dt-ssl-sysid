@@ -8,7 +8,8 @@ import pytest
 
 from dtssl.models import AnalyticFOPDTPlant, DofParam, IdealKinematicPlant, load_twin_params, wrap_to_pi
 from dtssl.sim.backends import available, make_world
-from dtssl.sim.entities import BallState, RobotCmd, RobotSpawn, Scene
+from dtssl.sim.collisions import GOAL_WALL_THICKNESS, clamp_to_goals, goal_segments
+from dtssl.sim.entities import ACTIVE_ROBOTS, ROSTER_SIZE, BallState, RobotCmd, RobotSpawn, Scene, park_spot
 from dtssl.sim.twin_world import (
     R_CONTACT,
     WHEEL_RADIUS,
@@ -178,16 +179,100 @@ def test_robot_robot_push_out_is_symmetric():
     assert w.contacts > 0
 
 
-def test_absent_robot_is_not_simulated_nor_published():
+def test_absent_robot_is_parked_outside_not_simulated_nor_published():
     w = TwinWorld("ideal", n_blue=2, n_yellow=0)
+    f = w.field
     w.set_present("blue", 1, False)
     w.set_command("blue", 1, RobotCmd(vx=1.0))
-    x0 = w.plants[("blue", 1)].pose[0]
+    spot = w.park_spot("blue", 1)
+    assert tuple(w.plants[("blue", 1)].pose) == spot                 # parked at its spot outside the walls
+    assert spot[1] < -(f.half_width + f.boundary_width) and spot[0] < 0.0 and spot[2] == pytest.approx(math.pi / 2)
     ws = w.step()
-    assert not ws.robots[("blue", 1)].present and w.plants[("blue", 1)].pose[0] == x0
+    r = ws.robots[("blue", 1)]
+    assert not r.present and (r.x, r.y) == spot[:2] and r.vx_b == 0.0   # reported, not stepped
     assert [r.id for r in ws.robots_of("blue")] == [0]
+    w.set_present("blue", 1, True)                                      # back in: just inside the nearest wall
+    r = w.state().robots[("blue", 1)]
+    assert r.present and r.x == pytest.approx(spot[0]) and r.y == pytest.approx(-(f.half_width + f.boundary_width
+                                                                                   - w.spec.radius))
+    assert w.step().robots[("blue", 1)].y > r.y                         # and the pending command drives it (+y)
+    w.teleport_robot("blue", 1, 1.0, 1.0, 0.0, present=False)           # a teleport out ignores the coordinates
+    assert tuple(w.plants[("blue", 1)].pose) == spot and not w.is_present("blue", 1)
     w.teleport_robot("blue", 1, 1.0, 1.0, 0.0, present=True)
     assert w.step().robots[("blue", 1)].present
+
+
+def test_default_roster_parks_the_substitutes_outside_the_walls():
+    w = TwinWorld("ideal", n_blue=ROSTER_SIZE, n_yellow=ROSTER_SIZE, n_active=ACTIVE_ROBOTS)
+    ws = w.step()
+    f = w.field
+    on, off = [k for k, r in ws.robots.items() if r.present], [k for k, r in ws.robots.items() if not r.present]
+    assert len(on) == 2 * ACTIVE_ROBOTS and len(off) == 2 * (ROSTER_SIZE - ACTIVE_ROBOTS)
+    assert all(rid < ACTIVE_ROBOTS for _, rid in on) and all(rid >= ACTIVE_ROBOTS for _, rid in off)
+    pts = [(ws.robots[k].x, ws.robots[k].y) for k in ws.robots]
+    for i in range(len(pts)):                                             # nobody overlaps anybody
+        for j in range(i + 1, len(pts)):
+            assert math.hypot(pts[j][0] - pts[i][0], pts[j][1] - pts[i][1]) >= 2 * w.spec.radius - 1e-9
+    for k in on:
+        assert abs(ws.robots[k].x) < f.half_length and abs(ws.robots[k].y) < f.half_width
+    for k in off:
+        r = ws.robots[k]
+        assert r.y + w.spec.radius < -(f.half_width + f.boundary_width)   # fully beyond the -y wall
+        assert abs(r.x) < f.half_length and (r.x < 0) == (k[0] == "blue") # bench on the team's own half
+        assert (r.x, r.y, r.theta) == pytest.approx(park_spot(k[0], k[1], f.length, f.width, f.boundary_width))
+    assert Scene.default(3, 2) == Scene.default(3, 2, n_active=None)         # no roster: everybody on the field
+
+
+def test_goal_walls_stop_robots_and_bounce_the_ball():
+    """Goal posts, sides and back are solid for robots and the ball (the mouth stays open); without ``goals``
+    everything goes through to the arena wall, as before."""
+    f = load_field_geometry()
+    segs = goal_segments(f)
+    assert len(segs) == 6 and GOAL_WALL_THICKNESS == 0.02
+    R = 0.09
+    x_back = f.half_length + f.goal_depth - GOAL_WALL_THICKNESS - R              # robot centre at the back wall
+    assert clamp_to_goals(4.6, 0.0, R, f, segs) == pytest.approx((x_back, 0.0))
+    assert clamp_to_goals(4.0, 0.0, R, f, segs) == (4.0, 0.0)                     # in front of the goal: free
+    x, y = clamp_to_goals(4.55, 0.45, R, f, segs)                                 # inside, against a side wall
+    assert y == pytest.approx(f.goal_width / 2 - R) and x == pytest.approx(4.55)
+    # robot driving into the goal mouth stops at the back wall; beside the post it stops on the wall line
+    w = TwinWorld("ideal", n_blue=2, n_yellow=0, watchdog_clock="sim")
+    w.teleport_robot("blue", 0, 4.0, 0.0, 0.0)
+    w.teleport_robot("blue", 1, 4.2, 0.9, 0.0)
+    for _ in range(90):
+        w.set_command("blue", 0, RobotCmd(vx=1.0))
+        w.set_command("blue", 1, RobotCmd(vx=1.0))
+        ws = w.step()
+    assert ws.robots[("blue", 0)].x == pytest.approx(x_back, abs=1e-6)
+    assert ws.robots[("blue", 1)].x == pytest.approx(f.half_length + f.boundary_width - R, abs=1e-6)
+    # ball shot into the goal (robots out of the way): bounces off the back wall and never crosses it
+    w.teleport_robot("blue", 0, -3.0, 2.0, 0.0)
+    w.teleport_robot("blue", 1, -3.0, -2.0, 0.0)
+    w.teleport_ball(3.0, 0.0, vx=3.0, vy=0.0)
+    xs = [w.step().ball.x for _ in range(120)]
+    x_ball_max = f.half_length + f.goal_depth - GOAL_WALL_THICKNESS - w.ball_params.radius
+    assert max(xs) <= x_ball_max + 1e-9 and max(xs) > f.half_length + 0.1       # entered the goal, stopped by it
+    assert xs[-1] < max(xs) - 0.05                                                # and came back out
+    # ball at the post: deflected, never reaches the goal line between the posts
+    w.teleport_ball(4.0, 0.53, vx=2.0, vy=0.0)
+    pts = [(b.x, b.y) for b in (w.step().ball for _ in range(60))]
+    assert max(x for x, _ in pts) < f.half_length + f.goal_depth and all(y > 0.4 for _, y in pts)
+    # without goal walls the ball runs on to the arena wall
+    w0 = TwinWorld("ideal", n_blue=0, n_yellow=0, goals=False)
+    w0.teleport_ball(3.0, 0.0, vx=3.0, vy=0.0)
+    xs0 = [w0.step().ball.x for _ in range(120)]
+    assert max(xs0) > x_ball_max + 0.05 and max(xs0) <= f.half_length + f.boundary_width - w0.ball_params.radius
+
+
+def test_boundary_off_lets_robots_and_ball_leave_the_arena():
+    w = TwinWorld("ideal", n_blue=1, n_yellow=0, boundary=False, goals=False, watchdog_clock="sim")
+    w.teleport_robot("blue", 0, 4.0, 2.0, 0.0)
+    w.teleport_ball(4.0, -2.0, vx=4.0, vy=0.0)
+    for _ in range(120):
+        w.set_command("blue", 0, RobotCmd(vx=1.0))
+        ws = w.step()
+    assert ws.robots[("blue", 0)].x > w.field.half_length + w.field.boundary_width
+    assert ws.ball.x > w.field.half_length + w.field.boundary_width
 
 
 def test_teleport_resets_plant_and_velocity():

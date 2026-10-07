@@ -14,10 +14,16 @@ Per step (``dt = Ts = 1/60`` by default):
    optional firmware per-wheel deadzone, both **off** by default because the published model
    has neither);
 2. robot-robot disc overlaps are resolved by a symmetric positional push-out and robot
-   centres are clamped to the arena walls (the plant pose is patched; its internal lag/delay
-   state is untouched, so a robot without contacts reproduces the plant bit for bit);
+   centres are clamped to the arena walls (``boundary``) and pushed out of the goal walls, posts, sides and
+   back (``goals``; the plant pose is patched; its internal lag/delay state is untouched, so a robot without
+   contacts reproduces the plant bit for bit);
 3. kick / dribbler logic and the analytic ball (:mod:`dtssl.sim.ball`) in substeps of at most
-   ``dt_sub`` (1/600 s), including robot-ball contacts and wall bounces.
+   ``dt_sub`` (1/600 s), including robot-ball contacts, wall bounces and goal-wall bounces.
+
+Robots that are not *present* (substitutes, ``RobotSpawn.present=False``, ``set_present(False)``, a teleport
+with ``present=False``) wait at their :func:`dtssl.sim.entities.park_spot` outside the arena walls: they are
+not stepped, meet nothing and are not published in vision, but their pose is reported so the GUI can draw
+them beside the field. ``set_present(True)`` brings a robot back where it is, clamped into the arena.
 
 Thread-safety: all public methods take the world lock; the bridge calls ``set_command`` /
 ``teleport_*`` from network threads while the server thread calls ``step``.
@@ -46,12 +52,15 @@ from dtssl.models import (
 from dtssl.sim.ball import Ball, BallParams, Walls
 from dtssl.sim.collisions import (
     ball_in_front,
+    clamp_to_goals,
     clamp_to_walls,
     dribbler_hold_pose,
+    goal_ball_contact,
+    goal_segments,
     resolve_robot_robot,
     robot_ball_contact,
 )
-from dtssl.sim.entities import RobotCmd, RobotState, Scene, Team, WorldState
+from dtssl.sim.entities import RobotCmd, RobotState, Scene, Team, WorldState, park_spot
 from dtssl.sim.world import FieldGeometry, RobotSpec, World
 
 Key = tuple[Team, int]
@@ -209,6 +218,7 @@ class TwinWorld(World):
                  watchdog_s: float | None = None, watchdog_clock: str | Callable[[], float] = "wall",
                  dt_sub: float = 1.0 / 600.0, kick_cooldown_s: float = 0.1,
                  limits_path: str | Path | None = None, twin_params_path: str | Path | None = None,
+                 boundary: bool = True, goals: bool = True, n_active: int | None = None,
                  **unknown):
         if unknown:  # options meant for other backends (e.g. mujoco ``route``) are tolerated but reported
             logging.getLogger(__name__).warning("TwinWorld: ignoring unknown options %s", sorted(unknown))
@@ -230,7 +240,10 @@ class TwinWorld(World):
         self.watchdog_clock = watchdog_clock
         self.dt_sub = float(dt_sub)
         self.kick_cooldown_s = float(kick_cooldown_s)
+        self.boundary = bool(boundary)                 # arena walls: robots clamped, ball bounces
+        self.goals = bool(goals)                       # goal walls (posts, sides, back) for robots and ball
         self.walls = Walls.from_field(self._field, self.ball_params.radius)
+        self.goal_segs = goal_segments(self._field) if self.goals else ()
 
         self.plants: dict[Key, Plant] = {}
         self.commands: dict[Key, RobotCmd] = {}
@@ -243,7 +256,8 @@ class TwinWorld(World):
         self.watchdog_hits = 0
         self.kicks = 0
         self.contacts = 0
-        self.reset(scene or Scene.default(n_blue, n_yellow, self._field.length, self._field.width))
+        self.reset(scene or Scene.default(n_blue, n_yellow, self._field.length, self._field.width,
+                                          n_active=n_active, boundary_width_m=self._field.boundary_width))
 
     # ------------------------------------------------------------------ construction helpers
     def _make_factory(self, plant) -> Callable[[], Plant]:
@@ -269,6 +283,10 @@ class TwinWorld(World):
         p.prime_delay([])
         return p
 
+    def park_spot(self, team: Team, rid: int) -> tuple[float, float, float]:
+        """Where robot ``rid`` of ``team`` waits outside the arena when it is not present."""
+        return park_spot(team, rid, self._field.length, self._field.width, self._field.boundary_width)
+
     # ------------------------------------------------------------------ World API
     @property
     def field(self) -> FieldGeometry:
@@ -291,7 +309,8 @@ class TwinWorld(World):
             self._kick_ready.clear()
             for sp in scene.robots:
                 key = (sp.team, int(sp.id))
-                self.plants[key] = self._new_plant(sp.x, sp.y, sp.theta)
+                pose = (sp.x, sp.y, sp.theta) if sp.present else self.park_spot(*key)
+                self.plants[key] = self._new_plant(*pose)
                 self._present[key] = bool(sp.present)
                 self.commands[key] = RobotCmd()
             b = scene.ball
@@ -353,6 +372,9 @@ class TwinWorld(World):
                        present: bool = True, vx: float = 0.0, vy: float = 0.0, w: float = 0.0) -> None:
         """Reset a robot's plant to ``(x, y, theta)`` with **world** velocity ``(vx, vy, w)``."""
         key = (team, int(rid))
+        if not present:                                # removed from the field: parked outside, at rest
+            x, y, theta = self.park_spot(*key)
+            vx = vy = w = 0.0
         c, s = math.cos(theta), math.sin(theta)
         velb0 = (c * vx + s * vy, -s * vx + c * vy, w)
         with self._lock:
@@ -386,12 +408,23 @@ class TwinWorld(World):
             return tuple(float(v) for v in self.plants[(team, int(rid))].pose)
 
     def set_present(self, team: Team, rid: int, present: bool) -> None:
+        """Remove a robot from play (parked outside the arena) or bring it back where it is (clamped into
+        the arena, i.e. just inside the wall nearest to its parking spot when it was parked)."""
         key = (team, int(rid))
         with self._lock:
-            if key in self.plants:
-                self._present[key] = bool(present)
-                if not present and self.ball_obj.captured_by == key:
+            plant = self.plants.get(key)
+            if plant is None or self._present.get(key, True) == bool(present):
+                return
+            self._present[key] = bool(present)
+            if not present:
+                if self.ball_obj.captured_by == key:
                     self.ball_obj.captured_by = None
+                self.plants[key] = self._new_plant(*self.park_spot(*key))
+            elif self.boundary:
+                x, y, th = (float(v) for v in plant.pose)
+                cx, cy = clamp_to_walls(x, y, self._spec.radius, self._field)
+                if (cx, cy) != (x, y):
+                    self.plants[key] = self._new_plant(cx, cy, th)
 
     def is_present(self, team: Team, rid: int) -> bool:
         return self._present.get((team, int(rid)), False)
@@ -482,7 +515,9 @@ class TwinWorld(World):
             self.contacts += 1
         for k, (px, py) in zip(keys, positions, strict=True):
             plant = self.plants[k]
-            cx, cy = clamp_to_walls(px, py, self._spec.radius, self._field)
+            cx, cy = clamp_to_walls(px, py, self._spec.radius, self._field) if self.boundary else (px, py)
+            if self.goal_segs:
+                cx, cy = clamp_to_goals(cx, cy, self._spec.radius, self._field, self.goal_segs)
             if cx != plant.x or cy != plant.y:
                 plant.x, plant.y = cx, cy   # patch pose only; lag/delay state untouched
 
@@ -544,8 +579,11 @@ class TwinWorld(World):
                 w = float(plant.body_velocity[2])
             robots.append((x0, y0, th0, x1, y1, th1, vxw, vyw, w))
         e = self.ball_params.restitution_robot
+        walls = self.walls if self.boundary else None
         for i in range(1, n_sub + 1):
-            ball.step(h, self.walls)
+            ball.step(h, walls)
+            if self.goal_segs:
+                goal_ball_contact(ball, self._field, segments=self.goal_segs)
             a = i / n_sub
             for (x0, y0, th0, x1, y1, th1, vxw, vyw, w) in robots:
                 robot_ball_contact(ball, x0 + a * (x1 - x0), y0 + a * (y1 - y0), th0 + a * (th1 - th0),

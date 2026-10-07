@@ -53,6 +53,8 @@ class WorldPlant(Plant):
                     watchdog_clock="sim")
         if self.backend.startswith("mujoco"):
             opts["boundary"] = False
+        else:
+            opts["goals"] = False           # analytic worlds: the harness never had goal walls (walls stay as before)
         if params is not None:
             opts["params"] = params
         opts.update(world_opts or {})

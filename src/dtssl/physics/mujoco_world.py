@@ -67,7 +67,8 @@ from dtssl.physics.mjcf import (
     normalize_route,
     robot_name,
 )
-from dtssl.sim.entities import BallState, RobotCmd, RobotState, Scene, Team, WorldState
+from dtssl.sim.collisions import clamp_to_walls
+from dtssl.sim.entities import BallState, RobotCmd, RobotState, Scene, Team, WorldState, park_spot
 from dtssl.sim.world import FieldGeometry, RobotSpec, World
 
 Key = tuple[Team, int]
@@ -141,7 +142,8 @@ class _Robot:
     wd_armed: bool = False
     kick_ready: float = -math.inf
     dribbling: bool = False
-    park: tuple[float, float] = (0.0, 0.0)
+    park: tuple[float, float] = (0.0, 0.0)  # parking spot outside the arena (not present)
+    park_theta: float = 0.0
 
 
 class MuJoCoWorld(World):
@@ -166,7 +168,7 @@ class MuJoCoWorld(World):
                  boundary: bool = True, chassis: str = "mesh", visual: str = "primitive",
                  dribbler: str = "spring", dribbler_opt: DribblerOptions | None = None,
                  limits_path: str | Path | None = None, twin_params_path: str | Path | None = None,
-                 **unknown):
+                 n_active: int | None = None, **unknown):
         if unknown:
             _log.warning("MuJoCoWorld: ignoring unknown options %s", sorted(unknown))
         self._mj = self._import_mujoco()
@@ -246,7 +248,8 @@ class MuJoCoWorld(World):
         self.watchdog_hits = 0
         self.kicks = 0
         self.contacts = 0
-        self.reset(scene or Scene.default(n_blue, n_yellow, self._field.length, self._field.width))
+        self.reset(scene or Scene.default(n_blue, n_yellow, self._field.length, self._field.width,
+                                          n_active=n_active, boundary_width_m=self._field.boundary_width))
 
     # ------------------------------------------------------------------ construction helpers
     @staticmethod
@@ -329,13 +332,14 @@ class MuJoCoWorld(World):
             self._ball_dofadr = int(jb.dofadr[0])
             self._ball_body = int(m.body(BALL_BODY).id)
             self._ball_geom = int(m.geom("ball_geom").id)
-            park_x0 = self._field.half_length + self._field.boundary_width + 0.6
-            park_y = -(self._field.half_width + self._field.boundary_width + 0.6)
-            for i, sp in enumerate(spawns):
+            for sp in spawns:
                 key = (sp.team, int(sp.id))
                 name = robot_name(*key)
+                # substitutes wait outside the arena walls (same spots as TwinWorld: dtssl.sim.entities.park_spot)
+                park = park_spot(sp.team, int(sp.id), self._field.length, self._field.width,
+                                 self._field.boundary_width)
                 rob = _Robot(key=key, name=name, present=bool(sp.present), body_id=int(m.body(name).id),
-                             park=(park_x0 + 0.25 * i, park_y))
+                             park=(park[0], park[1]), park_theta=park[2])
                 self._chassis_geoms.add(int(m.geom(f"{name}_chassis").id))
                 if self.dribbler == "bar":
                     rob.bar_act = int(m.actuator(f"{name}_act_dribbler").id)
@@ -369,7 +373,7 @@ class MuJoCoWorld(World):
                 if rob.present:
                     self._write_robot_pose(rob, sp.x, sp.y, sp.theta)
                 else:
-                    self._write_robot_pose(rob, rob.park[0], rob.park[1], 0.0)
+                    self._write_robot_pose(rob, rob.park[0], rob.park[1], rob.park_theta)
             # route a: dead-beat gains are kv = m / h; remember the gain per unit 1/h to rescale on dt changes
             self._h_model = float(self.solver.timestep)
             self._gain_ref = np.array(m.actuator_gainprm[:, 0], dtype=float) if self.route == "a" else None
@@ -456,7 +460,7 @@ class MuJoCoWorld(World):
                 return
             rob.present = bool(present)
             if not present:
-                x, y, theta, vx, vy, w = rob.park[0], rob.park[1], 0.0, 0.0, 0.0, 0.0
+                x, y, theta, vx, vy, w = rob.park[0], rob.park[1], rob.park_theta, 0.0, 0.0, 0.0
             self._write_robot_pose(rob, x, y, theta, vx, vy, w)
             if self.route == "a":
                 c, s = math.cos(theta), math.sin(theta)
@@ -513,14 +517,18 @@ class MuJoCoWorld(World):
             return self._robot_pose(self.robots[(team, int(rid))])
 
     def set_present(self, team: Team, rid: int, present: bool) -> None:
+        """Remove a robot from play (parked outside the arena, see ``park_spot``) or bring it back where it is,
+        clamped into the arena (just inside the wall nearest to its parking spot when it was parked)."""
         key = (team, int(rid))
         with self._lock:
             rob = self.robots.get(key)
             if rob is None or rob.present == bool(present):
                 return
             if present:
-                st = self._robot_pose(rob)
-                self.teleport_robot(team, rid, st[0], st[1], st[2], present=True)
+                x, y, th = self._robot_pose(rob)
+                if self.boundary:
+                    x, y = clamp_to_walls(x, y, self._spec.radius, self._field)
+                self.teleport_robot(team, rid, x, y, th, present=True)
             else:
                 self.teleport_robot(team, rid, 0.0, 0.0, 0.0, present=False)
 

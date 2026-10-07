@@ -39,7 +39,7 @@ class FieldGeometry:
         return {k: int(round(getattr(self, k) * 1000.0)) for k in self.__dataclass_fields__}
 
     @staticmethod
-    def from_mm(d: dict) -> "FieldGeometry":
+    def from_mm(d: dict) -> FieldGeometry:
         keys = FieldGeometry.__dataclass_fields__
         return FieldGeometry(**{k: float(d[k]) / 1000.0 for k in keys if k in d})
 
