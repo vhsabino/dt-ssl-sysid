@@ -7,6 +7,7 @@ without poisoning the cache. ``reload()`` drops every cached entry.
     geom = load_geometry()                      # RobotGeometry (robot_geometry.json + robot_limits.json)
     spec, ball, deadzone = load_limits()        # RobotSpec, ball dict, deadzone dict (robot_limits.json)
     field = load_field()                        # FieldGeometry in metres (field_divB.json is in mm)
+    preset = load_field_preset("divA")          # FieldPreset: geometry + robots per team of an SSL division
     bridge = load_bridge_config()               # dict (bridge.json)
     mcfg = load_metrics_config()                # dict (metrics.json)
     theta = load_twin_params()                  # dict[str, DofParam] (twin_params.json; re-export)
@@ -16,7 +17,7 @@ from __future__ import annotations
 import copy
 import json
 import os
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from functools import lru_cache
 from pathlib import Path
 
@@ -28,6 +29,7 @@ from dtssl.sim.world import FieldGeometry, RobotSpec
 __all__ = [
     "load_geometry", "load_limits", "load_field", "load_bridge_config", "load_metrics_config",
     "load_holdout_config", "load_twin_params", "load_json", "reload", "DofParam",
+    "FieldPreset", "FIELD_PRESETS", "DEFAULT_FIELD", "field_presets", "load_field_preset",
 ]
 
 
@@ -85,11 +87,75 @@ def load_limits(path: str | Path | None = None) -> tuple[RobotSpec, dict, dict]:
     return spec, ball, dz
 
 
-def load_field(path: str | Path | None = None) -> FieldGeometry:
-    """``FieldGeometry`` (metres) from ``config/field_divB.json`` (millimetres)."""
-    cfg = load_json(path, "field_divB.json")
+def _field_from_json(cfg: dict) -> FieldGeometry:
+    """mm JSON with ssl-vision key names (``field_length`` ...) -> FieldGeometry (m); extra keys are ignored."""
     return FieldGeometry.from_mm({k[len("field_"):] if k.startswith("field_") else k: v
                                   for k, v in cfg.items() if not k.startswith("_")})
+
+
+def load_field(path: str | Path | None = None) -> FieldGeometry:
+    """``FieldGeometry`` (metres) from ``config/field_divB.json`` (millimetres), or from ``path``."""
+    return _field_from_json(load_json(path, "field_divB.json"))
+
+
+# --- field presets (SSL divisions) ------------------------------------------------------
+@dataclass(frozen=True)
+class FieldPreset:
+    """A field the GUI / CLI can switch to: the geometry of an SSL division plus how many robots a team fields in
+    it (``robots_per_team`` key of the JSON, 6 when absent). ``name`` is the preset key (``divB``, ``divA``) or
+    the stem of a custom JSON; ``label`` is what the GUI shows."""
+
+    name: str
+    label: str
+    path: Path
+    field: FieldGeometry
+    robots_per_team: int
+
+    @property
+    def division(self) -> str | None:
+        """``"A"`` / ``"B"`` for the built-in presets, None for a custom file."""
+        return self.name[-1].upper() if self.name in FIELD_PRESETS else None
+
+
+#: preset key -> (GUI label, file under config/). Division B first: it is the default and the RoboCIn division.
+FIELD_PRESETS: dict[str, tuple[str, str]] = {"divB": ("Div B", "field_divB.json"),
+                                             "divA": ("Div A", "field_divA.json")}
+DEFAULT_FIELD = "divB"
+
+
+def _preset_key(field: str) -> str | None:
+    """``divB`` / ``div-b`` / ``B`` / ``Division B`` (any case) -> ``divB``; None when it is not a preset name."""
+    norm = "".join(ch for ch in field.lower() if ch.isalnum())
+    for key in FIELD_PRESETS:
+        div = key[-1].lower()
+        if norm in (key.lower(), div, "div" + div, "division" + div):
+            return key
+    return None
+
+
+def load_field_preset(field: str | Path | None = None) -> FieldPreset:
+    """``FieldPreset`` from a preset name (``divB`` / ``divA``, also ``A``/``B`` or ``Division A``, any case) or
+    from the path of a field JSON in millimetres; ``None`` -> :data:`DEFAULT_FIELD`."""
+    key = _preset_key(field) if isinstance(field, str) else (DEFAULT_FIELD if field is None else None)
+    if key is not None:
+        label, fname = FIELD_PRESETS[key]
+        path = config_path(fname)
+    else:
+        path = Path(field).expanduser()
+        key = label = path.stem
+    cfg = load_json(path, path.name)
+    return FieldPreset(key, label, path, _field_from_json(cfg), int(cfg.get("robots_per_team", 6)))
+
+
+def field_presets() -> list[FieldPreset]:
+    """The built-in presets whose JSON exists, in :data:`FIELD_PRESETS` order (Division B first)."""
+    out = []
+    for key in FIELD_PRESETS:
+        try:
+            out.append(load_field_preset(key))
+        except FileNotFoundError:
+            continue
+    return out
 
 
 def load_bridge_config(path: str | Path | None = None) -> dict:

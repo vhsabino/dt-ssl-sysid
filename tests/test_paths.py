@@ -6,12 +6,24 @@ from pathlib import Path
 import pytest
 
 from dtssl import paths
-from dtssl.config import (load_bridge_config, load_field, load_geometry, load_holdout_config,
-                          load_limits, load_metrics_config, load_twin_params, reload)
+from dtssl.config import (
+    FIELD_PRESETS,
+    FieldPreset,
+    field_presets,
+    load_bridge_config,
+    load_field,
+    load_field_preset,
+    load_geometry,
+    load_holdout_config,
+    load_limits,
+    load_metrics_config,
+    load_twin_params,
+    reload,
+)
 from dtssl.sim.world import FieldGeometry, RobotSpec
 
 CONFIG_FILES = ("twin_params.json", "metrics.json", "holdout_events.json", "robot_geometry.json",
-                "robot_limits.json", "field_divB.json", "bridge.json")
+                "robot_limits.json", "field_divB.json", "field_divA.json", "bridge.json")
 
 
 def test_repo_root_and_config_files_exist():
@@ -86,3 +98,32 @@ def test_cache_returns_copies_and_reload_sees_edits(tmp_path):
 
 def test_config_path_is_absolute():
     assert Path(paths.config_path("metrics.json")).is_absolute()
+
+
+def test_field_presets_follow_the_ssl_divisions(tmp_path):
+    """Division B (default) and Division A presets: rulebook geometry plus the robots a team fields."""
+    presets = field_presets()
+    assert [p.name for p in presets] == list(FIELD_PRESETS) == ["divB", "divA"]
+    b, a = presets
+    assert isinstance(b, FieldPreset) and b.label == "Div B" and b.division == "B" and b.robots_per_team == 6
+    assert (b.field.length, b.field.width, b.field.goal_width) == (9.0, 6.0, 1.0)
+    assert b.field == load_field() == load_field_preset().field              # the default field is Division B
+    assert a.label == "Div A" and a.division == "A" and a.robots_per_team == 11
+    assert (a.field.length, a.field.width, a.field.goal_width, a.field.goal_depth) == (12.0, 9.0, 1.8, 0.18)
+    assert (a.field.penalty_area_width, a.field.penalty_area_depth) == (3.6, 1.8)
+    assert a.field.goal_center_to_penalty_mark == 8.0 and a.field.boundary_width == 0.3
+    assert a.field.center_circle_radius == b.field.center_circle_radius == 0.5
+    assert "robots_per_team" not in a.field.to_mm()                          # not a geometry field (vision packet)
+    for alias in ("divA", "DIVA", "div-a", "A", "Division A", "div_a"):
+        assert load_field_preset(alias) == a, alias
+    # a custom field JSON (mm) is a preset too: named after the file, 6 robots per team unless the key is given
+    p = tmp_path / "field_lab.json"
+    p.write_text(json.dumps({"field_length": 4000, "field_width": 3000, "goal_width": 700, "goal_depth": 180,
+                             "boundary_width": 200}), encoding="utf-8")
+    c = load_field_preset(p)
+    assert c.name == c.label == "field_lab" and c.division is None and c.robots_per_team == 6
+    assert (c.field.length, c.field.width, c.field.goal_width, c.field.boundary_width) == (4.0, 3.0, 0.7, 0.2)
+    assert c.field.penalty_area_depth == FieldGeometry().penalty_area_depth     # missing keys keep the defaults
+    assert load_field_preset(str(p)) == c
+    with pytest.raises(FileNotFoundError):
+        load_field_preset(tmp_path / "missing.json")
