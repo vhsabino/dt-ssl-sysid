@@ -12,7 +12,7 @@ function T = step_probe(stepFile, varargin)
 %   Units are the file units (Inventor -> mm).  The output table has one row per leaf occurrence
 %   (path, n points, lo, hi, size) plus a last row 'ASSEMBLY' with the union.  Optional name/value:
 %     'Transform', M   4x4 matrix applied to every point before the statistics (e.g. the dtssl
-%                      USD -> MJCF map: x' = -y, y' = x, z' = z - 24.15 mm; see tools/usd_to_mjcf_meshes.py)
+%                      Inventor -> MJCF map: x' = -y, y' = x, z' = z - 24.15 mm; see tools/inventor_export_cad.m)
 %     'Quiet', true    do not print the table
 %     'SolidsOnly', tf true (default): only MANIFOLD_SOLID_BREP / BREP_WITH_VOIDS bodies are measured;
 %                      false also follows sheet bodies and other representation items (an Inventor
