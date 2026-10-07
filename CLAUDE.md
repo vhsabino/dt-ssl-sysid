@@ -32,7 +32,7 @@ número: `results/CHANGELOG.md`. Índice de documentos: `docs/README.md`.*
 | `simulink/parameter_estimation_model_pid_v3.slx` | único oráculo Simulink mantido (~9,5 s/sim) |
 | `tests/` | pytest; marcadores `requires_data / requires_mujoco / requires_gui / requires_net / requires_rsim`; goldens em `tests/fixtures/` (θ do golden em `plant_golden_theta.json`, **não** o θ oficial) |
 | `data/` (DVC) · `models/` (.mat) · `results/` (artefatos + CHANGELOG) · `docs/` · `latex/` · `slr/` · `notebooks/` | dados, modelos, resultados, documentação, artigo |
-| `tools/` | `make_release.py` (pacote anonimizado → `dist/`), `ssl_unification/` (build WSL2 + `config/local`), `external_sims/` (grSim/ER-Force no WSL2 + experimento C2b), `apply_refactor_manifest.json` |
+| `tools/` | `make_release.py` (pacote anonimizado → `dist/`), `ssl_unification/` (build WSL2 + `config/local`), `external_sims/` (grSim/ER-Force no WSL2 + experimento C2b), `apply_refactor_manifest.json`, `usd_to_mjcf_meshes.py` (malhas do chassi/rodas de `usd/` + `--register-mechanisms`), `inventor_export_mechanisms.m` (chute e dribbler tesselados do `robot_v2025_v3.iam` pela API COM do Inventor, Windows), `step_probe.m` (bbox por peça de um STEP) |
 | `legacy/` | `archive/` (RL TD3 de maio, viewers, testes) e `apresentacao/` — fora do pacote |
 | `phase0_replay/` | shim de compatibilidade (reexporta `dtssl`); remover em v2 |
 

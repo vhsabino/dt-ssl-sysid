@@ -172,6 +172,53 @@ grupos, placa), tamanhos compilados iguais (`nbody/njnt/nq/nv/nu`, massas e iné
 bit-a-bit** com e sem as malhas (90 passos, com contato com a bola, rotas a e b), CLI escreve modelo autônomo.
 Prévia: `docs/img/mjcf_cad_preview.png` (renderização offscreen `MUJOCO_GL=osmesa`).
 
+## Chute e dribbler (06/10/2026)
+
+O chassi de `usd/` é só o primeiro andar: a boca da frente ficava vazia. Os dois mecanismos entraram como malhas
+visuais fixas ao chassi (`src/dtssl/physics/assets/ssl_kicker.obj`, `ssl_dribbler.obj` e os pares `_lod` para a GUI),
+exportadas diretamente da montagem principal do Inventor, `ssl-mechanics\v2025\inventor\robot_v2025_v3.iam`, por
+`tools/inventor_export_mechanisms.m` (MATLAB controlando o Inventor pela API COM, Windows). A ferramenta abre a
+montagem, acha as ocorrências pelo nome em qualquer nível da árvore, tessela cada corpo folha visível com
+`SurfaceBodies(i).CalculateFacets` (tolerância de corda 0,1 mm; os corpos de uma ocorrência já vêm no frame da
+montagem principal, que é o mesmo frame de `robot_chasis.usd`: traseira em y = 88,0, tampa em z = 149,2, origem no
+eixo do robô) e escreve os OBJ no frame de corpo do MJCF com a mesma transformação do chassi
+(x' = −y, y' = x, z' = z − 24,15 mm, metros), logo os geoms ficam em `pos = (0, 0, wheel.r)` como o chassi. Parafusos,
+fio das bobinas e passivos SMD das PCBs são omitidos (`SkipPattern`). O cabeçalho de cada OBJ guarda a proveniência
+(montagem, ocorrência, matriz 4×4 da ocorrência, tolerância) e uma linha `# part` com a caixa de cada peça;
+`python tools/usd_to_mjcf_meshes.py --register-mechanisms` lê os OBJ (só numpy) e grava em `meshes.json` as chaves
+`kicker`, `dribbler`, `kicker_lod`, `dribbler_lod` (faces, vértices, bbox, md5, proveniência e as *features*: eixo da
+barra do dribbler, eixos dos êmbolos reto e chip, cabeças, placa do chip, PCBs do sensor IR). A exportação normal do
+chassi chama a mesma rotina, então regenerar o chassi não apaga as entradas.
+
+| Ocorrência (dentro de `first_floor_kicker_new_motor:1`) | translação (mm, frame Inventor) | conteúdo exportado |
+|---|---|---|
+| `kicker_assembly_5mm:1` | (0; −54,45; 6,00), rot. 180° | chute reto + chute chip (desenho TIGERs: `kicker_front_head`, `kicker_chip_head`, 4 `Kicker Eisen`, 2 bobinas, `Kicker Base` ×2, `kicker_plate_5mm`, placa de contato `KICKER_TANGENCY` de 57 mm); 12 peças, 4 990 faces (LOD 1 500) |
+| `Dribbler_Robocup2025v3:1` | (−38,25; −75,00; 4,00), rot. 120° | dribbler completo: barra `Dribblerschnecke` Ø12,9 × 72 mm, eixo, motor EC16 com pinhões z18/z26/z18, placas laterais, suporte do chip v2020 (`ChipHolderV17` ×2 + placa de 74 mm), 2 PCBs do sensor IR; 32 peças, 14 862 faces (LOD 3 500) |
+
+No frame de corpo (mm; alturas acima do piso = z' + 29,5): barra do dribbler com eixo em x' = 72,9, 43,2 mm acima do
+piso, 72 mm de comprimento centrada em y; placa do chip de x' 59 a 78, 2,8 a 23,3 mm acima do piso; o conjunto do
+chute termina em x' = 60,5 (placa-base), 16 mm atrás do plano frontal do chassi (76,5 mm), e a placa de contato
+`KICKER_TANGENCY`, na posição recolhida da montagem, fica em x' = 46,9, 22 a 31 mm acima do piso; êmbolo do chip
+13 a 23 mm acima do piso. O dribbler avança 3,4 mm além do plano frontal. Nada abaixo do piso.
+
+No builder: `CAD_MECHANISMS` em `mjcf.py` (chave do `meshes.json`, nome do `<mesh>`, cor); `cad_assets()` declara as
+quatro malhas e `_cad_chassis` adiciona os dois geoms visuais (`contype=conaffinity=0`, `mass=0`, `group=1`), sem
+juntas: por ora o êmbolo e a barra não se movem. Física inalterada: os testes de tamanhos compilados (agora
+`ngeom + 7` por robô, `nmesh + 4`) e de trajetória bit a bit com e sem as malhas continuam passando; os sites
+`_dribbler`/`_kicker` da lógica de chute e dribbler não foram movidos (mudá-los mudaria o comportamento). GUI:
+`scene3d.mechanism_meshes` / `RobotMeshes.mechanisms`, itens estáticos com a transformada do chassi em `view3d`
+(12 robôs, LOD) e `robot_view3d` (resolução cheia). Testes novos em `tests/test_physics_cad.py`
+(`test_mechanism_meshes_sit_in_the_chassis_mouth`, `test_mechanism_features_from_the_part_boxes`) e
+`tests/test_gui_view3d.py` (`test_mechanism_meshes_match_the_physics_assets`).
+
+Observação para a mecânica (não afeta o visual): na posição modelada, com a bola encostada na face da placa do chip
+(x' = 77,8), o centro da bola fica a 34,2 mm do eixo da barra, acima dos 27,95 mm de contato (6,45 + 21,5): a barra
+não toca a bola (folga de ~6 mm). Provavelmente o dribbler pivota no `AmortecedorCad` e a montagem está recolhida.
+Verificar antes de usar esse CAD em qualquer física de dribbler.
+
+Limitação da ferramenta: iniciar o Inventor pela COM exige sessão Autodesk válida; sem ela o processo novo cai na
+inicialização ("Autodesk Error Report"). Com o Inventor aberto à mão e logado, a função reutiliza a instância.
+
 ## Como abrir o viewer
 
 ```bash

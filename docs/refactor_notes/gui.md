@@ -269,6 +269,18 @@ transformadas da peça e setas) e `tests/test_gui_robot_tab.py` (+2: seletor e t
 fonte real, arrasto, presets, teclado, auto-rotação, oculta = barata; e o `MainWindow` selecionando pelo combo da aba).
 Verificado renderizando de verdade sob `xvfb` + Mesa (llvmpipe) no sandbox: `docs/img/gui_robot_tab_3d.png`.
 
+## Chute e dribbler nas vistas 3D (06/10/2026)
+
+As duas vistas 3D (campo, `view3d._RobotItems`; aba Robot, `RobotView3D._build_items`) passaram a desenhar o chute e o
+dribbler do CAD como itens estáticos presos ao chassi: `scene3d.mechanism_meshes(lod)` lê `ssl_kicker*.obj` e
+`ssl_dribbler*.obj` de `physics/assets` (mesmo frame do OBJ do chassi, origem z no plano dos eixos das rodas) e
+`RobotMeshes.mechanisms` os carrega junto (vazio no modo primitivo); os `GLMeshItem` recebem a transformada do
+chassi a cada quadro, com as cores de `mjcf.CAD_MECHANISMS` (`scene3d.MECHANISM_RGBA`: aço para o chute, escuro para o
+dribbler). Campo com 12 robôs usa os LOD (1 500 + 3 500 faces por robô); a aba Robot usa a resolução cheia
+(4 990 + 14 862). Nada se move ainda (sem juntas). Origem e proveniência das malhas: `docs/refactor_notes/physics.md`,
+seção "Chute e dribbler". Teste: `tests/test_gui_view3d.py::test_mechanism_meshes_match_the_physics_assets`
+(+ `RobotMeshes` com os mecanismos nas três variantes).
+
 ## Correção 03/09/2026 — `ZeroDivisionError` do pyqtgraph ao trocar de robô
 
 Sintoma (Windows, pyqtgraph 0.14.0, modo Debug): ao selecionar um robô, o console repete
