@@ -142,82 +142,125 @@ contadores `kicks`/`contacts`/`watchdog_hits`, `watchdog_clock="wall"|"sim"|call
   cilindros, elipsoides); a física é bit-a-bit igual com e sem as malhas (teste).
 - O viewer (`mujoco.viewer.launch_passive`) precisa de display/GL; não é testado no CI.
 
-## Malhas do CAD (C5, 08/09/2026)
+## Malhas do CAD (C5, 08/09/2026; refeito em 07/10/2026)
 
-`tools/usd_to_mjcf_meshes.py` exporta o CAD RobôCIn v2025 de `usd/` para `src/dtssl/physics/assets/`
-(`ssl_chassis.obj`, `ssl_wheel.obj`, `meshes.json` com proveniência: md5 dos USD, contagem de faces, bbox):
+Histórico: a primeira versão exportava só o chassi e a roda de `usd/` (`tools/usd_to_mjcf_meshes.py`, `fast_simplification`),
+em cinza único, e o chute e o dribbler entraram em 06/10 como malhas fixas tesseladas do Inventor
+(`tools/inventor_export_mechanisms.m`). Em 07/10 as quatro malhas passaram a sair de uma única ferramenta, com as
+cores do CAD, e as duas anteriores foram retiradas (cópias em `_to_delete\superseded_20261007\tools\`; `usd/` segue no
+repositório só como arquivo de origem antigo).
 
-| Malha | Fonte | Faces (fonte → exportada) | Frame |
-|---|---|---|---|
-| `ssl_chassis.obj` | `usd/wheel/robot_chasis.usd` (46 sólidos; o `Cylinder` de colisão é descartado) | 141 969 → 37 330 | frame de corpo MJCF: USD tem o dribbler em −y e rodas em −30/45/135/210°; aplicada R_z(+90°) (x' = −y, y' = x) → dribbler em +x, rodas em 60/135/225/300°; mm → m; **origem z no plano dos eixos das rodas** (USD z = 24,15 mm), por isso o geom fica em `pos = (0, 0, wheel.r)`: as rodas do CAD tocam o chão onde as rodas físicas tocam, qualquer que seja `r` no `robot_geometry.json` |
-| `ssl_wheel.obj` | `usd/wheel/hub.usd` (cubo `hub_v2` + 20 roletes) | 164 621 → 7 999 | eixo em +x, centrado no eixo; no MJCF `euler = (0, 0, φ_i)` põe o eixo na direção radial u_r (a dobradiça é −u_r); raio externo 30,1 mm (CAD) vs 29,5 mm (física) |
+### Exportação (Inventor, COM) e registro
 
-Decimação por sólido (`fast_simplification`, colapso de arestas quádrico) depois de soldar vértices duplicados (o
-export CAD separa os vértices por face). OBJ de um único objeto, só triângulos (o MuJoCo lê a primeira *shape*).
-A ferramenta escreve também o par leve para a aba 3D da GUI (C6): `ssl_chassis_lod.obj` (10 771 faces = só os
-componentes conexos **exteriores** da malha completa, ≥ 60 mm — casca, base, tampa; parafusos, pinos e eletrônica
-interna são descartados — e decimados de novo) e `ssl_wheel_lod.obj` (1 180 faces, decimação mais agressiva);
-`meshes.json` ganha as chaves `chassis_lod`/`wheel_lod`. O MuJoCo continua usando as malhas completas.
+`tools/inventor_export_cad.m` (MATLAB controlando o Inventor 2026 pela API COM, Windows) abre a montagem principal
+`ssl-mechanics\v2025\inventor\robot_v2025_v3.iam` (ou reutiliza a instância aberta), percorre a árvore de ocorrências
+uma vez, tessela cada corpo folha visível com `SurfaceBodies(i).CalculateFacets` (tolerância de corda 0,1 mm; os
+*proxies* já vêm no frame da montagem principal) e escreve quatro malhas no frame de corpo do MJCF
+(p' = R_z(+90°)·(p − [0 0 24,15 mm]) / 1000: x' = −y, y' = x, origem z no plano dos eixos das rodas, logo os geoms
+ficam em `pos = (0, 0, wheel.r)`), cada uma com o par `_lod` para a GUI (decimação `reducepatch` **por peça**, para
+as cores sobreviverem):
 
-No builder: `robot_fragment(..., visual="cad")` / `build_world_xml(..., visual="cad")` / `MuJoCoWorld(visual="cad")` /
-`dtssl mjcf --visual cad [--view]`. As malhas entram como geoms **só visuais** (`contype=conaffinity=0`, `mass=0`,
-`group=1`); as primitivas (chassi de colisão, cubos e roletes) vão para o `group=3` (oculto no viewer por default) e
-a placa de identificação SSL sobe para a tampa do CAD (`wheel.r + z_top_above_axle` = 154,5 mm — o CAD fica 4,5 mm
-acima do limite de 150 mm da regra, medido no modelo). Rota a: 4 rodas estáticas no corpo do chassi; rota b: a malha
-da roda vai no corpo da roda e gira com ela. O modelo com malhas exige os bytes dos OBJ na compilação:
-`mjcf.load_model(xml)` (`MjModel.from_xml_string(xml, assets)`) — usado por `MuJoCoWorld.reset` e `describe_xml`;
-`dtssl mjcf --out DIR --visual cad` copia os OBJ para `DIR` para que `ssl_route_<r>_cad.xml` carregue sozinho.
-Testes (`tests/test_physics_cad.py`, 13): assets ↔ `meshes.json` ↔ md5 dos USD, frame das malhas, XML (geoms,
-grupos, placa), tamanhos compilados iguais (`nbody/njnt/nq/nv/nu`, massas e inércias), **trajetórias idênticas
-bit-a-bit** com e sem as malhas (90 passos, com contato com a bola, rotas a e b), CLI escreve modelo autônomo.
-Prévia: `docs/img/mjcf_cad_preview.png` (renderização offscreen `MUJOCO_GL=osmesa`).
+| Malha | O que entra | Peças | Faces (cheia / LOD) | Cores |
+|---|---|---|---|---|
+| `ssl_chassis.obj` | tudo o que não é mecanismo, roda, fixador (DIN/ISO), decalque ou peça SMD menor que 4 mm (`SkipPattern`, `MinPartMm`) | 218 (554 omitidas) | 60 188 / 14 080 | 13 |
+| `ssl_wheel.obj` | uma roda, `Direct_Transmission_new:1/Wheel_v2025_new:1` (`WheelPath`), no frame da roda: eixo em +x (saída), plano médio dos roletes em x = 0; as outras três ficam fora do chassi | 82 | 8 088 / 2 238 | 5 |
+| `ssl_kicker.obj` | `kicker_assembly_5mm:1` (chute reto + chip), frame do chassi | 12 | 4 990 / 1 490 | 3 |
+| `ssl_dribbler.obj` | `Dribbler_Robocup2025v3:1` (barra, motor, engrenagens, placas laterais, suporte do chip, PCBs IR) | 32 | 14 862 / 3 506 | 9 |
 
-## Chute e dribbler (06/10/2026)
+Cores: cada folha recebe a cor base (difusa) da sua própria aparência, `ComponentOccurrence.Appearance` (aparência da
+peça ou *override* da ocorrência), lida do *asset* pelas chaves do esquema (`generic_diffuse`, `plasticvinyl_color`,
+`metal_color`, `wallpaint_color`, ...; cinza 191 quando não há). É o que o viewport sombreado do Inventor mostra:
+um *override* numa submontagem não se propaga (a submontagem da tampa tem *override* "green" e é desenhada preta),
+texturas são ignoradas e decalques são imagens sobre faces, não aparências. Por isso a tampa (`Capa_2025_V3`), que
+no CAD é envolvida por um decalque preto com os patrocinadores, recebe preto por nome (`ColourOverrides`); a barra
+`Dribblerschnecke` ("Gummi - schwarz", textura) fica no cinza claro base, igual ao viewport. Conferido contra o
+render do viewport (`Camera.SaveAsBitmap`): tampa e chassi pretos, módulo do dribbler cinza/branco, cubos das rodas
+pretos, roletes cinza, capacitor branco. As faces saem agrupadas por peça (`g <caminho>`) e por cor (`usemtl m_rrggbb`;
+materiais em `ssl_<tag>.mtl`, `Kd` 0 a 1, compartilhado pelo `_lod`). O cabeçalho de cada OBJ guarda a proveniência
+(montagem, alvo, tolerância), o plano do decalque do padrão de id (`# id plate z`, peças `Papier*`, omitidas),
+os dados do eixo da roda (ângulo no CAD 60,000°, centro (39,8; 68,9) mm, raio externo 30,38 mm) e uma linha
+`# part <caminho> | lo | hi | mtl | aparência` por peça (mm, frame MJCF). A exportação completa leva ~41 s com a
+montagem aberta.
 
-O chassi de `usd/` é só o primeiro andar: a boca da frente ficava vazia. Os dois mecanismos entraram como malhas
-visuais fixas ao chassi (`src/dtssl/physics/assets/ssl_kicker.obj`, `ssl_dribbler.obj` e os pares `_lod` para a GUI),
-exportadas diretamente da montagem principal do Inventor, `ssl-mechanics\v2025\inventor\robot_v2025_v3.iam`, por
-`tools/inventor_export_mechanisms.m` (MATLAB controlando o Inventor pela API COM, Windows). A ferramenta abre a
-montagem, acha as ocorrências pelo nome em qualquer nível da árvore, tessela cada corpo folha visível com
-`SurfaceBodies(i).CalculateFacets` (tolerância de corda 0,1 mm; os corpos de uma ocorrência já vêm no frame da
-montagem principal, que é o mesmo frame de `robot_chasis.usd`: traseira em y = 88,0, tampa em z = 149,2, origem no
-eixo do robô) e escreve os OBJ no frame de corpo do MJCF com a mesma transformação do chassi
-(x' = −y, y' = x, z' = z − 24,15 mm, metros), logo os geoms ficam em `pos = (0, 0, wheel.r)` como o chassi. Parafusos,
-fio das bobinas e passivos SMD das PCBs são omitidos (`SkipPattern`). O cabeçalho de cada OBJ guarda a proveniência
-(montagem, ocorrência, matriz 4×4 da ocorrência, tolerância) e uma linha `# part` com a caixa de cada peça;
-`python tools/usd_to_mjcf_meshes.py --register-mechanisms` lê os OBJ (só numpy) e grava em `meshes.json` as chaves
-`kicker`, `dribbler`, `kicker_lod`, `dribbler_lod` (faces, vértices, bbox, md5, proveniência e as *features*: eixo da
-barra do dribbler, eixos dos êmbolos reto e chip, cabeças, placa do chip, PCBs do sensor IR). A exportação normal do
-chassi chama a mesma rotina, então regenerar o chassi não apaga as entradas.
+`python tools/register_cad_meshes.py` (só numpy) lê os OBJ/MTL e grava `src/dtssl/physics/assets/meshes.json`:
+por malha `file`, `mtl`, `n_parts`, `n_skipped`, `faces_source`, `faces`, `vertices`, `bbox`, `md5`, `source`,
+`materials` (`m_rrggbb` → rgb 0 a 1 + nome da aparência); no chassi `z_top_above_axle` (bbox, 125,0 mm),
+`z_cover_above_axle` (plano superior da tampa, 120,2 mm: maior plano horizontal voltado para cima ≥ 50 cm²) e
+`z_id_plate_above_axle` (decalque do padrão, 119,25 mm); na roda `outer_radius`, `axle`, `cad_angle_deg`,
+`cad_centre`; no chute e no dribbler as *features* derivadas das caixas das peças (barra do dribbler: eixo y,
+centro (72,9; −0,25; 13,75) mm, raio 6,47 mm, 72 mm; placa do chip como caixa orientada por PCA, face frontal
+inclinada 16° para trás; boca: faces internas das placas laterais y = −27,75 e +28,75 mm, fundo x = 59,1 mm, borda
+frontal x = 79,9 mm; êmbolos e cabeças do chute; PCBs IR). `mjcf.cad_meta()` é o único leitor.
 
-| Ocorrência (dentro de `first_floor_kicker_new_motor:1`) | translação (mm, frame Inventor) | conteúdo exportado |
-|---|---|---|
-| `kicker_assembly_5mm:1` | (0; −54,45; 6,00), rot. 180° | chute reto + chute chip (desenho TIGERs: `kicker_front_head`, `kicker_chip_head`, 4 `Kicker Eisen`, 2 bobinas, `Kicker Base` ×2, `kicker_plate_5mm`, placa de contato `KICKER_TANGENCY` de 57 mm); 12 peças, 4 990 faces (LOD 1 500) |
-| `Dribbler_Robocup2025v3:1` | (−38,25; −75,00; 4,00), rot. 120° | dribbler completo: barra `Dribblerschnecke` Ø12,9 × 72 mm, eixo, motor EC16 com pinhões z18/z26/z18, placas laterais, suporte do chip v2020 (`ChipHolderV17` ×2 + placa de 74 mm), 2 PCBs do sensor IR; 32 peças, 14 862 faces (LOD 3 500) |
+### No builder e na GUI
 
-No frame de corpo (mm; alturas acima do piso = z' + 29,5): barra do dribbler com eixo em x' = 72,9, 43,2 mm acima do
-piso, 72 mm de comprimento centrada em y; placa do chip de x' 59 a 78, 2,8 a 23,3 mm acima do piso; o conjunto do
-chute termina em x' = 60,5 (placa-base), 16 mm atrás do plano frontal do chassi (76,5 mm), e a placa de contato
-`KICKER_TANGENCY`, na posição recolhida da montagem, fica em x' = 46,9, 22 a 31 mm acima do piso; êmbolo do chip
-13 a 23 mm acima do piso. O dribbler avança 3,4 mm além do plano frontal. Nada abaixo do piso.
+Um `<mesh>` do MuJoCo tem uma só cor, então `mjcf.split_obj` parte cada OBJ em memória em um sub-mesh por material
+(`cad_submeshes()`, nomes de arquivo virtuais `ssl_<chave>__<material>.obj`; a barra do dribbler sai separada, rótulo
+`bar`, para poder girar): 30 *assets* (13 + 5 + 3 + 9) e 45 geoms visuais por robô (13 do chassi, 4 × 5 das rodas,
+3 do chute, 9 do dribbler), `contype=conaffinity=0`, `mass=0`, `group=1`, `rgba` do material; as primitivas vão para o
+`group=3`. `mjcf.load_model(xml)` anexa os bytes (`MjModel.from_xml_string(xml, assets)`); `dtssl mjcf --out DIR
+--visual cad` escreve os 30 OBJ e o `meshes.json` ao lado do XML. A física é a mesma nos dois modos (teste bit a
+bit mantido: tamanhos compilados `ngeom + 45` por robô, `nmesh + 30`, massas e inércias iguais, trajetórias iguais).
+Na GUI, `scene3d.parse_obj` recebe os materiais e devolve `colors` por face; `cad_meshes`/`mechanism_meshes` vêm
+coloridas e `view3d`/`robot_view3d` desenham com `faceColors` (na aba Robot as rodas continuam tingidas pela
+velocidade, agora sobre a cor do CAD, `wheel_face_colors`, re-upload da malha só quando o nível de tinta muda).
 
-No builder: `CAD_MECHANISMS` em `mjcf.py` (chave do `meshes.json`, nome do `<mesh>`, cor); `cad_assets()` declara as
-quatro malhas e `_cad_chassis` adiciona os dois geoms visuais (`contype=conaffinity=0`, `mass=0`, `group=1`), sem
-juntas: por ora o êmbolo e a barra não se movem. Física inalterada: os testes de tamanhos compilados (agora
-`ngeom + 7` por robô, `nmesh + 4`) e de trajetória bit a bit com e sem as malhas continuam passando; os sites
-`_dribbler`/`_kicker` da lógica de chute e dribbler não foram movidos (mudá-los mudaria o comportamento). GUI:
-`scene3d.mechanism_meshes` / `RobotMeshes.mechanisms`, itens estáticos com a transformada do chassi em `view3d`
-(12 robôs, LOD) e `robot_view3d` (resolução cheia). Testes novos em `tests/test_physics_cad.py`
-(`test_mechanism_meshes_sit_in_the_chassis_mouth`, `test_mechanism_features_from_the_part_boxes`) e
-`tests/test_gui_view3d.py` (`test_mechanism_meshes_match_the_physics_assets`).
+Placa de identificação: ela ficava em `wheel.r + z_top_above_axle` (154,5 mm acima do piso), o topo da bbox, que é
+uma peça saliente sobre a tampa; as bolinhas pareciam flutuar 4 a 6 mm. Agora `mjcf.cad_plate_z()` usa o plano do
+decalque do padrão no CAD (`z_id_plate_above_axle`, 148,7 mm acima do piso, dentro dos 150 mm da regra), com
+recuo para a tampa e para a bbox quando a chave não existe; builder (`_robot_visuals`) e GUI (`RobotMeshes.build`)
+usam o mesmo valor.
 
-Observação para a mecânica (não afeta o visual): na posição modelada, com a bola encostada na face da placa do chip
-(x' = 77,8), o centro da bola fica a 34,2 mm do eixo da barra, acima dos 27,95 mm de contato (6,45 + 21,5): a barra
-não toca a bola (folga de ~6 mm). Provavelmente o dribbler pivota no `AmortecedorCad` e a montagem está recolhida.
-Verificar antes de usar esse CAD em qualquer física de dribbler.
+## Dribbler físico (`dribbler="bar"`, 07/10/2026)
 
-Limitação da ferramenta: iniciar o Inventor pela COM exige sessão Autodesk válida; sem ela o processo novo cai na
-inicialização ("Autodesk Error Report"). Com o Inventor aberto à mão e logado, a função reutiliza a instância.
+`MuJoCoWorld(..., dribbler="bar")` / `build_world_xml(..., dribbler="bar")` / `dtssl mjcf --dribbler bar` constroem o
+mecanismo do CAD em vez da mola virtual (`"spring"`, default, inalterado): a barra de borracha como cápsula
+(r 6,47 mm, 72 mm) num corpo `<robô>_dribbler_bar` com dobradiça `<robô>_dribbler` (eixo y do corpo) acionada por um
+`velocity` (laço de velocidade do BLDC; `ctrl` = rad/s da barra, 0 a `dribbler_rpm_max` do `robot_limits.json`,
+6000 rpm, trem 18:26:18 = 1:1; torque limitado a `torque_max`), montado num corpo `<robô>_dribbler_module` com uma
+junta prismática `<robô>_dribbler_slide` ao longo da direção barra → bola (45°), com mola e amortecedor (os
+`AmortecedorCad` do CAD), dentro de uma **boca**: fundo da casca em D cortado na placa do chip, duas bochechas até a
+borda frontal das placas laterais (x = 79,9 mm, 5 mm além da face em D) e a placa do chip como caixa orientada
+(`mouth_fragment`, classe `mouth`, sem massa). Bits de contato: `BIT_MOUTH = 32`; a bola passa a colidir com
+piso, paredes e boca (`BALL_CONAFF_MOUTH`) e deixa de tocar a casca em D (`ROBOT_CONAFF_MOUTH`), que segue colidindo
+com robôs e paredes; a barra e a boca têm prioridade 2 (a bola mantém seus parâmetros identificados no piso).
+Por robô: +2 corpos, +2 juntas, +5 geoms, +1 atuador, +3 malhas compartilhadas (fundo e bochechas); o módulo e a
+barra tiram sua massa do inercial do chassi (massa total = `spec.mass`). `MuJoCoWorld.dribbler_state(team, id)`
+devolve (velocidade da barra, posição do slide, barra tocando a bola); `_ball_actions` manda `ctrl` = rpm do
+comando → rad/s; `has_ball` continua a regra geométrica do IR. Visual `cad`: a malha da barra é desenhada no corpo
+que gira; as outras peças do módulo ficam fixas.
+
+Princípio e números. Na pose do CAD a barra fica 2,96 mm longe de uma bola encostada na placa do chip (e a placa
+impede a bola de chegar mais perto: uma barra fixa nessa pose nunca tocaria a bola no piso). O módulo descansa
+então num batente `engage` = 8 mm além do contato (slide 0, mola relaxada; uma bola na placa empurra o módulo 8 mm
+para trás, 0,3 N com `stiffness` = 37,5 N/m; a barra segue a bola até 8 mm à frente da placa). A barra gira a bola
+para trás (taxa positiva em +y arrasta o topo da bola para o robô); o retro-giro faz o atrito do piso puxar a bola
+para a boca e a barra a pressiona no piso. Como a barra está 45° atrás e acima da bola, sua normal empurra a bola
+para a frente e só os atritos (barra e piso, `mu_slide` = 0,186 identificado) a seguram: em repouso a bola flutua
+~6 mm à frente da placa, pressionada com ~0,25 N, girando a −92 rad/s (velocidade periférica da barra a 3000 rpm);
+nada além de atrito a segura, então ela é perdida quando o robô freia, recua ou gira mais forte do que o atrito
+permite (como nos robôs reais). Dois detalhes que fizeram diferença: a barra real é uma rosca
+(`Dribblerschnecke`, duas hélices opostas que se encontram no centro) e centraliza a bola; um cilindro no MuJoCo
+não faz isso, então o mundo aplica a força lateral `−helix·N·clip(y/helix_width)` na bola enquanto a barra a toca
+(`helix` = 0,3 da normal, saturada a 5 mm de desvio); sem isso a bola escapa de lado em qualquer curva. E o
+contato bola-placa precisa ser inelástico (`mouth_solref` (0,01; 1,0), atrito 0,2) e o da barra macio e
+sobreamortecido (`solref` (0,02; 2,0)), senão a bola quica para fora na captura.
+
+Envelope medido (`_to_delete\sweep_bar.py`, rota a, cenário com rampas: captura a v, frenagem a a, recuo a 0,3 m/s,
+curva a 1,5 rad/s com 3a rad/s², passo lateral a 0,3 m/s, dribbler a 3000 rpm): a bola fica na boca em todas as
+fases para capturas até 0,8 m/s com rampas de 1 m/s² e até 0,5 m/s com rampas de 3 m/s²; perde-se ao frear a
+≥ 2 m/s² depois de capturas a ≥ 0,8 m/s e nas capturas a 1,2 m/s. Recepção de passe (robô parado): 1,0 m/s é
+segurada; 1,5 e 2,0 m/s quicam 2 a 8 mm além do alcance da barra (o robô real avança); 3 m/s volta 7 cm. Degraus
+de comando (sem rampa) de −0,5 m/s perdem a bola, como esperado. Rotas a e b e `visual="cad"` dão o mesmo
+resultado (física idêntica).
+
+Parâmetros sem fonte no repositório (`DribblerOptions`, marcados no docstring): `engage`, `travel_back`,
+`stiffness`, `damping`, `module_mass`, `bar_mass`, `armature`, `torque_max`, `friction`, `mouth_*`, `helix`,
+`helix_width`. O que depende da mecânica: a posição real de repouso do módulo em relação ao CAD (a folga de 3 mm
+sugere que a montagem não está na pose de operação), curso e pré-carga dos amortecedores, dados do motor do
+dribbler. Testes: `tests/test_physics_dribbler.py` (14: geometria da boca, XML nas duas rotas e nos dois visuais,
+tamanhos compilados, captura + frenagem + recuo + curva + passo lateral segurando a bola com retro-giro, perda num
+degrau forte, curva sem `helix` perde a bola, estado do mundo e default `spring` intacto).
 
 ## Como abrir o viewer
 

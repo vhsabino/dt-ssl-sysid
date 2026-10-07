@@ -269,17 +269,30 @@ transformadas da peça e setas) e `tests/test_gui_robot_tab.py` (+2: seletor e t
 fonte real, arrasto, presets, teclado, auto-rotação, oculta = barata; e o `MainWindow` selecionando pelo combo da aba).
 Verificado renderizando de verdade sob `xvfb` + Mesa (llvmpipe) no sandbox: `docs/img/gui_robot_tab_3d.png`.
 
-## Chute e dribbler nas vistas 3D (06/10/2026)
+## Chute e dribbler nas vistas 3D (06/10/2026) e cores do CAD (07/10/2026)
 
 As duas vistas 3D (campo, `view3d._RobotItems`; aba Robot, `RobotView3D._build_items`) passaram a desenhar o chute e o
 dribbler do CAD como itens estáticos presos ao chassi: `scene3d.mechanism_meshes(lod)` lê `ssl_kicker*.obj` e
 `ssl_dribbler*.obj` de `physics/assets` (mesmo frame do OBJ do chassi, origem z no plano dos eixos das rodas) e
 `RobotMeshes.mechanisms` os carrega junto (vazio no modo primitivo); os `GLMeshItem` recebem a transformada do
-chassi a cada quadro, com as cores de `mjcf.CAD_MECHANISMS` (`scene3d.MECHANISM_RGBA`: aço para o chute, escuro para o
-dribbler). Campo com 12 robôs usa os LOD (1 500 + 3 500 faces por robô); a aba Robot usa a resolução cheia
-(4 990 + 14 862). Nada se move ainda (sem juntas). Origem e proveniência das malhas: `docs/refactor_notes/physics.md`,
-seção "Chute e dribbler". Teste: `tests/test_gui_view3d.py::test_mechanism_meshes_match_the_physics_assets`
-(+ `RobotMeshes` com os mecanismos nas três variantes).
+chassi a cada quadro. Campo com 12 robôs usa os LOD (1 490 + 3 506 faces por robô); a aba Robot usa a resolução cheia
+(4 990 + 14 862). Nada se move ainda nas vistas da GUI (o dribbler físico do MuJoCo, `dribbler="bar"`, gira a barra
+só no modelo; a GUI continua desenhando o CAD estático). Origem e proveniência das malhas: `docs/refactor_notes/physics.md`,
+seção "Malhas do CAD".
+
+Cores (07/10): as quatro malhas (chassi, roda, chute, dribbler) agora saem do Inventor com as cores do CAD, agrupadas
+por material no OBJ (`usemtl m_rrggbb` + `ssl_<tag>.mtl`). `scene3d.parse_obj(data, materials)` devolve `Mesh.colors`
+(RGBA por face) e `_asset_mesh(key, lod)` lê o OBJ com o MTL de `meshes.json`, então `cad_meshes()` e
+`mechanism_meshes()` vêm coloridas (preto da tampa e do chassi, cinza e branco do módulo do dribbler, cubos pretos e
+roletes cinza nas rodas); `MECHANISM_RGBA` deixou de existir (`MECHANISM_KEYS`). `view3d._mesh_kwargs` e
+`robot_view3d._mesh_kwargs` passam `faceColors` ao `GLMeshItem` quando a malha tem cores (senão `color` liso, como
+nas primitivas). Na aba Robot as rodas continuam coloridas pela velocidade: `robot_view3d.wheel_face_colors(base,
+omega)` tinge as cores do CAD para o vermelho (frente) ou azul (ré) em 32 níveis e a malha só é reenviada à GPU
+(`setMeshData(..., faceColors=...)`) quando o nível muda. Placa de id: `RobotMeshes.build` usa
+`wheel.r + mjcf.cad_plate_z()` (plano do decalque do padrão no CAD, 148,7 mm acima do piso) em vez do topo da bbox
+(154,5 mm): as bolinhas deixaram de flutuar sobre a tampa. Testes: `tests/test_gui_view3d.py`
+(`test_cad_meshes_match_the_physics_assets` confere as 13 cores do chassi, `test_mechanism_meshes_match_the_physics_assets`,
+`test_robot_meshes_build_all_variants` confere cores por face nas três variantes e a altura da placa).
 
 ## Correção 03/09/2026 — `ZeroDivisionError` do pyqtgraph ao trocar de robô
 
