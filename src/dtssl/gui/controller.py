@@ -42,7 +42,7 @@ from dtssl.gui.keyboard import KeyboardProvider
 from dtssl.gui.replay import ReplaySession, horizons_from_config
 from dtssl.models.params import DofParam, load_twin_params
 from dtssl.sim.backends import available, make_world
-from dtssl.sim.entities import BallState, RobotCmd, RobotState, Scene, WorldState
+from dtssl.sim.entities import ACTIVE_ROBOTS, ROSTER_SIZE, BallState, RobotCmd, RobotState, Scene, WorldState
 from dtssl.sim.world import World
 
 log = logging.getLogger(__name__)
@@ -96,13 +96,15 @@ class Controller(QtCore.QObject):
 
     def __init__(self, backend: str = "fopdt", mode: str = "debug", team: str = "yellow", *,
                  bridge_config: str | Path | dict | None = None, joy_map: JoyMap | str | Path | None = None,
-                 n_blue: int = 6, n_yellow: int = 6, publish: bool = False, realtime: bool | None = None,
+                 n_blue: int = ROSTER_SIZE, n_yellow: int = ROSTER_SIZE, n_active: int | None = ACTIVE_ROBOTS,
+                 publish: bool = False, realtime: bool | None = None,
                  params: dict[str, DofParam] | None = None, world_opts: dict | None = None,
                  use_pygame: bool | None = None, parent=None):
         super().__init__(parent)
         self.backend = backend
         self.team = team
         self.n_blue, self.n_yellow = int(n_blue), int(n_yellow)
+        self.n_active = None if n_active is None else int(n_active)   # per team on the field; the rest parked
         self.publish = bool(publish)
         self.world_opts = dict(world_opts or {})
         self.params: dict[str, DofParam] = params or load_twin_params()
@@ -167,6 +169,7 @@ class Controller(QtCore.QObject):
         opts = dict(self.world_opts)
         opts.setdefault("n_blue", self.n_blue)
         opts.setdefault("n_yellow", self.n_yellow)
+        opts.setdefault("n_active", self.n_active)
         if backend != "ideal":
             opts.setdefault("params", self.params)
         world = make_world(backend, **opts)
@@ -204,9 +207,12 @@ class Controller(QtCore.QObject):
             self._ws = self.world.state()
         return self._ws
 
-    def robot_keys(self, team: str | None = None) -> list[Key]:
+    def robot_keys(self, team: str | None = None, present: bool | None = True) -> list[Key]:
+        """Robots of ``team`` (both teams when None): in play (``present=True``, default), parked (``False``) or
+        all (``None``)."""
         ws = self.latest_state()
-        return [k for k, r in sorted(ws.robots.items()) if r.present and (team is None or k[0] == team)]
+        return [k for k, r in sorted(ws.robots.items())
+                if (present is None or r.present == present) and (team is None or k[0] == team)]
 
     # ------------------------------------------------------------------ lifecycle
     def start(self) -> None:
@@ -312,7 +318,9 @@ class Controller(QtCore.QObject):
         self.selection_changed.emit(self.selected)
 
     def reset_scene(self) -> None:
-        scene = Scene.default(self.n_blue, self.n_yellow, self.world.field.length, self.world.field.width)
+        f = self.world.field
+        scene = Scene.default(self.n_blue, self.n_yellow, f.length, f.width, n_active=self.n_active,
+                              boundary_width_m=f.boundary_width)
         self.world.reset(scene)
         self._ws = self.world.state()
         self._select_default()
@@ -400,6 +408,37 @@ class Controller(QtCore.QObject):
         self.world.teleport_ball(float(x), float(y))
         self._ws = self.world.state()
         return True
+
+    # ------------------------------------------------------------------ substitutions
+    def park_robot(self, key: Key) -> bool:
+        """Take a robot out of play: the world parks it outside the arena walls."""
+        if self.mode == "replay":
+            return False
+        key = (str(key[0]), int(key[1]))
+        if key not in self.robot_keys(present=True):
+            return False
+        self.world.set_present(key[0], key[1], False)
+        self._ws = self.world.state()
+        if self.selected == key:
+            self._select_default()
+            self.selection_changed.emit(self.selected)
+        return True
+
+    def enter_robot(self, x: float, y: float, team: str | None = None) -> Key | None:
+        """Bring the lowest-id parked robot of ``team`` (the joystick team by default) into play at ``(x, y)``,
+        facing the opponent goal, and select it. Returns its key, or None when nobody is on the bench."""
+        if self.mode == "replay":
+            return None
+        team = team or self.team
+        parked = self.robot_keys(team, present=False)
+        if not parked:
+            return None
+        key = parked[0]
+        theta = 0.0 if team == "blue" else math.pi
+        self.world.teleport_robot(key[0], key[1], float(x), float(y), theta, present=True)
+        self._ws = self.world.state()
+        self.select(key)
+        return key
 
     # ------------------------------------------------------------------ parameters
     def apply_params(self, params: dict[str, DofParam]) -> None:

@@ -14,6 +14,8 @@ import importlib.util
 import sys
 from pathlib import Path
 
+from dtssl.sim.entities import ACTIVE_ROBOTS, ROSTER_SIZE
+
 GUI_MODULES = ("PySide6", "pyqtgraph")
 
 
@@ -24,8 +26,11 @@ def add_gui_arguments(p: argparse.ArgumentParser) -> None:
     p.add_argument("--config", type=Path, default=None, help="bridge config JSON (default config/bridge.json)")
     p.add_argument("--joy-map", default=None, metavar="FILE|PRESET",
                    help="joystick map JSON or preset (gamecontroller, dualsense-raw-linux, dualsense-raw-windows)")
-    p.add_argument("--n-blue", type=int, default=6)
-    p.add_argument("--n-yellow", type=int, default=6)
+    p.add_argument("--n-blue", type=int, default=ROSTER_SIZE, help="robots of the blue roster (ids 0..n-1)")
+    p.add_argument("--n-yellow", type=int, default=ROSTER_SIZE, help="robots of the yellow roster")
+    p.add_argument("--n-active", type=int, default=ACTIVE_ROBOTS,
+                   help="robots per team on the field at start (Division B: 6); the rest wait parked outside the "
+                        "walls (Shift+click on the field brings one in, Shift+click on a robot takes it out)")
     p.add_argument("--publish", action="store_true", help="Debug: publish vision through a step-mode SimServer")
     p.add_argument("--no-realtime", action="store_true", help="Bridge: tick the SimServer from the GUI timer")
     p.add_argument("--no-joystick", action="store_true", help="do not probe pygame (keyboard only)")

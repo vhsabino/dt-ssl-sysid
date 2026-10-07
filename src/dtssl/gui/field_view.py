@@ -29,6 +29,8 @@ FIELD_GREEN = QtGui.QColor(34, 120, 52)
 BOUNDARY_GREEN = QtGui.QColor(26, 92, 40)
 LINE_WHITE = QtGui.QColor(245, 245, 245)
 BALL_ORANGE = QtGui.QColor(255, 140, 0)
+PARKED_OPACITY = 0.45                                # robots out of play (parked outside the walls)
+PARK_MARGIN_MM = 500.0                               # view margin beyond the -y wall for the parked robots
 
 
 def _cosmetic_pen(color, width_px: float = 1.0, style=Qt.SolidLine) -> QtGui.QPen:
@@ -50,6 +52,7 @@ class RobotItem(QtWidgets.QGraphicsItem):
         self.ghost = ghost
         self.selected_ = False
         self.has_ball = False
+        self.present = True
         self._path = self._build_path()
         self._label = QtWidgets.QGraphicsSimpleTextItem(str(self.rid), self)
         self._label.setFlag(QtWidgets.QGraphicsItem.ItemIgnoresTransformations, True)
@@ -114,6 +117,14 @@ class RobotItem(QtWidgets.QGraphicsItem):
             self.has_ball = bool(has)
             self.update()
 
+    def set_present(self, present: bool) -> None:
+        """Robots out of play (parked outside the walls by the world) are drawn dimmed."""
+        if present != self.present:
+            self.present = bool(present)
+            if not self.ghost:
+                self.setOpacity(1.0 if self.present else PARKED_OPACITY)
+            self.update()
+
 
 class BallItem(QtWidgets.QGraphicsEllipseItem):
     """Ball (drawn larger than 21.5 mm for visibility); grows and fades when airborne."""
@@ -173,6 +184,8 @@ class FieldView(QtWidgets.QGraphicsView):
     robot_teleport_requested = Signal(float, float)     # x_m, y_m (left click)
     ball_teleport_requested = Signal(float, float)      # x_m, y_m (right click)
     robot_selected = Signal(str, int)                   # Ctrl+click on a robot
+    robot_park_requested = Signal(str, int)             # Shift+click on a robot in play: out, to the bench
+    robot_enter_requested = Signal(float, float)        # Shift+click elsewhere: a parked robot comes in there
 
     def __init__(self, field: FieldGeometry | None = None, robot_radius_m: float = 0.09,
                  dribbler_offset_m: float = 0.075, ball_radius_m: float = 0.0215,
@@ -284,7 +297,8 @@ class FieldView(QtWidgets.QGraphicsView):
     def fit_field(self) -> None:
         if self._field_rect.isNull():
             return
-        self.fitInView(self._field_rect.adjusted(-100, -100, 100, 100), Qt.KeepAspectRatio)
+        # the parked substitutes stand beyond the -y wall (dtssl.sim.entities.park_spot): keep them in view
+        self.fitInView(self._field_rect.adjusted(-100, -PARK_MARGIN_MM, 100, 100), Qt.KeepAspectRatio)
         self._user_zoom = False
 
     # ------------------------------------------------------------------ coordinates
@@ -351,17 +365,16 @@ class FieldView(QtWidgets.QGraphicsView):
 
     def update_state(self, ws: WorldState, selected: tuple[str, int] | None = None,
                      truth_pose: tuple[float, float, float] | None = None, t: float | None = None) -> None:
-        """Move every item to ``ws`` (robots absent from ``ws`` or not present are hidden)."""
+        """Move every item to ``ws`` (robots absent from ``ws`` are hidden; robots not present are drawn dimmed
+        where the world parks them, outside the walls)."""
         seen = set()
         for key, r in ws.robots.items():
             it = self.robot_item(*key)
             seen.add(key)
-            if not r.present:
-                it.setVisible(False)
-                continue
             it.setVisible(True)
+            it.set_present(r.present)
             it.set_pose(r.x, r.y, r.theta)
-            it.set_has_ball(r.has_ball)
+            it.set_has_ball(r.has_ball and r.present)
         for key, it in self.robots.items():
             if key not in seen:
                 it.setVisible(False)
@@ -389,9 +402,11 @@ class FieldView(QtWidgets.QGraphicsView):
             self.truth_robot.setVisible(False)
         self.frames += 1
 
-    def robot_at(self, scene_pt: QPointF) -> tuple[str, int] | None:
+    def robot_at(self, scene_pt: QPointF, present_only: bool = True) -> tuple[str, int] | None:
         for key, it in self.robots.items():
-            if it.isVisible() and (it.pos() - scene_pt).manhattanLength() <= 1.5 * self.robot_radius_mm:
+            if not it.isVisible() or (present_only and not it.present):
+                continue
+            if (it.pos() - scene_pt).manhattanLength() <= 1.5 * self.robot_radius_mm:
                 return key
         return None
 
@@ -437,6 +452,12 @@ class FieldView(QtWidgets.QGraphicsView):
                     key = self.robot_at(pt)
                     if key is not None:
                         self.robot_selected.emit(key[0], key[1])
+                elif ev.modifiers() & Qt.ShiftModifier:       # substitution: out if on a robot, in otherwise
+                    key = self.robot_at(pt)
+                    if key is not None:
+                        self.robot_park_requested.emit(key[0], key[1])
+                    else:
+                        self.robot_enter_requested.emit(x, y)
                 else:
                     self.robot_teleport_requested.emit(x, y)
             elif ev.button() == Qt.RightButton:

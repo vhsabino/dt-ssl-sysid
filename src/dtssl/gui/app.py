@@ -31,6 +31,7 @@ from dtssl.gui.plots import VelocityPlots
 from dtssl.gui.replay import SPEEDS, ReplaySession, list_datasets, list_events, list_labels
 from dtssl.gui.robot_tab import RobotTab
 from dtssl.gui.view3d import View3D
+from dtssl.sim.entities import ACTIVE_ROBOTS, ROSTER_SIZE
 
 log = logging.getLogger(__name__)
 
@@ -90,7 +91,8 @@ def install_excepthook(logger: logging.Logger) -> None:
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, backend: str = "fopdt", mode: str = "debug", team: str = "yellow", *,
-                 bridge_config=None, joy_map=None, n_blue: int = 6, n_yellow: int = 6, publish: bool = False,
+                 bridge_config=None, joy_map=None, n_blue: int = ROSTER_SIZE, n_yellow: int = ROSTER_SIZE,
+                 n_active: int | None = ACTIVE_ROBOTS, publish: bool = False,
                  realtime: bool | None = None, params=None, world_opts: dict | None = None,
                  use_pygame: bool | None = None, autostart: bool = True, view3d: bool = True,
                  cad: bool = True, robot_tab: bool = True, telemetry: bool | None = None,
@@ -98,7 +100,8 @@ class MainWindow(QtWidgets.QMainWindow):
         super().__init__(parent)
         self.setWindowTitle("dtssl gui — SSL digital twin")
         self.controller = Controller(backend=backend, mode=mode, team=team, bridge_config=bridge_config,
-                                     joy_map=joy_map, n_blue=n_blue, n_yellow=n_yellow, publish=publish,
+                                     joy_map=joy_map, n_blue=n_blue, n_yellow=n_yellow, n_active=n_active,
+                                     publish=publish,
                                      realtime=realtime, params=params, world_opts=world_opts,
                                      use_pygame=use_pygame, parent=self)
         c = self.controller
@@ -340,6 +343,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.field_view.robot_teleport_requested.connect(self._on_teleport_robot)
         self.field_view.ball_teleport_requested.connect(self._on_teleport_ball)
         self.field_view.robot_selected.connect(lambda team, rid: c.select((team, rid)))
+        self.field_view.robot_park_requested.connect(self._on_park_robot)
+        self.field_view.robot_enter_requested.connect(self._on_enter_robot)
         self.params_panel.apply_requested.connect(c.apply_params)
         if self.view3d is not None and self.view3d.available:
             self.view3d.preset_changed.connect(lambda n: self.statusBar().showMessage(f"3D camera: {n}", 2000))
@@ -467,6 +472,21 @@ class MainWindow(QtWidgets.QMainWindow):
     def _on_teleport_ball(self, x: float, y: float) -> None:
         if self.controller.teleport_ball(x, y):
             self.log(f"teleport ball -> ({x:.2f}, {y:.2f}) m")
+
+    def _on_park_robot(self, team: str, rid: int) -> None:
+        if self.controller.park_robot((team, rid)):
+            self.field_view.clear_trails()
+            self._refresh_robot_combo()          # the bench is not listed (selection may be unchanged)
+            self.log(f"robot {team} {rid} out: parked outside the field")
+
+    def _on_enter_robot(self, x: float, y: float) -> None:
+        key = self.controller.enter_robot(x, y)
+        if key is None:
+            self.log(f"no parked robot of team {self.controller.team} to bring in")
+            return
+        self.field_view.clear_trails()
+        self._refresh_robot_combo()
+        self.log(f"robot {key[0]} {key[1]} in at ({x:.2f}, {y:.2f}) m")
 
     # ------------------------------------------------------------------ replay UI
     def _fill_datasets(self) -> None:
@@ -653,7 +673,8 @@ def run(args) -> int:
 
         params = load_twin_params(args.theta)
     win = MainWindow(backend=args.backend, mode=args.mode, team=args.team, bridge_config=args.config,
-                     joy_map=args.joy_map, n_blue=args.n_blue, n_yellow=args.n_yellow, publish=args.publish,
+                     joy_map=args.joy_map, n_blue=args.n_blue, n_yellow=args.n_yellow,
+                     n_active=getattr(args, "n_active", ACTIVE_ROBOTS), publish=args.publish,
                      realtime=(False if getattr(args, "no_realtime", False) else None), params=params,
                      world_opts=world_opts, use_pygame=(False if getattr(args, "no_joystick", False) else None),
                      view3d=not getattr(args, "no_3d", False), cad=not getattr(args, "no_cad", False),

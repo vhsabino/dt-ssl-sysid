@@ -87,8 +87,17 @@ def test_fieldview_items_reused_and_trails(qapp):
     assert v.truth_robot is not None and v.truth_robot.isVisible()
     world.set_present("yellow", 0, False)
     v.update_state(world.step(), selected=("blue", 1))
-    assert not v.robots[("yellow", 0)].isVisible() and not v.truth_robot.isVisible()
+    parked = v.robots[("yellow", 0)]                           # drawn dimmed, outside the walls (bench side)
+    px, py, _ = world.park_spot("yellow", 0)
+    assert parked.isVisible() and not parked.present and parked.opacity() == pytest.approx(0.45)
+    assert parked.pos().x() == pytest.approx(px * MM) and parked.pos().y() == pytest.approx(py * MM)
+    assert py < -(world.field.half_width + world.field.boundary_width)
+    assert not v.truth_robot.isVisible()
     assert v.robot_at(QPointF(1.5 * MM + 50.0, -0.5 * MM)) == ("blue", 1)
+    assert v.robot_at(parked.pos()) is None and v.robot_at(parked.pos(), present_only=False) == ("yellow", 0)
+    world.set_present("yellow", 0, True)
+    v.update_state(world.step(), selected=("blue", 1))
+    assert parked.present and parked.opacity() == pytest.approx(1.0)
     v.set_selected(None)
     assert not it.selected_ and len(v.sim_trail.points) == 0
     v.close()
@@ -110,6 +119,17 @@ def test_fieldview_click_signals(qapp):
     target = v.px_from_m(-2.0, -1.0).toPoint()
     QTest.mouseClick(v.viewport(), QtCore.Qt.RightButton, QtCore.Qt.NoModifier, target)
     assert got["ball"] == pytest.approx((-2.0, -1.0), abs=0.02)
+    # Shift+click: on empty field = bring a parked robot in there; on a robot in play = take it out
+    v.robot_enter_requested.connect(lambda x, y: got.__setitem__("enter", (x, y)))
+    v.robot_park_requested.connect(lambda team, rid: got.__setitem__("park", (team, rid)))
+    target = v.px_from_m(0.5, 1.0).toPoint()
+    QTest.mouseClick(v.viewport(), QtCore.Qt.LeftButton, QtCore.Qt.ShiftModifier, target)
+    assert got["enter"] == pytest.approx((0.5, 1.0), abs=0.02) and "park" not in got
+    world = TwinWorld("ideal", n_blue=1, n_yellow=0)
+    world.teleport_robot("blue", 0, -1.0, 0.0, 0.0)
+    v.update_state(world.step())
+    QTest.mouseClick(v.viewport(), QtCore.Qt.LeftButton, QtCore.Qt.ShiftModifier, v.px_from_m(-1.0, 0.0).toPoint())
+    assert got["park"] == ("blue", 0)
     v.close()
 
 
@@ -375,6 +395,35 @@ def test_controller_backend_switch_and_reset(qapp):
     c.teleport_selected(2.0, 1.0)
     c.reset_scene()
     assert c.latest_state().robots[("blue", 0)].x == pytest.approx(-2.25)
+    c.shutdown()
+
+
+def test_controller_roster_substitutions(qapp):
+    """Default world: an 11-robot roster per team, 6 on the field (Division B), 5 parked outside the walls;
+    Shift+click semantics: enter_robot brings the lowest parked id of the joystick team in, park_robot takes one out."""
+    c = Controller(backend="fopdt", mode="debug", team="blue", use_pygame=False)
+    assert (c.n_blue, c.n_yellow, c.n_active) == (11, 11, 6)
+    ws = c.latest_state()
+    assert len(ws.robots) == 22 and len(c.robot_keys()) == 12 and len(c.robot_keys(present=False)) == 10
+    f = c.world.field
+    for key in c.robot_keys(present=False):
+        r = ws.robots[key]
+        assert r.y < -(f.half_width + f.boundary_width) and abs(r.x) < f.half_length   # bench, own half
+        assert (r.x < 0) == (key[0] == "blue")
+    assert c.selected == ("blue", 0)
+    key = c.enter_robot(1.0, -0.5)
+    assert key == ("blue", 6) and c.selected == key
+    r = c.latest_state().robots[key]
+    assert r.present and (r.x, r.y, r.theta) == (1.0, -0.5, 0.0) and len(c.robot_keys("blue")) == 7
+    assert c.park_robot(("blue", 6)) and not c.latest_state().robots[("blue", 6)].present
+    assert c.selected == ("blue", 0) and len(c.robot_keys("blue")) == 6
+    assert not c.park_robot(("blue", 6))                        # already out
+    for _ in range(5):
+        assert c.enter_robot(-1.0, 1.0, team="yellow") is not None
+    assert c.enter_robot(-1.0, 1.0, team="yellow") is None       # the yellow bench is empty
+    assert c.latest_state().robots[("yellow", 10)].theta == pytest.approx(math.pi)
+    c.reset_scene()
+    assert len(c.robot_keys()) == 12 and len(c.robot_keys(present=False)) == 10
     c.shutdown()
 
 

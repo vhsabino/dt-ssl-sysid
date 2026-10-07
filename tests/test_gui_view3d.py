@@ -167,17 +167,26 @@ def test_field_geometry_arrays():
     assert q.n_faces == 8 and q.colors.shape == (8, 4)
 
 
-def test_compute_frame_hides_absent_robots_and_spins_wheels():
+def test_compute_frame_draws_parked_robots_still_and_spins_wheels():
     meshes = S.RobotMeshes.build(WHEEL, RobotSpec(), cad=False)
-    poses = {("blue", 0): S.RobotPose(0.0, 0.0, 0.0, vx=1.0), ("blue", 1): S.RobotPose(1.0, 1.0, 0.0, present=False)}
+    poses = {("blue", 0): S.RobotPose(0.0, 0.0, 0.0, vx=1.0),
+             ("blue", 1): S.RobotPose(1.0, -3.55, 0.0, vx=1.0, present=False)}      # parked outside the walls
     spin = S.WheelSpin(WHEEL)
     fr0 = S.compute_frame(poses, (0.1, 0.2, 0.0), meshes, WHEEL, spin, 0.0)
     fr1 = S.compute_frame(poses, (0.1, 0.2, 0.0), meshes, WHEEL, spin, 1 / 60)
-    assert fr1.hidden == {("blue", 1)} and set(fr1.chassis) == {("blue", 0)} and len(fr1.wheels[("blue", 0)]) == 4
+    assert fr1.hidden == set() and set(fr1.chassis) == {("blue", 0), ("blue", 1)}
+    assert len(fr1.wheels[("blue", 0)]) == 4
     assert not np.allclose(fr0.wheels[("blue", 0)][0], fr1.wheels[("blue", 0)][0])   # the wheel turned
+    np.testing.assert_allclose(fr0.wheels[("blue", 1)][0], fr1.wheels[("blue", 1)][0])   # parked: wheels still
     np.testing.assert_allclose(fr1.chassis[("blue", 0)][:3, 3], [0.0, 0.0, meshes.z_chassis])
+    np.testing.assert_allclose(fr1.chassis[("blue", 1)][:3, 3], [1.0, -3.55, meshes.z_chassis])
     frn = S.compute_frame(poses, (0.0, 0.0, 0.0), meshes, WHEEL, None, 1 / 60)
     np.testing.assert_allclose(frn.wheels[("blue", 0)][0], S.wheel_transform(0.0, 0.0, 0.0, WHEEL, 0, 0.0))
+    frh = S.compute_frame(poses, (0.0, 0.0, 0.0), meshes, WHEEL, None, 1 / 60, show_absent=False)
+    assert frh.hidden == {("blue", 1)} and set(frh.chassis) == {("blue", 0)}
+    apron = S.apron_quads(FieldGeometry(), S.APRON_WIDTH)
+    assert apron.shape == (16, 3) and np.abs(apron[:, 1]).max() == pytest.approx(3.3 + S.APRON_WIDTH)
+    assert S.quad_mesh(apron, S.APRON_RGBA).n_faces == 8
 
 
 # ---------------------------------------------------------------- widget (requires_gui)

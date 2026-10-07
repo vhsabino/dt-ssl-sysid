@@ -184,7 +184,8 @@ class View3D(QtWidgets.QWidget):
             self.view.removeItem(it)
         self._field_items = []
         outer, inner = S.floor_quads(self.field)
-        for corners, rgba in ((outer, S.BOUNDARY_RGBA), (inner, S.FLOOR_RGBA)):
+        apron = S.apron_quads(self.field, S.APRON_WIDTH)          # where the parked substitutes stand
+        for corners, rgba in ((apron, S.APRON_RGBA), (outer, S.BOUNDARY_RGBA), (inner, S.FLOOR_RGBA)):
             q = S.quad_mesh(corners, rgba)
             it = gl.GLMeshItem(vertexes=q.vertices, faces=q.faces, faceColors=q.colors, smooth=False,
                                computeNormals=False, shader=None, glOptions="opaque")
@@ -306,6 +307,7 @@ class View3D(QtWidgets.QWidget):
             return
         meshes = self._robot_meshes()
         poses = {key: S.RobotPose(r.x, r.y, r.theta, r.vx_b, r.vy_b, r.w, r.present) for key, r in ws.robots.items()}
+        # robots out of play are drawn too, parked outside the walls by the world (no ring, wheels still)
         fr = S.compute_frame(poses, (ws.ball.x, ws.ball.y, ws.ball.z), meshes, self.wheel,
                              self._spin if self.spin_wheels else None, dt)
         for key in poses:
@@ -318,7 +320,8 @@ class View3D(QtWidgets.QWidget):
                 continue
             items.set_visible(True)
             p = poses[key]
-            items.apply(fr.chassis[key], fr.wheels[key], S.robot_transform(p.x, p.y, p.theta), key == selected)
+            items.apply(fr.chassis[key], fr.wheels[key], S.robot_transform(p.x, p.y, p.theta),
+                        key == selected and p.present)
         for key, items in self._robots.items():
             if key not in poses:
                 items.set_visible(False)

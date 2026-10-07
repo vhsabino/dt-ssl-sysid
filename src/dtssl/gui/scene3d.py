@@ -61,6 +61,8 @@ MECHANISM_KEYS = ("kicker", "dribbler")      # meshes.json entries drawn with th
 PRIMITIVE_RGBA = (0.24, 0.24, 0.27, 1.0)
 FLOOR_RGBA = (0.13, 0.47, 0.20, 1.0)
 BOUNDARY_RGBA = (0.10, 0.36, 0.16, 1.0)
+APRON_RGBA = (0.22, 0.22, 0.24, 1.0)          # floor outside the walls (parked substitutes)
+APRON_WIDTH = 0.6                             # m beyond the walls
 LINE_RGBA = (0.96, 0.96, 0.96, 1.0)
 BALL_RGBA = (1.0, 0.55, 0.0, 1.0)
 SELECT_RGBA = (1.0, 1.0, 1.0, 0.9)
@@ -288,6 +290,19 @@ class WheelSpin:
 # --------------------------------------------------------------------------------------
 # Field
 # --------------------------------------------------------------------------------------
+def apron_quads(f: FieldGeometry, apron: float) -> np.ndarray:
+    """Frame of 4 quads ``(16, 3)`` at z = 0, ``apron`` wide around the arena (walls): the strip where the parked
+    substitutes stand (:func:`dtssl.sim.entities.park_spot`)."""
+    Lb, Wb = f.half_length + f.boundary_width, f.half_width + f.boundary_width
+    La, Wa = Lb + apron, Wb + apron
+    return np.array([
+        [-La, -Wa, 0.0], [La, -Wa, 0.0], [La, -Wb, 0.0], [-La, -Wb, 0.0],
+        [-La, Wb, 0.0], [La, Wb, 0.0], [La, Wa, 0.0], [-La, Wa, 0.0],
+        [-La, -Wb, 0.0], [-Lb, -Wb, 0.0], [-Lb, Wb, 0.0], [-La, Wb, 0.0],
+        [Lb, -Wb, 0.0], [La, -Wb, 0.0], [La, Wb, 0.0], [Lb, Wb, 0.0],
+    ])
+
+
 def floor_quads(f: FieldGeometry) -> tuple[np.ndarray, np.ndarray]:
     """Floor as non-overlapping rectangles at z = 0 (no coplanar overlap -> no z-fighting): the boundary
     area as a frame of 4 quads ``(16, 3)`` and the playing field ``(4, 3)``."""
@@ -519,14 +534,20 @@ class SceneFrame:
 
 
 def compute_frame(poses: dict[tuple[str, int], RobotPose], ball_xyz: tuple[float, float, float],
-                  meshes: RobotMeshes, wheel: WheelGeometry, spin: WheelSpin | None, dt: float) -> SceneFrame:
+                  meshes: RobotMeshes, wheel: WheelGeometry, spin: WheelSpin | None, dt: float,
+                  show_absent: bool = True) -> SceneFrame:
+    """Transforms of every robot. Robots that are not present are drawn where the world parks them (outside
+    the arena, wheels still) unless ``show_absent`` is False, in which case they go to ``hidden``."""
     fr = SceneFrame(ball=ball_xyz)
     for key, p in poses.items():
-        if not p.present:
+        if not p.present and not show_absent:
             fr.hidden.add(key)
             continue
         fr.chassis[key] = robot_transform(p.x, p.y, p.theta, meshes.z_chassis)
-        angles = spin.advance(key, p.vx, p.vy, p.w, dt) if spin is not None else np.zeros(len(wheel.angles))
+        if p.present and spin is not None:
+            angles = spin.advance(key, p.vx, p.vy, p.w, dt)
+        else:
+            angles = np.zeros(len(wheel.angles))
         fr.wheels[key] = [wheel_transform(p.x, p.y, p.theta, wheel, i, float(angles[i]))
                           for i in range(len(wheel.angles))]
     return fr
@@ -536,9 +557,11 @@ __all__ = [
     "Mesh", "parse_obj", "cad_meshes", "mechanism_meshes", "MECHANISM_KEYS", "d_prism_mesh", "cylinder_mesh",
     "disc_mesh", "merge_meshes",
     "id_plate_mesh", "RobotMeshes", "rot_z", "rot_x", "translate", "robot_transform", "wheel_transform",
-    "WheelSpin", "floor_quads", "quad_mesh", "circle_points", "field_segments", "goal_frames", "RobotPose",
+    "WheelSpin", "floor_quads", "apron_quads", "quad_mesh", "circle_points", "field_segments", "goal_frames",
+    "RobotPose",
     "SceneFrame", "compute_frame", "CAMERA_PRESETS", "CHASSIS_RGBA", "WHEEL_RGBA", "PRIMITIVE_RGBA",
-    "FLOOR_RGBA", "BOUNDARY_RGBA", "LINE_RGBA", "BALL_RGBA", "SELECT_RGBA", "PLATE_Z_OVER_TOP", "LINE_Z",
+    "FLOOR_RGBA", "BOUNDARY_RGBA", "APRON_RGBA", "APRON_WIDTH", "LINE_RGBA", "BALL_RGBA", "SELECT_RGBA",
+    "PLATE_Z_OVER_TOP", "LINE_Z",
     "ROBOT_VIEW_PRESETS", "ROBOT_VIEW_DISTANCE", "AXIS_RGBA", "arcball_point", "axis_angle", "rotation_between",
     "Arcball", "WheelAngles", "robot_part_transforms", "arrow_segments",
 ]
