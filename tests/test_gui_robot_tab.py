@@ -139,9 +139,24 @@ def test_tab_selector_and_view_switch(qapp):
     assert tab2.view3d is None and tab2.view_mode == "2d" and not tab2.view_box.isEnabled()
 
 
+def _wheel_colour(v, i: int) -> np.ndarray:
+    """RGB drawn on wheel ``i``: the mean of the per-face tint (CAD meshes) or the item colour (primitives)."""
+    if v._wheel_mesh.colors is None:
+        return np.asarray(v.wheels[i].opts["color"], dtype=float)[:3]
+    return np.asarray(v.wheels[i].opts["meshdata"].faceColors(), dtype=float)[:, :3].mean(0)
+
+
+def _expected_wheel_colour(v, omega: float) -> np.ndarray:
+    from dtssl.gui.robot_view3d import wheel_face_colors, wheel_rgba
+
+    if v._wheel_mesh.colors is None:
+        return np.asarray(wheel_rgba(omega))[:3]
+    return wheel_face_colors(v._wheel_mesh.colors, omega)[:, :3].mean(0)
+
+
 def test_robot_view3d_records_rotation_and_presets(qapp):
     from dtssl.gui import scene3d as S
-    from dtssl.gui.robot_view3d import RobotView3D, wheel_rgba
+    from dtssl.gui.robot_view3d import RobotView3D, wheel_face_colors, wheel_rgba
 
     v = RobotView3D(hq=False)
     if not v.available:
@@ -154,14 +169,17 @@ def test_robot_view3d_records_rotation_and_presets(qapp):
     v.set_record(_twin(t=1.1), None)
     assert v.frames == 3 and v._plate_key == ("yellow", 2) and v.plate is not None
     np.testing.assert_allclose(v._angles.angles, [0.9, 2 * math.pi - 1.9, 2.9, 2 * math.pi - 3.9], atol=1e-9)
-    assert v.ball.visible() and v.wheels[0].opts["color"] == pytest.approx(wheel_rgba(9.0))
+    assert v.ball.visible()
+    np.testing.assert_allclose(_wheel_colour(v, 0), _expected_wheel_colour(v, 9.0), atol=1e-6)
+    assert not np.allclose(_wheel_colour(v, 0), _expected_wheel_colour(v, 0.0))      # tinted by the speed
     assert "gemeo" in v.info.text() and "+9" in v.info.text()
     # real wheel speeds when chosen and present; twin otherwise
     real = RobotTelemetry(source="real", team="yellow", id=2, t=5.0, wheel_meas=(100.0, 0.0, 0.0, 0.0))
     v.set_wheel_source("real")
     assert v.source_box.currentIndex() == 1
     v.set_record(_twin(t=1.2), real)
-    assert "real" in v.info.text() and v.wheels[0].opts["color"] == pytest.approx(wheel_rgba(100.0))
+    assert "real" in v.info.text()
+    np.testing.assert_allclose(_wheel_colour(v, 0), _expected_wheel_colour(v, 100.0), atol=1e-6)
     v.set_record(_twin(t=1.3), None)
     assert "gemeo" in v.info.text()
     # arcball drag turns the part, presets reset it, keyboard nudges it
@@ -194,6 +212,10 @@ def test_robot_view3d_records_rotation_and_presets(qapp):
     v.set_cad(False)
     assert not v.cad
     assert wheel_rgba(None) == (0.62, 0.62, 0.66, 1.0) and wheel_rgba(-1e9)[2] == pytest.approx(1.0)
+    base = np.array([[0.1, 0.2, 0.3, 1.0], [0.5, 0.5, 0.5, 1.0]])
+    np.testing.assert_array_equal(wheel_face_colors(base, 0.0), base)                # CAD colours at rest
+    np.testing.assert_allclose(wheel_face_colors(base, 1e9)[:, :3], [wheel_rgba(1e9)[:3]] * 2)   # saturates red
+    assert wheel_face_colors(base, -1e9)[0, 2] == pytest.approx(wheel_rgba(-1e9)[2])            # blue backward
     v.close()
 
 

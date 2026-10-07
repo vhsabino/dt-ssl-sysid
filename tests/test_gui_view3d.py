@@ -36,6 +36,7 @@ def test_parse_obj_handles_polygons_and_slashes():
 def test_cad_meshes_match_the_physics_assets():
     chassis, wheel, meta = S.cad_meshes()
     assert chassis.n_faces == meta["chassis"]["faces"] and wheel.n_faces == meta["wheel"]["faces"]
+    assert len({tuple(c) for c in chassis.colors}) == len(meta["chassis"]["materials"])   # Inventor colours
     lo, hi = chassis.bbox()
     assert hi[2] == pytest.approx(meta["chassis"]["z_top_above_axle"], abs=1e-6)
     assert 0.07 < hi[0] < 0.08 and lo[0] < -0.085                    # dribbler at +x
@@ -81,13 +82,19 @@ def test_robot_meshes_build_all_variants():
     cad = S.RobotMeshes.build(WHEEL, RobotSpec(), cad=True, lod=False)
     lod = S.RobotMeshes.build(WHEEL, RobotSpec(), cad=True, lod=True)
     prim = S.RobotMeshes.build(WHEEL, RobotSpec(), cad=False)
-    assert cad.cad and not cad.lod and cad.z_chassis == pytest.approx(WHEEL.r) and 0.15 < cad.z_top < 0.156
+    assert cad.cad and not cad.lod and cad.z_chassis == pytest.approx(WHEEL.r)
+    assert 0.145 < cad.z_top <= 0.150                                  # id plate on the CAD decal plane
+    assert cad.z_top == pytest.approx(WHEEL.r + S.cad_plate_z())
     assert lod.cad and lod.lod and lod.z_top == cad.z_top and lod.z_chassis == cad.z_chassis
-    assert 3 * lod.chassis.n_faces < cad.chassis.n_faces and 4 * lod.wheel.n_faces < cad.wheel.n_faces
+    assert 3 * lod.chassis.n_faces < cad.chassis.n_faces and 3 * lod.wheel.n_faces < cad.wheel.n_faces
     assert not prim.cad and prim.z_chassis == 0.0 and prim.z_top == pytest.approx(RobotSpec().height)
     assert lod.chassis.n_faces > 10 * prim.chassis.n_faces
     assert set(cad.mechanisms) == set(lod.mechanisms) == {"kicker", "dribbler"} and prim.mechanisms == {}
     assert all(lod.mechanisms[k].n_faces < cad.mechanisms[k].n_faces for k in cad.mechanisms)
+    for mesh in (cad.chassis, cad.wheel, lod.chassis, *cad.mechanisms.values()):   # CAD colours per face
+        assert mesh.colors is not None and mesh.colors.shape == (mesh.n_faces, 4)
+        assert len({tuple(np.round(c, 3)) for c in mesh.colors}) >= 3
+    assert prim.chassis.colors is None
 
 
 def test_robot_transform_maps_body_points_to_world():

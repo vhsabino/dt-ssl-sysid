@@ -4,10 +4,11 @@ Everything the :mod:`dtssl.gui.view3d` widget draws is prepared by this module f
 can be unit-tested without a GL context:
 
 * :func:`parse_obj` reads the CAD meshes shipped in ``dtssl.physics.assets`` (the same OBJ files the
-  MuJoCo ``visual="cad"`` mode uses, see ``tools/usd_to_mjcf_meshes.py``; the kicker and dribbler come from
-  ``tools/inventor_export_mechanisms.m`` and are fixed to the chassis, :func:`mechanism_meshes`);
-  :class:`RobotMeshes` also offers the primitive fallback (D-shaped prism + wheel cylinders) when the CAD is
-  not wanted.
+  MuJoCo ``visual="cad"`` mode uses: chassis, wheel, kicker and dribbler tessellated with their Inventor colours
+  by ``tools/inventor_export_cad.m``; the per-part ``usemtl`` groups become per-face colours, so every
+  ``GLMeshItem`` is drawn with ``faceColors``); the kicker and dribbler are fixed to the chassis
+  (:func:`mechanism_meshes`). :class:`RobotMeshes` also offers the primitive fallback (D-shaped prism + wheel
+  cylinders) when the CAD is not wanted.
 * :func:`robot_transform` / :func:`wheel_transform` give the 4x4 matrices of the chassis and of each
   wheel for a pose ``(x, y, theta)`` and the wheel spin angles; :class:`WheelSpin` integrates the spin
   from the body velocity through the inverse kinematics ``omega_i r = -sin(phi_i) vx + cos(phi_i) vy + R w``
@@ -30,7 +31,6 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from dtssl.physics.mjcf import (
-    CAD_MECHANISMS,
     GREEN_RGBA,
     ID_DOT_POS,
     ID_PATTERN,
@@ -38,7 +38,10 @@ from dtssl.physics.mjcf import (
     TEAM_RGBA,
     WheelGeometry,
     cad_meta,
+    cad_plate_z,
     mesh_assets,
+    read_mtl,
+    read_obj,
 )
 from dtssl.sim.world import FieldGeometry, RobotSpec
 
@@ -52,9 +55,9 @@ LINE_Z = 0.003                     # field markings above the floor (avoids z-fi
 PLATE_Z_OVER_TOP = 0.0015          # id plate thickness above the cover (m)
 PLATE_RADIUS = 0.025
 DOT_RADIUS = 0.02
-CHASSIS_RGBA = (0.26, 0.26, 0.29, 1.0)
+CHASSIS_RGBA = (0.26, 0.26, 0.29, 1.0)      # fallback colour of a CAD mesh without materials
 WHEEL_RGBA = (0.62, 0.62, 0.66, 1.0)
-MECHANISM_RGBA = {key: rgba for key, _, rgba in CAD_MECHANISMS}      # kicker (steel), dribbler (dark)
+MECHANISM_KEYS = ("kicker", "dribbler")      # meshes.json entries drawn with the chassis transform
 PRIMITIVE_RGBA = (0.24, 0.24, 0.27, 1.0)
 FLOOR_RGBA = (0.13, 0.47, 0.20, 1.0)
 BOUNDARY_RGBA = (0.10, 0.36, 0.16, 1.0)
@@ -80,44 +83,46 @@ class Mesh:
         return self.vertices.min(0), self.vertices.max(0)
 
 
-def parse_obj(data: bytes | str) -> Mesh:
-    """Minimal Wavefront OBJ reader (``v`` and triangular ``f`` lines; ``f a/b/c`` forms accepted)."""
-    text = data.decode("utf-8") if isinstance(data, bytes) else data
-    verts: list[tuple[float, float, float]] = []
-    faces: list[tuple[int, int, int]] = []
-    for line in text.splitlines():
-        if line.startswith("v "):
-            p = line.split()
-            verts.append((float(p[1]), float(p[2]), float(p[3])))
-        elif line.startswith("f "):
-            idx = [int(tok.split("/")[0]) for tok in line.split()[1:]]
-            for j in range(1, len(idx) - 1):           # fan-triangulate polygons
-                faces.append((idx[0] - 1, idx[j] - 1, idx[j + 1] - 1))
-    return Mesh(np.asarray(verts, dtype=float).reshape(-1, 3), np.asarray(faces, dtype=np.int32).reshape(-1, 3))
+def parse_obj(data: bytes | str, materials: dict[str, tuple[float, float, float]] | None = None,
+              default_rgba=CHASSIS_RGBA) -> Mesh:
+    """Wavefront OBJ reader (``dtssl.physics.mjcf.read_obj``): with ``materials`` (``{usemtl name: (r, g, b)}``,
+    from :func:`dtssl.physics.mjcf.read_mtl`) the ``usemtl`` groups become per-face RGBA colours; a mesh without
+    any material gets ``colors = None`` (drawn with a single colour by the widgets)."""
+    obj = read_obj(data, materials)
+    mesh = Mesh(obj.vertices, obj.faces)
+    if obj.materials and any(mtl for _, mtl, _, _ in obj.groups):
+        cols = np.tile(default_rgba, (len(obj.faces), 1))
+        for _, mtl, a, b in obj.groups:
+            rgb = obj.materials.get(mtl)
+            if rgb is not None:
+                cols[a:b] = (rgb[0], rgb[1], rgb[2], 1.0)
+        mesh.colors = cols
+    return mesh
+
+
+def _asset_mesh(key: str, lod: bool) -> Mesh:
+    meta = cad_meta()
+    assets = mesh_assets()
+    k = f"{key}_lod" if lod and f"{key}_lod" in meta else key
+    entry = meta[k]
+    mtl = read_mtl(assets[entry["mtl"]]) if entry.get("mtl") in assets else None
+    return parse_obj(assets[entry["file"]], mtl)
 
 
 def cad_meshes(lod: bool = False) -> tuple[Mesh, Mesh, dict]:
     """``(chassis, wheel, meta)`` from ``dtssl.physics.assets`` (chassis z origin on the wheel-axle plane,
-    wheel centred on its axle with the axle along +x). ``lod=True`` picks the light pair exported for the
-    GUI (``ssl_*_lod.obj``, ~5x fewer triangles) when the assets have it."""
-    meta = cad_meta()
-    assets = mesh_assets()
-    ck, wk = ("chassis_lod", "wheel_lod") if lod and "chassis_lod" in meta else ("chassis", "wheel")
-    return parse_obj(assets[meta[ck]["file"]]), parse_obj(assets[meta[wk]["file"]]), meta
+    wheel centred on its axle with the axle along +x), with per-face colours. ``lod=True`` picks the light pair
+    exported for the GUI (``ssl_*_lod.obj``, ~4x fewer triangles) when the assets have it."""
+    return _asset_mesh("chassis", lod), _asset_mesh("wheel", lod), cad_meta()
 
 
 def mechanism_meshes(lod: bool = False) -> dict[str, Mesh]:
     """``{"kicker": Mesh, "dribbler": Mesh}`` from ``dtssl.physics.assets`` (same frame as the chassis OBJ: z
-    origin on the wheel-axle plane, so they are drawn with the chassis transform). ``lod=True`` picks the
-    decimated ``ssl_*_lod.obj`` when present. Mechanisms missing from ``meshes.json`` are left out."""
+    origin on the wheel-axle plane, so they are drawn with the chassis transform), with per-face colours.
+    ``lod=True`` picks the decimated ``ssl_*_lod.obj`` when present. Mechanisms missing from ``meshes.json``
+    are left out."""
     meta = cad_meta()
-    assets = mesh_assets()
-    out: dict[str, Mesh] = {}
-    for key, _, _ in CAD_MECHANISMS:
-        k = f"{key}_lod" if lod and f"{key}_lod" in meta else key
-        if k in meta:
-            out[key] = parse_obj(assets[meta[k]["file"]])
-    return out
+    return {key: _asset_mesh(key, lod) for key in MECHANISM_KEYS if key in meta}
 
 
 def d_prism_mesh(radius: float, front: float, z0: float, z1: float, n_arc: int = 40) -> Mesh:
@@ -210,8 +215,8 @@ class RobotMeshes:
     def build(cls, wheel: WheelGeometry, spec: RobotSpec, cad: bool = True, lod: bool = True) -> RobotMeshes:
         if cad:
             chassis, wh, meta = cad_meshes(lod=lod)
-            # the plate sits on the full-resolution cover height (the LOD bbox differs by a few mm)
-            return cls(chassis, wh, wheel.r + float(meta["chassis"]["z_top_above_axle"]), wheel.r, True,
+            # the id plate sits where the CAD has its pattern decals (cover top), not on the bbox top
+            return cls(chassis, wh, wheel.r + cad_plate_z(meta), wheel.r, True,
                        lod and "chassis_lod" in meta, mechanism_meshes(lod=lod))
         chassis = d_prism_mesh(spec.radius, spec.dribbler_offset, 0.008, spec.height)
         wh = cylinder_mesh(wheel.r * 0.92, wheel.hub_half_width)
@@ -528,7 +533,7 @@ def compute_frame(poses: dict[tuple[str, int], RobotPose], ball_xyz: tuple[float
 
 
 __all__ = [
-    "Mesh", "parse_obj", "cad_meshes", "mechanism_meshes", "MECHANISM_RGBA", "d_prism_mesh", "cylinder_mesh",
+    "Mesh", "parse_obj", "cad_meshes", "mechanism_meshes", "MECHANISM_KEYS", "d_prism_mesh", "cylinder_mesh",
     "disc_mesh", "merge_meshes",
     "id_plate_mesh", "RobotMeshes", "rot_z", "rot_x", "translate", "robot_transform", "wheel_transform",
     "WheelSpin", "floor_quads", "quad_mesh", "circle_points", "field_segments", "goal_frames", "RobotPose",

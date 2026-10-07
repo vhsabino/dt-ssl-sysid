@@ -41,6 +41,16 @@ def _qmatrix(m: np.ndarray) -> QtGui.QMatrix4x4:
     return QtGui.QMatrix4x4(*[float(v) for v in np.asarray(m, dtype=float).reshape(16)])
 
 
+def _mesh_kwargs(mesh: S.Mesh, color) -> dict:
+    """``GLMeshItem`` geometry arguments: the per-face CAD colours when the mesh has them, else one ``color``."""
+    kw = dict(vertexes=mesh.vertices, faces=mesh.faces)
+    if mesh.colors is not None:
+        kw["faceColors"] = mesh.colors
+    else:
+        kw["color"] = color
+    return kw
+
+
 class _RobotItems:
     """GL items of one robot: chassis, 4 wheels, kicker and dribbler (CAD only, fixed to the chassis), id plate
     (+ selection ring)."""
@@ -50,11 +60,11 @@ class _RobotItems:
         self.key = key
         opts = dict(smooth=False, computeNormals=True, shader="shaded", drawEdges=False, glOptions="opaque")
         col = S.CHASSIS_RGBA if meshes.cad else S.PRIMITIVE_RGBA
-        self.chassis = gl.GLMeshItem(vertexes=meshes.chassis.vertices, faces=meshes.chassis.faces, color=col, **opts)
-        self.wheels = [gl.GLMeshItem(vertexes=meshes.wheel.vertices, faces=meshes.wheel.faces, color=S.WHEEL_RGBA,
-                                     **opts) for _ in range(4)]
-        self.mechanisms = [gl.GLMeshItem(vertexes=m.vertices, faces=m.faces, color=S.MECHANISM_RGBA[k], **opts)
-                           for k, m in meshes.mechanisms.items()]
+        self.chassis = gl.GLMeshItem(**_mesh_kwargs(meshes.chassis, col), **opts)
+        self.wheels = [gl.GLMeshItem(**_mesh_kwargs(meshes.wheel, S.WHEEL_RGBA), **opts) for _ in range(4)]
+        # kicker and dribbler (CAD only): fixed to the chassis, drawn with its transform and their CAD colours
+        self.mechanisms = [gl.GLMeshItem(**_mesh_kwargs(m, S.CHASSIS_RGBA), **opts)
+                           for m in meshes.mechanisms.values()]
         plate = S.id_plate_mesh(team, rid, meshes.z_top + S.PLATE_Z_OVER_TOP)
         self.plate = gl.GLMeshItem(vertexes=plate.vertices, faces=plate.faces, faceColors=plate.colors, **opts)
         ring = S.circle_points(0.0, 0.0, spec.radius + 0.012, 48, 0.004)

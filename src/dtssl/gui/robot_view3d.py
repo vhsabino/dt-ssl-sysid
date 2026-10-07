@@ -98,6 +98,28 @@ def wheel_rgba(omega: float | None) -> tuple[float, float, float, float]:
     return tuple(c + (h - c) * a for c, h in zip(WHEEL_COLD, hot, strict=True)) + (1.0,)
 
 
+def wheel_face_colors(base: np.ndarray, omega: float | None) -> np.ndarray:
+    """Per-face colours of a CAD wheel tinted by its speed: the CAD colours at rest, blended toward the red
+    (forward) / blue (backward) of :func:`wheel_rgba` as the speed approaches ``WHEEL_MAX_RAD_S``."""
+    out = np.array(base, dtype=float, copy=True)
+    if omega is None or abs(float(omega)) < 1e-9:
+        return out
+    a = min(1.0, abs(float(omega)) / WHEEL_MAX_RAD_S)
+    hot = np.asarray(WHEEL_HOT_FWD if omega >= 0 else WHEEL_HOT_BACK, dtype=float)
+    out[:, :3] += (hot - out[:, :3]) * a
+    return out
+
+
+def _mesh_kwargs(mesh: S.Mesh, color) -> dict:
+    """``GLMeshItem`` geometry arguments: the per-face CAD colours when the mesh has them, else one ``color``."""
+    kw = dict(vertexes=mesh.vertices, faces=mesh.faces)
+    if mesh.colors is not None:
+        kw["faceColors"] = mesh.colors
+    else:
+        kw["color"] = color
+    return kw
+
+
 class _ArcballView(gl.GLViewWidget if gl is not None else object):
     """``GLViewWidget`` whose left drag turns the part (arcball) instead of orbiting the camera."""
 
@@ -254,12 +276,12 @@ class RobotView3D(QtWidgets.QWidget):
         self._shader = _headlight_shader()
         opts = dict(smooth=False, computeNormals=True, shader=self._shader, drawEdges=False, glOptions="opaque")
         col = CHASSIS_RGBA if meshes.cad else PRIMITIVE_RGBA
-        self.chassis = gl.GLMeshItem(vertexes=meshes.chassis.vertices, faces=meshes.chassis.faces, color=col, **opts)
-        self.wheels = [gl.GLMeshItem(vertexes=meshes.wheel.vertices, faces=meshes.wheel.faces, color=S.WHEEL_RGBA,
-                                     **opts) for _ in self.wheel.angles]
-        # kicker and dribbler (CAD only): fixed to the chassis, drawn with its transform
-        self.mechanisms = [gl.GLMeshItem(vertexes=m.vertices, faces=m.faces, color=S.MECHANISM_RGBA[k], **opts)
-                           for k, m in meshes.mechanisms.items()]
+        self.chassis = gl.GLMeshItem(**_mesh_kwargs(meshes.chassis, col), **opts)
+        self.wheels = [gl.GLMeshItem(**_mesh_kwargs(meshes.wheel, S.WHEEL_RGBA), **opts) for _ in self.wheel.angles]
+        self._wheel_mesh = meshes.wheel                   # CAD per-face colours in .colors (None for primitives)
+        self._wheel_tint = [None] * len(self.wheels)      # last speed level drawn per wheel (1/32 steps)
+        # kicker and dribbler (CAD only): fixed to the chassis, drawn with its transform and their CAD colours
+        self.mechanisms = [gl.GLMeshItem(**_mesh_kwargs(m, CHASSIS_RGBA), **opts) for m in meshes.mechanisms.values()]
         self.plate = None
         self._plate_key: tuple[str, int] | None = None
         md = gl.MeshData.sphere(rows=10, cols=16, radius=self.ball_radius)
@@ -414,7 +436,16 @@ class RobotView3D(QtWidgets.QWidget):
         self._ensure_plate((tw.team, tw.id) if tw is not None and tw.team is not None else None)
         speeds = src.wheel_meas if src is not None else None
         for i, it in enumerate(self.wheels):
-            it.setColor(wheel_rgba(None if speeds is None or i >= len(speeds) else speeds[i]))
+            omega = None if speeds is None or i >= len(speeds) else speeds[i]
+            wm = self._wheel_mesh
+            if wm.colors is None:
+                it.setColor(wheel_rgba(omega))
+            else:   # CAD colours tinted by the speed; re-uploaded only when the tint level changes
+                level = None if omega is None else (int(round(32 * min(1.0, abs(float(omega)) / WHEEL_MAX_RAD_S))),
+                                                     omega >= 0)
+                if level != self._wheel_tint[i]:
+                    self._wheel_tint[i] = level
+                    it.setMeshData(vertexes=wm.vertices, faces=wm.faces, faceColors=wheel_face_colors(wm.colors, omega))
         self.ball.setVisible(bool(tw is not None and tw.has_ball))
         if tw is not None:
             self.arrow_cmd.setData(pos=S.arrow_segments(tw.cmd_vx or 0.0, tw.cmd_vy or 0.0, self._top_z() + 0.03,
@@ -493,4 +524,4 @@ class RobotView3D(QtWidgets.QWidget):
             self._timer.stop()
 
 
-__all__ = ["RobotView3D", "wheel_rgba", "GL_IMPORT_ERROR"]
+__all__ = ["RobotView3D", "wheel_rgba", "wheel_face_colors", "GL_IMPORT_ERROR"]
