@@ -35,6 +35,10 @@ def add_serve_arguments(p: argparse.ArgumentParser) -> None:
     p.add_argument("--bind-ip", default=None, help="bind address of the control sockets (default 0.0.0.0)")
     p.add_argument("--n-blue", type=int, default=None)
     p.add_argument("--n-yellow", type=int, default=None)
+    p.add_argument("--field", default=None, metavar="divB|divA|FILE",
+                   help="field geometry: SSL division preset (divB 9 x 6 m, divA 12 x 9 m) or a field JSON in mm; "
+                        "published in the geometry packet. Without --n-blue/--n-yellow the division's robots per "
+                        "team (6 / 11) are spawned. Default: config/field_divB.json")
     p.add_argument("--duration", type=float, default=None, help="stop after S seconds (default: run until Ctrl-C)")
     p.add_argument("--no-realtime", action="store_true", help="step as fast as possible (no sleeping)")
     p.add_argument("--speed", type=float, default=None, help="simulation speed factor (real-time mode)")
@@ -52,6 +56,15 @@ def build_world_from_args(args, cfg):
     from dtssl.sim.backends import make_world
 
     opts: dict = {"n_blue": cfg.sim.n_blue, "n_yellow": cfg.sim.n_yellow}
+    if getattr(args, "field", None):
+        from dtssl.config import load_field_preset
+
+        preset = load_field_preset(args.field)
+        opts["field"] = preset.field
+        if getattr(args, "n_blue", None) is None:
+            opts["n_blue"] = preset.robots_per_team
+        if getattr(args, "n_yellow", None) is None:
+            opts["n_yellow"] = preset.robots_per_team
     if getattr(args, "saturate", False):
         opts["saturate"] = True
     if getattr(args, "deadzone", False):

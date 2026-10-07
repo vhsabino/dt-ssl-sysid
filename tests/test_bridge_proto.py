@@ -239,3 +239,33 @@ def test_recorder_matches_log_contract():
     assert C["move_x"].dtype == np.float64 and C["robot_id"].dtype == np.int64
     assert R["position_x"].iloc[-1] == pytest.approx(world.state().robots[("blue", 0)].x * 1000.0)
     assert R["velocity_norm"].iloc[-1] == pytest.approx(1000.0)      # mm/s
+
+
+def test_serve_field_option_builds_the_division_world_and_geometry_packet():
+    """``dtssl serve --field divA``: Division A geometry in the world (and so in the geometry packet) and the
+    division's 11 robots per team unless --n-blue/--n-yellow say otherwise; without --field nothing changes."""
+    import argparse
+
+    from dtssl.bridge.cli import add_serve_arguments, build_world_from_args
+
+    ap = argparse.ArgumentParser()
+    add_serve_arguments(ap)
+    cfg = BridgeConfig.load()
+    args = ap.parse_args(["--field", "divA", "--no-realtime"])
+    w = build_world_from_args(args, cfg.with_overrides(n_blue=args.n_blue, n_yellow=args.n_yellow))
+    assert w.field.length == 12.0 and w.field.goal_width == 1.8
+    ws = w.state()
+    assert len(ws.robots_of("blue")) == len(ws.robots_of("yellow")) == 11
+    pkt = VisionPublisher(VisionConfig(), w.field, open_socket=False).build_packet(ws, with_geometry=True)
+    assert pkt.geometry.field.field_length == 12000 and pkt.geometry.field.goal_width == 1800
+    assert pkt.geometry.field.penalty_area_width == 3600 and len(pkt.detection.robots_blue) == 11
+    w.close()
+    args = ap.parse_args(["--field", "divA", "--n-blue", "3"])
+    w = build_world_from_args(args, cfg.with_overrides(n_blue=args.n_blue, n_yellow=args.n_yellow))
+    ws = w.state()
+    assert (len(ws.robots_of("blue")), len(ws.robots_of("yellow"))) == (3, 11)
+    w.close()
+    args = ap.parse_args([])
+    w = build_world_from_args(args, cfg)
+    assert w.field.length == 9.0 and len(w.state().robots_of("blue")) == cfg.sim.n_blue
+    w.close()

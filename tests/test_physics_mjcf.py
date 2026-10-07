@@ -103,6 +103,52 @@ def test_ik_matrix_matches_spec_formula_and_kinematics_module():
     assert np.allclose(M, kin.body_to_wheel_matrix(wheel.to_robot_geometry()))
 
 
+def test_field_xml_follows_the_division_a_geometry():
+    """``config/field_divA.json`` through the same fragment: goals 1.8 m wide at x = +-6 m, walls at +-6.3 / +-4.8."""
+    from dtssl.config import load_field_preset
+
+    fld = load_field_preset("divA").field
+    root = ET.fromstring(mjcf.build_field_xml(fld, boundary=True))
+    geoms = {g.get("name"): g for g in root.iter("geom") if g.get("name")}
+    bodies = {b.get("name"): b for b in root.iter("body") if b.get("name")}
+    gx = [float(v) for v in bodies["goal_right"].get("pos").split()]
+    assert gx[0] == pytest.approx(6.0 + 0.18 / 2)                                   # goal body centred on its depth
+    top = [float(v) for v in geoms["goal_right_top"].get("pos").split()]
+    assert top[1] == pytest.approx(0.9 + 0.01)                                      # half the 1.8 m goal + wall/2
+    wx = [float(v) for v in geoms["wall_xpos"].get("pos").split()]
+    wy = [float(v) for v in geoms["wall_ypos"].get("pos").split()]
+    assert wx[0] == pytest.approx(6.3 + 0.01) and wy[1] == pytest.approx(4.8 + 0.01)
+    pen = [float(v) for v in geoms["pen_right_front"].get("pos").split()]
+    assert pen[0] == pytest.approx(6.0 - 1.8)                                       # 3.6 x 1.8 m defense area
+    assert float(geoms["pen_right_front"].get("size").split()[1]) == pytest.approx(1.8 + 0.005)
+
+
+def test_mjcf_cli_field_option_writes_the_division_a_model(tmp_path):
+    """``dtssl mjcf --route a --field divA``: Division A fragment, the division's 11 robots per team, file names
+    suffixed with the preset; without ``--field`` the Division B files keep their names and 6 per team."""
+    import argparse
+
+    from dtssl.physics.cli import _add_arguments, write_models
+
+    ap = argparse.ArgumentParser()
+    _add_arguments(ap)
+    args = ap.parse_args(["--route", "a", "--field", "divA"])
+    assert (args.field, args.n_blue) == ("divA", None)
+    written = write_models("a", tmp_path, field=args.field)
+    assert [p.name for p in written] == ["ssl_route_a_divA.xml", "ssl_route_a_divA.md"]
+    root = ET.fromstring(written[0].read_text(encoding="utf-8").split("\n", 1)[1])
+    geoms = {g.get("name"): g for g in root.iter("geom") if g.get("name")}
+    assert float(geoms["wall_xpos"].get("pos").split()[0]) == pytest.approx(6.3 + 0.01)
+    robots = [b.get("name") for b in root.iter("body") if b.get("name", "").startswith(("blue_", "yellow_"))
+              and b.get("name", "").count("_") == 1]
+    assert len(robots) == 22 and "--field divA" in written[0].read_text(encoding="utf-8").split("\n", 1)[0]
+    written = write_models("a", tmp_path, n_blue=2, n_yellow=0)
+    assert [p.name for p in written] == ["ssl_route_a.xml", "ssl_route_a.md"]
+    root = ET.fromstring(written[0].read_text(encoding="utf-8").split("\n", 1)[1])
+    geoms = {g.get("name"): g for g in root.iter("geom") if g.get("name")}
+    assert float(geoms["wall_xpos"].get("pos").split()[0]) == pytest.approx(4.8 + 0.01)
+
+
 def test_loaders_read_config_files():
     fld = mjcf.load_field_geometry()
     assert isinstance(fld, FieldGeometry) and fld.length == 9.0 and fld.goal_depth == pytest.approx(0.18)

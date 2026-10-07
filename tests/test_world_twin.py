@@ -329,3 +329,36 @@ def test_default_scene_spacing_keeps_robots_inside_field_without_overlap():
         assert abs(xs[i][0]) < 4.5 and abs(xs[i][1]) < 3.0
         for j in range(i + 1, len(xs)):
             assert math.hypot(xs[j][0] - xs[i][0], xs[j][1] - xs[i][1]) >= 2 * w.spec.radius
+
+
+def test_division_a_field_fits_the_full_roster_and_builds_its_goals_and_walls():
+    """``config/field_divA.json`` (12 x 9 m, goal 1.8 m): 11 robots per team on the field without overlap, walls
+    and goal walls at the Division A positions, substitutes (if any) parked beyond the wider arena."""
+    from dtssl.config import load_field_preset
+
+    preset = load_field_preset("divA")
+    f = preset.field
+    assert preset.robots_per_team == 11 and (f.length, f.width, f.goal_width) == (12.0, 9.0, 1.8)
+    w = TwinWorld("ideal", n_blue=11, n_yellow=11, field=f, n_active=preset.robots_per_team)
+    ws = w.step()
+    assert len(ws.robots) == 22 and all(r.present for r in ws.robots.values())
+    pts = [(r.x, r.y) for r in ws.robots.values()]
+    for i, (x, y) in enumerate(pts):
+        assert abs(x) < f.half_length and abs(y) < f.half_width
+        for j in range(i + 1, len(pts)):
+            assert math.hypot(pts[j][0] - x, pts[j][1] - y) >= 2 * w.spec.radius
+    R = w.spec.radius
+    w.teleport_robot("blue", 0, 5.5, 0.3, 0.0)                  # into the right goal mouth (|y| < 0.9)
+    w.teleport_robot("blue", 1, 5.5, 2.5, 0.0)                  # beside the goal: stops at the arena wall
+    for _ in range(120):
+        w.set_command("blue", 0, RobotCmd(vx=1.5))
+        w.set_command("blue", 1, RobotCmd(vx=1.5))
+        ws = w.step()
+    x_goal_back = f.half_length + f.goal_depth - GOAL_WALL_THICKNESS - R
+    assert ws.robots[("blue", 0)].x == pytest.approx(x_goal_back, abs=1e-6) and x_goal_back > 6.0
+    assert ws.robots[("blue", 1)].x == pytest.approx(f.half_length + f.boundary_width - R, abs=1e-6)
+    # a Division A world with the Division B roster rule parks 5 per team beyond the -y wall of the wider arena
+    w2 = TwinWorld("ideal", n_blue=11, n_yellow=11, field=f, n_active=6)
+    parked = [r for r in w2.state().robots.values() if not r.present]
+    assert len(parked) == 10 and all(r.y < -(f.half_width + f.boundary_width) for r in parked)
+    assert all(abs(r.x) < f.half_length for r in parked)

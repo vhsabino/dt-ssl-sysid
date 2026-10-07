@@ -237,6 +237,32 @@ def test_registry_state_teleport(name):
     w.close()
 
 
+def test_division_a_world_hosts_the_full_roster():
+    """The Division A preset through ``make_world(field=...)``: 22 robots in play inside the 12 x 9 m field, goal
+    and boundary walls at the Division A positions."""
+    from dtssl.config import load_field_preset
+    from dtssl.sim.backends import make_world
+
+    preset = load_field_preset("divA")
+    w = make_world("mujoco-velocity", n_blue=11, n_yellow=11, n_active=preset.robots_per_team, field=preset.field,
+                   watchdog_clock="sim")
+    ws = w.step()
+    f = w.field
+    assert f.length == 12.0 and f.goal_width == 1.8 and len(ws.robots) == 22
+    assert all(r.present and abs(r.x) < f.half_length and abs(r.y) < f.half_width for r in ws.robots.values())
+    m = w.model
+    assert m.geom("wall_xpos").pos[0] == pytest.approx(6.3 + 0.01)
+    assert m.geom("wall_ypos").pos[1] == pytest.approx(4.8 + 0.01)
+    assert m.body("goal_right").pos[0] == pytest.approx(6.0 + 0.09)
+    w.teleport_robot("blue", 0, 5.9, 0.3, 0.0)                  # drives into the goal mouth and is held by its back
+    for _ in range(90):
+        w.set_command("blue", 0, RobotCmd(vx=1.0))
+        ws = w.step()
+    x = ws.robots[("blue", 0)].x
+    assert 6.0 < x < f.half_length + f.goal_depth - w.spec.radius + 0.01
+    w.close()
+
+
 def test_watchdog_zeroes_stale_command():
     w = _world("a", [RobotSpawn("blue", 0, 0.0, 0.0, 0.0)])
     w.set_command("blue", 0, RobotCmd(vx=1.0))
