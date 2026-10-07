@@ -21,7 +21,8 @@ o loader/rollout/métricas e os backends foram usados **como estão**.
 
 ```
 dtssl gui [--backend fopdt|ideal|mujoco-velocity|mujoco-rollers] [--mode debug|bridge|replay] [--team yellow]
-          [--config config/bridge.json] [--joy-map arquivo.json|preset] [--n-blue 6 --n-yellow 6]
+          [--config config/bridge.json] [--joy-map arquivo.json|preset] [--field divB|divA|FILE]
+          [--n-blue 11 --n-yellow 11] [--n-active N]
           [--publish] [--no-realtime] [--no-joystick] [--theta θ.json] [--saturate] [--deadzone]
           [--dataset ID --label L --event E] [-v]
 python -m dtssl.gui ...
@@ -300,10 +301,11 @@ Pedido do Victor em 07/10: 11 robôs por time, com os inativos fora das bordas p
 traves e bordas no modo debug. O lado do mundo está em `docs/refactor_notes/bridge.md` (seção de 07/10: `park_spot`,
 `Scene.default(n_active=...)`, gols sólidos no `TwinWorld`); aqui só o que a GUI faz com isso.
 
-- **Defaults**: `Controller(n_blue=ROSTER_SIZE, n_yellow=ROSTER_SIZE, n_active=ACTIVE_ROBOTS)` e `MainWindow` idem;
-  `dtssl gui --n-blue 11 --n-yellow 11 --n-active 6` é o novo padrão (Divisão B: 6 em campo, 5 no banco de cada
-  time). `--n-blue 6 --n-yellow 6` reproduz a configuração antiga sem ninguém no banco. Vale para todos os
-  backends (`_make_world` passa `n_active`), e a troca de backend ou o `reset` recoloca cada um na vaga.
+- **Defaults**: `Controller(n_blue=ROSTER_SIZE, n_yellow=ROSTER_SIZE)` e `MainWindow` idem; o número em campo
+  segue a divisão do campo (6 na Div B, 11 na Div A; seção seguinte) e `--n-active N` fixa outro número. O padrão
+  (`dtssl gui`) é a Divisão B com 6 em campo e 5 no banco de cada time; `--n-blue 6 --n-yellow 6` reproduz a
+  configuração antiga sem ninguém no banco. Vale para todos os backends (`_make_world` passa `n_active`), e a
+  troca de backend ou o `reset` recoloca cada um na vaga.
 - **Campo 2D** (`field_view.py`): as reservas são desenhadas na vaga, além da parede de −y, com opacidade
   `PARKED_OPACITY = 0,45` (`RobotItem.set_present`), sem marcador de bola; `fit_field` reserva `PARK_MARGIN_MM = 500`
   abaixo da arena para o banco caber. `robot_at(pt, present_only=True)` ignora o banco, então Ctrl+clique e as
@@ -325,6 +327,45 @@ traves e bordas no modo debug. O lado do mundo está em `docs/refactor_notes/bri
   Shift+clique; `test_controller_roster_substitutions`: 22 robôs, 12 presentes, 10 no banco no próprio lado,
   `enter_robot`/`park_robot`, banco amarelo esvazia depois de 5 entradas, `reset_scene` restaura) e
   `tests/test_gui_view3d.py` (reserva desenhada com rodas paradas, avental).
+
+## Seletor de campo Div A / Div B (07/10/2026)
+
+Pedido do Victor em 07/10: uma caixa de seleção para escolher entre os campos das Divisões A e B na execução de
+debug, com 6 robôs de cada lado na B e 11 na A, e verificar em que modos faz sentido ter os dois campos.
+
+- **Presets** (`dtssl.config`): `FieldPreset(name, label, path, field, robots_per_team)`, `FIELD_PRESETS`
+  (`divB` = `config/field_divB.json`, default e divisão do RobôCIn; `divA` = `config/field_divA.json`, novo),
+  `load_field_preset("divA" | "A" | "Division A" | caminho de um JSON em mm)` e `field_presets()`. A chave
+  `robots_per_team` do JSON (6 e 11, os máximos do livro de regras por divisão) é lida só pela GUI e pelas CLIs; a
+  `FieldGeometry` e o pacote de geometria a ignoram. Div A no JSON: 12 × 9 m, gol 1,8 × 0,18 m, área de defesa
+  3,6 × 1,8 m, marca de pênalti a 8 m, círculo central r 0,5 m, linhas 10 mm, `boundary_width` 300 (as regras dão
+  0,3 m nas laterais e 0,6 m atrás dos gols; o `SSL_GeometryFieldSize` só tem um valor, então 0,3 m em volta).
+  Conferido no livro de regras da SSL em 07/10/2026 (seção Field Setup).
+- **Controller**: `field: FieldPreset | str | Path` no construtor (`--field`), `field_preset`, `field_name`,
+  `n_active` virou propriedade (`robots_per_team` do preset, ou o `--n-active` fixado em `n_active_pinned`),
+  `set_field(preset)` reconstrói o mundo na nova geometria como `set_backend` faz (θ preservado, elenco
+  reposicionado pelo `Scene.default` com o `n_active` da divisão, servidor reiniciado se estava ligado, mundo antigo
+  mantido se a construção falhar) e emite `field_changed(name)`. Um preset inválido ou arquivo ausente vira
+  mensagem no Log, sem trocar nada.
+- **Toolbar**: combo `field` (`Div B`, `Div A`; um `--field` com JSON próprio aparece com o nome do arquivo) ao lado
+  do backend. Ao trocar: campo 2D e 3D redesenhados (`FieldView.set_field`, `View3D.set_field`, que já escala a
+  câmera pelo comprimento do campo), rastros e plots limpos, combos de robô refeitos (6 ou 11 por time), Log com
+  `field: Div A (12 x 9 m): 22 robots on the field (11 per team), 0 parked`.
+- **Em que modos vale**: **Debug** (o uso pedido: mundo local, colisões nas paredes e gols do campo escolhido) e
+  **Bridge** (o campo vai no pacote de geometria da visão, então a estratégia externa recebe 12 × 9 m e 11 robôs
+  por time; a troca reinicia o `SimServer` e o primeiro quadro já leva a nova geometria; o lado da estratégia
+  precisa estar configurado para a mesma divisão, o ssl-unification tem o seu próprio número de robôs). **Replay**
+  não: os eventos do dataset são logs do RobôCIn gravados em campos da Divisão B, e o campo é propriedade dos dados;
+  o combo fica desabilitado e as vistas desenham a Divisão B (`app.REPLAY_FIELD`), voltando ao campo do mundo ao
+  sair do Replay. O mesmo preset serve ao `dtssl serve --field divA` (geometria publicada e 11 × 11 sem
+  `--n-blue/--n-yellow`) e ao `dtssl mjcf --field divA` (modelo e viewer na Divisão A, arquivos `ssl_route_<r>_divA.*`).
+- CLI: `dtssl gui [--field divB|divA|FILE] [--n-active N]` (`--n-active` sem default: segue a divisão).
+- Testes: `tests/test_paths.py` (presets e aliases, JSON próprio, arquivo ausente), `tests/test_gui_window.py`
+  (`test_controller_field_switch_follows_the_division`: B → A → B, 22 em campo na A e 12 + 10 no banco na B, gols
+  no lugar novo, `reset_scene`, preset quebrado, `--n-active` fixo; `test_window_field_box_switches_the_world_and_replay_draws_div_b`:
+  combo, vistas, combos de robô, Replay desabilita e desenha a B, `--field divA` na abertura), `tests/test_world_twin.py`,
+  `tests/test_physics_world.py`, `tests/test_physics_mjcf.py` e `tests/test_bridge_proto.py` (mundo, MJCF, pacote de
+  geometria e CLIs na Divisão A).
 
 ## Correção 03/09/2026 — `ZeroDivisionError` do pyqtgraph ao trocar de robô
 

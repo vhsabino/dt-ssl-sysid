@@ -58,9 +58,11 @@ Dados (`data/extracted/<dataset>/splits/<label>/<evento>/*.parquet`) são gerenc
 
 ```bash
 dtssl gui [--no-3d | --no-cad] [--telemetry]   # interface: campo 2D + aba 3D com o CAD + aba Robot (robô em 3D girável, telemetria;
-                                            #   --telemetry lê o Feedback dos robôs reais pelo rádio), plots cmd×estado,
-                                            #   editor de θ; modos Debug (DualSense/teclado), Bridge (ssl-unification), Replay
-dtssl serve [--backend fopdt|ideal|mujoco-velocity|mujoco-rollers] [--n-blue 6 --n-yellow 6] [--record DIR]
+          [--field divB|divA] [--n-active N]  #   --telemetry lê o Feedback dos robôs reais pelo rádio), plots cmd×estado,
+                                            #   editor de θ; modos Debug (DualSense/teclado), Bridge (ssl-unification), Replay;
+                                            #   combo de campo Div B (9 x 6 m, 6 por time em campo) / Div A (12 x 9 m, 11 por time),
+                                            #   elenco de 11 por time com as reservas estacionadas fora das paredes (Shift+clique substitui)
+dtssl serve [--backend fopdt|ideal|mujoco-velocity|mujoco-rollers] [--field divB|divA] [--n-blue 6 --n-yellow 6] [--record DIR]
                                             # servidor ssl-simulation-protocol: visão 224.5.23.2:10006, controle
                                             #   10301 (blue) / 10302 (yellow), SimulatorCommand 10300 (config/bridge.json)
 dtssl fake-strategy --team yellow --target 1 0.5        # cliente de fumaça que emula a estratégia
@@ -69,7 +71,7 @@ dtssl gate twin-vs-ideal | twin-vs-rsim [--mode A|B]    # gate estatístico do h
 dtssl analysis list | run <nome> | info <nome>          # cada número do artigo = um módulo de dtssl.analysis
 dtssl fig <nome>                                        # figuras do artigo
 dtssl etl extract|split|rotate|inspect                  # .log.gz (protobuf) -> parquet no contrato dos logs
-dtssl mjcf --route a|b [--view --demo] [--visual cad]   # gera/visualiza os modelos MuJoCo (--visual cad: malhas do CAD)
+dtssl mjcf --route a|b [--field divB|divA] [--view --demo] [--visual cad]   # gera/visualiza os modelos MuJoCo (--visual cad: malhas do CAD)
 dtssl cache-convert <pkl> <npz>  ·  dtssl proto-build   ·  dtssl release
 ```
 
@@ -101,7 +103,8 @@ dtssl analysis run protocol_holdout --kw sims=grsim delay=both   # o mesmo, com 
 ```
 pyproject.toml            pacote dtssl (src-layout); extras gui/mujoco/rsim/etl/mat/dev
 config/                   twin_params.json (θ oficial), metrics.json, holdout_events.json, robot_geometry.json,
-                          robot_limits.json, field_divB.json, bridge.json, external_sims.json, ssl_robot.sldd (SLDD do Simulink)
+                          robot_limits.json, field_divB.json e field_divA.json (campos das divisões B e A), bridge.json,
+                          external_sims.json, ssl_robot.sldd (SLDD do Simulink)
 src/dtssl/                paths, config, units, geometry, kinematics, cli
   data/                   schema, resample, loader, validate, splits, recordio, extract, rotate (+ _proto/)
   models/                 params (θ), Plant, AnalyticFOPDTPlant, IdealKinematicPlant, ConstantVelocity, RSimReplay
