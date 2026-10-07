@@ -40,6 +40,15 @@ def test_assets_present_and_meta_consistent():
         assert nf < meta[key]["faces_source"]                   # decimated
     assert meta["chassis_lod"]["faces"] < 0.4 * meta["chassis"]["faces"]     # GUI LOD: exterior only
     assert meta["wheel_lod"]["faces"] < 0.25 * meta["wheel"]["faces"]
+    for key, _, _ in mjcf.CAD_MECHANISMS:                          # kicker/dribbler: from the Inventor assembly
+        for k in (key, f"{key}_lod"):
+            p = mjcf.ASSET_DIR / meta[k]["file"]
+            assert p.is_file(), p
+            nv, nf, _ = _obj_stats(p)
+            assert nv == meta[k]["vertices"] and nf == meta[k]["faces"] and nf <= meta[k]["faces_source"]
+            assert hashlib.md5(p.read_bytes()).hexdigest() == meta[k]["md5"], f"{p.name} changed: re-register"
+            assert "robot_v2025_v3.iam" in meta[k]["source"][1] and key in meta[k]["source"][1].lower()
+        assert meta[f"{key}_lod"]["faces"] < 0.4 * meta[key]["faces"]
     assert set(mjcf.mesh_assets()) == set(OBJ_FILES)
     for f in OBJ_FILES:
         assert mjcf.mesh_assets()[f] == (mjcf.ASSET_DIR / f).read_bytes()
@@ -96,6 +105,45 @@ def test_chassis_lod_is_the_exterior_of_the_full_mesh():
     assert lod.min(0)[2] >= full.min(0)[2] - 0.005
 
 
+def test_mechanism_meshes_sit_in_the_chassis_mouth():
+    """Kicker and dribbler (occurrences of robot_v2025_v3.iam, tessellated in the assembly frame): same body
+    frame as the chassis OBJ (z origin on the wheel-axle plane). The dribbler spans the open mouth at the front,
+    the kicker lies on the body x axis behind it; nothing reaches below the floor."""
+    meta = mjcf.cad_meta()
+    r = mjcf.WheelGeometry().r
+    _, _, drib = _obj_stats(mjcf.ASSET_DIR / meta["dribbler"]["file"])
+    lo, hi = drib.min(0), drib.max(0)
+    assert 0.045 < lo[0] and 0.076 < hi[0] < 0.085               # at the front; a few mm proud of the 76.5 mm face
+    assert abs(hi[1] + lo[1]) < 0.004 and 0.095 < hi[1] - lo[1] < 0.105    # ~100 mm wide, centred on x
+    assert lo[2] + r > 0.0 and hi[2] + r < 0.080                   # above the floor, motor below the cover
+    _, _, kick = _obj_stats(mjcf.ASSET_DIR / meta["kicker"]["file"])
+    lo, hi = kick.min(0), kick.max(0)
+    assert abs(hi[1] + lo[1]) < 0.002 and hi[1] - lo[1] < 0.060    # centred, 57 mm wide (striking plate)
+    assert -0.088 < lo[0] and hi[0] < 0.0765                       # inside the chassis, head behind the front face
+    assert lo[2] + r > 0.0
+
+
+def test_mechanism_features_from_the_part_boxes():
+    """The exporter writes one box per part in the OBJ header; meshes.json derives the dribbler bar axis and the
+    kicker plunger axes from them (metres, body frame, z from the axle plane)."""
+    meta = mjcf.cad_meta()
+    feats = meta["dribbler"].get("features", {})
+    if "dribbler_bar" not in feats:
+        pytest.skip("mechanism OBJ without part boxes in the header")
+    r = mjcf.WheelGeometry().r
+    bar = feats["dribbler_bar"]
+    assert bar["axis"] == "y" and abs(bar["centre"][1]) < 0.002 and 0.070 < bar["length"] < 0.075
+    assert 0.0055 < bar["radius"] < 0.0075 and 0.065 < bar["centre"][0] < 0.080
+    assert 0.035 < bar["centre"][2] + r < 0.050                     # bar axis 36-50 mm above the floor
+    assert meta["dribbler_lod"]["features"] == feats
+    kf = meta["kicker"]["features"]
+    flat, chip = kf["kicker_flat_plunger"], kf["kicker_chip_plunger"]
+    for pl in (flat, chip):
+        assert pl["axis"] == "x" and abs(pl["centre"][1]) < 0.002 and 0.004 < pl["radius"] < 0.006
+    assert chip["centre"][2] < flat["centre"][2]                     # chip plunger under the flat one
+    assert 0.010 < chip["centre"][2] + r < 0.025 and 0.030 < flat["centre"][2] + r < 0.045
+
+
 @pytest.mark.parametrize("route", ["a", "b"])
 def test_cad_xml_adds_visual_only_geoms_and_hides_primitives(route):
     scene = Scene(robots=[RobotSpawn("blue", 2, 0.0, 0.0, 0.0), RobotSpawn("yellow", 5, 1.0, 0.0, math.pi)])
@@ -104,15 +152,20 @@ def test_cad_xml_adds_visual_only_geoms_and_hides_primitives(route):
     assert not mjcf.uses_cad(xml_p) and mjcf.uses_cad(xml_c)
     root = ET.fromstring(xml_c)
     meshes = {m.get("name"): m.get("file") for m in root.iter("mesh") if m.get("file")}
-    assert meshes == {mjcf.CAD_CHASSIS_MESH: "ssl_chassis.obj", mjcf.CAD_WHEEL_MESH: "ssl_wheel.obj"}
+    assert meshes == {mjcf.CAD_CHASSIS_MESH: "ssl_chassis.obj", mjcf.CAD_WHEEL_MESH: "ssl_wheel.obj",
+                      mjcf.CAD_KICKER_MESH: "ssl_kicker.obj", mjcf.CAD_DRIBBLER_MESH: "ssl_dribbler.obj"}
     cad_geoms = [g for g in root.iter("geom") if g.get("mesh") in meshes]
-    assert len(cad_geoms) == 2 * 5                           # per robot: chassis + 4 wheels
+    assert len(cad_geoms) == 2 * 7                           # per robot: chassis + 4 wheels + kicker + dribbler
     for g in cad_geoms:
         assert g.get("contype") == "0" and g.get("conaffinity") == "0" and g.get("mass") == "0"
     wheel = mjcf.WheelGeometry()
-    chassis = [g for g in cad_geoms if g.get("mesh") == mjcf.CAD_CHASSIS_MESH]
-    for g in chassis:
+    fixed = [g for g in cad_geoms if g.get("mesh") in (mjcf.CAD_CHASSIS_MESH, mjcf.CAD_KICKER_MESH,
+                                                        mjcf.CAD_DRIBBLER_MESH)]
+    assert len(fixed) == 3 * 2
+    for g in fixed:                                           # mechanisms share the chassis frame and offset
         assert [float(v) for v in g.get("pos").split()] == pytest.approx([0.0, 0.0, wheel.r])
+    names = {g.get("name") for g in fixed}
+    assert {"blue_2_cad_kicker", "blue_2_cad_dribbler", "yellow_5_cad_chassis"} <= names
     wheels = [g for g in cad_geoms if g.get("mesh") == mjcf.CAD_WHEEL_MESH]
     yaws = sorted(round(math.degrees(float(g.get("euler").split()[2]))) % 360 for g in wheels)
     assert yaws == sorted(list(wheel.angles_deg) * 2)
@@ -154,12 +207,14 @@ def test_cad_models_compile_with_identical_physics_sizes(route):
     mp = mjcf.load_model(mjcf.build_world_xml(scene, route, visual="primitive"))
     mc = mjcf.load_model(mjcf.build_world_xml(scene, route, visual="cad"))
     assert (mc.nbody, mc.njnt, mc.nq, mc.nv, mc.nu, mc.nsite) == (mp.nbody, mp.njnt, mp.nq, mp.nv, mp.nu, mp.nsite)
-    assert mc.ngeom == mp.ngeom + 4 * 5
-    assert mc.nmesh == mp.nmesh + 2
+    assert mc.ngeom == mp.ngeom + 4 * 7                      # per robot: chassis + 4 wheels + kicker + dribbler
+    assert mc.nmesh == mp.nmesh + 4
     faces = dict(zip((mc.mesh(i).name for i in range(mc.nmesh)), mc.mesh_facenum.tolist(), strict=True))
     meta = mjcf.cad_meta()
     assert faces[mjcf.CAD_CHASSIS_MESH] == meta["chassis"]["faces"]
     assert faces[mjcf.CAD_WHEEL_MESH] == meta["wheel"]["faces"]
+    assert faces[mjcf.CAD_KICKER_MESH] == meta["kicker"]["faces"]
+    assert faces[mjcf.CAD_DRIBBLER_MESH] == meta["dribbler"]["faces"]
     # same mass and inertia on every body
     np.testing.assert_allclose(mc.body_mass, mp.body_mass)
     np.testing.assert_allclose(mc.body_inertia, mp.body_inertia)
@@ -206,9 +261,10 @@ def test_mjcf_cli_writes_standalone_cad_models(tmp_path):
     assert set(OBJ_FILES) | {"meshes.json"} <= names
     for r in ("a", "b"):
         m = mujoco.MjModel.from_xml_path(str(tmp_path / f"ssl_route_{r}_cad.xml"))   # OBJ files resolved next to it
-        assert m.nmesh == 3
+        assert m.nmesh == 5
     md = (tmp_path / "ssl_route_b_cad.md").read_text(encoding="utf-8")
     assert "## CAD meshes" in md and "ssl_chassis.obj" in md and "nbody=" in md
+    assert "ssl_dribbler.obj" in md and "robot_v2025_v3.iam" in md
     assert json.loads((tmp_path / "meshes.json").read_text(encoding="utf-8")) == mjcf.cad_meta()
 
 

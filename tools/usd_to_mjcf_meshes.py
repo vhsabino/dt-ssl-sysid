@@ -39,12 +39,23 @@ dependencies).  Run from the repo root::
 
 Writes the OBJ files plus ``meshes.json`` (provenance: sources + md5, transform, face counts, bounding
 boxes and the derived constants used by ``dtssl.physics.mjcf``: top of the cover, wheel outer radius).
+
+Kicker and dribbler (``ssl_kicker.obj``, ``ssl_dribbler.obj`` + ``_lod``): these two mechanisms are **not** in
+``usd/`` (the chassis USD is the bare first floor). They are tessellated straight out of the Inventor assembly
+``robot_v2025_v3.iam`` (occurrences ``kicker_assembly_5mm:1`` and ``Dribbler_Robocup2025v3:1``, already placed
+by the assembly constraints) by ``tools/inventor_export_mechanisms.m`` (MATLAB + Inventor COM API, Windows),
+which writes them in the same MJCF body frame as the chassis (z origin on the wheel-axle plane). This script
+only *registers* them in ``meshes.json`` from the OBJ files themselves (counts, bbox, md5, header provenance and
+the derived features: dribbler bar axis, kicker plunger axes), so a re-export of the chassis keeps them::
+
+    python tools/usd_to_mjcf_meshes.py --register-mechanisms      # numpy only, no usd-core needed
 """
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -241,6 +252,106 @@ def export_wheel(target_faces: int, lod: bool = False) -> dict:
                 bbox=dict(lo=lo.round(6).tolist(), hi=hi.round(6).tolist()), outer_radius=float(radial))
 
 
+# --------------------------------------------------------------------------------------
+# Kicker and dribbler: registered from the OBJ files written by tools/inventor_export_mechanisms.m
+# --------------------------------------------------------------------------------------
+MECHANISMS = ("kicker", "dribbler")
+PART_LINE = re.compile(r"^# part (?P<path>.+?) \| lo (?P<lo>[-\d. ]+) \| hi (?P<hi>[-\d. ]+)$")
+
+
+def _read_obj(path: Path) -> tuple[list[str], np.ndarray, int]:
+    """``(header comment lines, vertices (n, 3), n_faces)`` of a single-object, triangles-only OBJ."""
+    header, pts, n_faces = [], [], 0
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.startswith("#"):
+            header.append(line)
+        elif line.startswith("v "):
+            pts.append([float(x) for x in line.split()[1:4]])
+        elif line.startswith("f "):
+            n_faces += 1
+    return header, np.asarray(pts, dtype=float).reshape(-1, 3), n_faces
+
+
+def _parts(header: list[str]) -> dict[str, dict]:
+    """``{part path: {lo, hi}}`` (mm, MJCF body frame) from the ``# part`` lines of the exporter header."""
+    out = {}
+    for line in header:
+        m = PART_LINE.match(line)
+        if m:
+            out[m["path"]] = dict(lo=[float(v) for v in m["lo"].split()], hi=[float(v) for v in m["hi"].split()])
+    return out
+
+
+def _box_m(box: dict) -> dict:
+    return dict(lo=(np.asarray(box["lo"]) / 1000.0).round(6).tolist(), hi=(np.asarray(box["hi"]) / 1000.0).round(6).tolist())
+
+
+def _axis_of(box: dict) -> dict:
+    """Axis of a cylindrical part from its box (mm -> m): the long side is the axis; ``centre`` is the box
+    centre (the axis passes through it), ``radius`` the mean transverse half-extent, ``span`` the extent along
+    the axis. Used for the dribbler bar (along y) and the kicker plungers (along x)."""
+    lo, hi = np.asarray(box["lo"]) / 1000.0, np.asarray(box["hi"]) / 1000.0
+    size = hi - lo
+    i = int(np.argmax(size))
+    j, k = [a for a in range(3) if a != i]
+    return dict(axis="xyz"[i], centre=((lo + hi) / 2.0).round(6).tolist(),
+                radius=round(float((size[j] + size[k]) / 4.0), 6), length=round(float(size[i]), 6),
+                span=[round(float(lo[i]), 6), round(float(hi[i]), 6)])
+
+
+def mechanism_features(parts: dict[str, dict]) -> dict:
+    """Derived constants (metres, MJCF body frame, z from the wheel-axle plane) read off the part boxes:
+    the dribbler bar axis, the flat/chip kicker plunger axes and heads, the chip plate, the IR sensor boards."""
+    def pick(pred):
+        return [b for p, b in parts.items() if pred(p)]
+
+    feats: dict = {}
+    bar = pick(lambda p: "Dribblerschnecke" in p)
+    if bar:
+        feats["dribbler_bar"] = _axis_of(bar[0])
+    for tag, sub in (("flat", "kicker_assembly_front"), ("chip", "kicker_assembly_chip")):
+        irons = pick(lambda p, sub=sub: sub in p and "Kicker Eisen" in p)
+        if irons:
+            lo = np.min([b["lo"] for b in irons], axis=0)
+            hi = np.max([b["hi"] for b in irons], axis=0)
+            feats[f"kicker_{tag}_plunger"] = _axis_of(dict(lo=lo.tolist(), hi=hi.tolist()))
+        head = pick(lambda p, sub=sub: sub in p and "head" in p.rsplit("/", 1)[-1])
+        if head:
+            feats[f"kicker_{tag}_head"] = _box_m(head[0])
+    plate = pick(lambda p: "ChipKicker_v2020" in p)
+    if plate:
+        feats["chip_plate"] = _box_m(plate[0])
+    boards = pick(lambda p: p.rsplit("/", 1)[-1] in ("Board:1", "Board_MIR:1"))
+    if boards:
+        feats["ir_boards"] = [_box_m(b) for b in boards]
+    return feats
+
+
+def register_mechanisms(meta: dict, assets: Path = ASSETS) -> dict:
+    """Add or refresh the ``kicker``/``dribbler`` (+ ``_lod``) entries of ``meta`` from the OBJ files in
+    ``assets`` (see the module docstring); an entry whose file is missing is dropped. Provenance = the four
+    header lines of the OBJ (generator, source assembly/occurrence/tolerance, frame, occurrence transform) and
+    the md5 of the OBJ itself. ``faces_source`` is the full-resolution count (the LOD is a decimation of it)."""
+    for key in MECHANISMS:
+        full = None
+        for suffix in ("", "_lod"):
+            f = assets / f"ssl_{key}{suffix}.obj"
+            if not f.is_file():
+                meta.pop(f"{key}{suffix}", None)
+                continue
+            header, pts, n_faces = _read_obj(f)
+            parts = _parts(header)
+            lo, hi = pts.min(0), pts.max(0)
+            entry = dict(file=f.name, n_parts=len(parts), faces_source=full["faces"] if full else n_faces, faces=n_faces,
+                         vertices=int(len(pts)), bbox=dict(lo=lo.round(6).tolist(), hi=hi.round(6).tolist()),
+                         md5=_md5(f), source=[ln[2:] for ln in header[:4]],
+                         features=full["features"] if full else mechanism_features(parts))
+            if suffix == "":
+                full = entry
+            meta[f"{key}{suffix}"] = entry
+    return meta
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--chassis-faces", type=int, default=30000)
@@ -249,8 +360,22 @@ def main(argv=None) -> int:
     ap.add_argument("--lod-wheel-faces", type=int, default=1200)
     ap.add_argument("--lod-min-diag", type=float, default=60.0, help="mm; smaller chassis parts are dropped in the LOD")
     ap.add_argument("--out", type=Path, default=ASSETS)
+    ap.add_argument("--register-mechanisms", action="store_true",
+                    help="only refresh the kicker/dribbler entries of meshes.json from the OBJ files in --out "
+                         "(written by tools/inventor_export_mechanisms.m); needs numpy only")
     a = ap.parse_args(argv)
     a.out.mkdir(parents=True, exist_ok=True)
+    if a.register_mechanisms:
+        meta_path = a.out / "meshes.json"
+        meta = json.loads(meta_path.read_text(encoding="utf-8")) if meta_path.is_file() else {}
+        register_mechanisms(meta, a.out)
+        meta_path.write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
+        for k in (k for k in meta if k.startswith(MECHANISMS)):
+            m = meta[k]
+            print(f"{m['file']}: {m['n_parts']} parts, {m['faces']} faces, {m['vertices']} vertices, "
+                  f"bbox lo {m['bbox']['lo']} hi {m['bbox']['hi']}")
+        print(f"registered in {meta_path}")
+        return 0
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     hdr = [f"generated by tools/usd_to_mjcf_meshes.py on {stamp}; do not edit (regenerate from usd/)",
            "units m; frame = dtssl MJCF body frame (dribbler at +x, wheels at 60/135/225/300 deg)"]
@@ -285,6 +410,7 @@ def main(argv=None) -> int:
             file=f"ssl_wheel{key}.obj", n_parts=wh["n_parts"], faces_source=wh["faces_source"],
             faces=int(len(wh["faces"])), vertices=int(len(wh["points"])), bbox=wh["bbox"],
             outer_radius=round(wh["outer_radius"], 6), axle="+x")
+    register_mechanisms(meta, a.out)          # kicker/dribbler OBJ (from Inventor) stay registered
     (a.out / "meshes.json").write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
     for k in ("chassis", "wheel", "chassis_lod", "wheel_lod"):
         m = meta[k]

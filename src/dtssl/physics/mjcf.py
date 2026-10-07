@@ -22,7 +22,9 @@ CCW tangent so that ``omega_i * r = -sin(phi_i) vx + cos(phi_i) vy + R w``.
 
 Visuals (``visual=``): ``"primitive"`` (default) draws the D-shaped collision shell, the hubs and
 the roller geoms themselves; ``"cad"`` adds the RobôCIn v2025 CAD meshes (``assets/ssl_chassis.obj``,
-``assets/ssl_wheel.obj``, exported from ``usd/`` by ``tools/usd_to_mjcf_meshes.py``) as visual-only
+``assets/ssl_wheel.obj``, exported from ``usd/`` by ``tools/usd_to_mjcf_meshes.py``; ``assets/ssl_kicker.obj``
+and ``assets/ssl_dribbler.obj``, the kicker and dribbler assemblies tessellated in place from the Inventor
+assembly ``robot_v2025_v3.iam`` by ``tools/inventor_export_mechanisms.m``, fixed to the chassis) as visual-only
 geoms (``contype = conaffinity = 0``, ``mass = 0``) and moves the primitives to geom group 3 (hidden
 in the viewer by default). The physics is identical in both modes (same bodies, joints, collision
 geoms, inertias and actuators): the meshes only change what is drawn. Models with CAD meshes must be
@@ -78,10 +80,16 @@ ID_DOT_POS = ((0.035, 0.054772), (0.035, -0.054772), (-0.054772, -0.035), (-0.05
 VISUAL_MODES = ("primitive", "cad")
 ASSET_DIR = Path(__file__).resolve().parent / "assets"
 CAD_CHASSIS_MESH, CAD_WHEEL_MESH = "ssl_cad_chassis", "ssl_cad_wheel"
-CAD_FILES = ("ssl_chassis.obj", "ssl_wheel.obj", "ssl_chassis_lod.obj", "ssl_wheel_lod.obj", "meshes.json")
+CAD_KICKER_MESH, CAD_DRIBBLER_MESH = "ssl_cad_kicker", "ssl_cad_dribbler"
+CAD_FILES = ("ssl_chassis.obj", "ssl_wheel.obj", "ssl_kicker.obj", "ssl_dribbler.obj",
+             "ssl_chassis_lod.obj", "ssl_wheel_lod.obj", "ssl_kicker_lod.obj", "ssl_dribbler_lod.obj", "meshes.json")
 HIDDEN_GROUP = "3"        # geom group not drawn by the viewer by default (groups 0-2 are)
 CAD_CHASSIS_RGBA = (0.16, 0.16, 0.18, 1.0)
 CAD_WHEEL_RGBA = (0.62, 0.62, 0.66, 1.0)
+CAD_KICKER_RGBA = (0.45, 0.47, 0.52, 1.0)        # steel: plungers, coils, base plate
+CAD_DRIBBLER_RGBA = (0.30, 0.30, 0.33, 1.0)      # rubber bar, anodised side plates, motor
+# (meshes.json key, <mesh> asset name, colour) of the mechanisms fixed to the chassis (same frame as the chassis OBJ)
+CAD_MECHANISMS = (("kicker", CAD_KICKER_MESH, CAD_KICKER_RGBA), ("dribbler", CAD_DRIBBLER_MESH, CAD_DRIBBLER_RGBA))
 
 
 def normalize_visual(visual: str | None) -> str:
@@ -659,18 +667,26 @@ def _robot_visuals(body: ET.Element, name: str, team: Team, rid: int, spec: Robo
 
 
 def cad_assets() -> list[ET.Element]:
-    """``<mesh>`` assets of the CAD chassis and wheel (file references resolved by ``load_model`` or
-    by the OBJ files copied next to the written XML)."""
+    """``<mesh>`` assets of the CAD chassis, wheel, kicker and dribbler (file references resolved by
+    ``load_model`` or by the OBJ files copied next to the written XML)."""
     meta = cad_meta()
-    return [_el("mesh", name=CAD_CHASSIS_MESH, file=meta["chassis"]["file"]),
-            _el("mesh", name=CAD_WHEEL_MESH, file=meta["wheel"]["file"])]
+    out = [_el("mesh", name=CAD_CHASSIS_MESH, file=meta["chassis"]["file"]),
+           _el("mesh", name=CAD_WHEEL_MESH, file=meta["wheel"]["file"])]
+    out += [_el("mesh", name=mesh, file=meta[key]["file"]) for key, mesh, _ in CAD_MECHANISMS if key in meta]
+    return out
 
 
 def _cad_chassis(body: ET.Element, name: str, wheel: WheelGeometry, rgba: Sequence[float]) -> None:
-    """Visual-only CAD chassis: the OBJ has its z origin on the wheel-axle plane, so it sits at
-    ``z = wheel.r`` and the CAD wheels touch the floor where the physics wheels do."""
+    """Visual-only CAD chassis + the kicker and dribbler assemblies fixed to it: the OBJ files have their z
+    origin on the wheel-axle plane, so they sit at ``z = wheel.r`` and the CAD wheels touch the floor where the
+    physics wheels do. The mechanisms are static (no joints: the plungers and the bar do not move)."""
     _sub(body, "geom", name=f"{name}_cad_chassis", type="mesh", mesh=CAD_CHASSIS_MESH, pos=(0, 0, wheel.r),
          rgba=tuple(rgba), contype="0", conaffinity="0", mass="0", group="1")
+    meta = cad_meta()
+    for key, mesh, mech_rgba in CAD_MECHANISMS:
+        if key in meta:
+            _sub(body, "geom", name=f"{name}_cad_{key}", type="mesh", mesh=mesh, pos=(0, 0, wheel.r),
+                 rgba=mech_rgba, contype="0", conaffinity="0", mass="0", group="1")
 
 
 def _cad_wheel(parent: ET.Element, name: str, i: int, phi: float, pos: Sequence[float]) -> None:
@@ -918,8 +934,8 @@ def describe_xml(xml: str, title: str = "MJCF model") -> str:
         meta = cad_meta()
         lines += ["## CAD meshes (visual only)", "", "| asset | file | faces | source |", "|---|---|---|---|"]
         for nm, f in meshes:
-            part = next((v for v in (meta.get("chassis"), meta.get("wheel")) if v and v.get("file") == f), {})
-            src = ", ".join(meta.get("sources", {}))
+            part = next((v for v in meta.values() if isinstance(v, dict) and v.get("file") == f), {})
+            src = part["source"][1] if "source" in part else ", ".join(meta.get("sources", {}))
             lines.append(f"| {nm} | {f} | {part.get('faces', '?')} | {src} |")
         lines.append("")
     try:
@@ -938,6 +954,7 @@ __all__ = [
     "to_xml_string", "field_fragment", "ball_fragment", "robot_fragment", "build_field_xml",
     "build_ball_xml", "build_robot_xml", "build_world_xml", "world_root", "describe_xml", "yaw_quat",
     "chassis_inertia", "VISUAL_MODES", "normalize_visual", "cad_meta", "cad_assets", "mesh_assets",
-    "uses_cad", "load_model", "ASSET_DIR", "CAD_FILES",
-    "BALL_BODY", "BALL_JOINT", "CHASSIS_MESH", "CAD_CHASSIS_MESH", "CAD_WHEEL_MESH", "HIDDEN_GROUP",
+    "uses_cad", "load_model", "ASSET_DIR", "CAD_FILES", "CAD_MECHANISMS",
+    "BALL_BODY", "BALL_JOINT", "CHASSIS_MESH", "CAD_CHASSIS_MESH", "CAD_WHEEL_MESH", "CAD_KICKER_MESH",
+    "CAD_DRIBBLER_MESH", "HIDDEN_GROUP",
 ]
