@@ -442,6 +442,48 @@ e cubo sextavado, "os polígonos da roda estão horríveis". Pedido: melhorar se
   cor da roda em `vertexColors()` quando a malha é suave. Suavizar as malhas custa uma vez por construção (scipy),
   não por quadro. Física, θ, `config/` e `data/` intocados; a mudança é só desenho.
 
+## Câmeras presas ao robô selecionado na vista 3D do campo: terceira e primeira pessoa (09/10/2026, tarde)
+
+Pedido do Victor: uma câmera em terceira pessoa sobre o robô selecionado, "como as câmeras de personagem de video
+game", e uma em primeira pessoa na frente do robô, em cima do dribbler.
+
+- **Geometria sem Qt** (`scene3d.RobotCamera`, `CameraPose`): o `GLViewWidget` do pyqtgraph só tem câmera orbital
+  (`center`, `azimuth`, `elevation`, `distance`; a câmera fica em `center + distance * u(el, az)` olhando para
+  `center`), então as duas câmeras são expressas nesses quatro números a cada quadro.
+  - `"chase"` (terceira pessoa): centro de mira `CHASE_AHEAD` = 0,25 m à frente do robô e `CHASE_HEIGHT` = 0,10 m
+    acima do piso (o robô fica na parte de baixo do quadro, como nos jogos), azimute = rumo do robô + 180° (câmera
+    atrás), elevação `CHASE_ELEVATION` = 20°, distância `CHASE_DISTANCE` = 1,1 m. O rumo da câmera segue o rumo do
+    robô por um filtro de primeira ordem (`CHASE_YAW_TAU` = 0,12 s, com `wrap_to_pi` de `dtssl.units` na diferença),
+    para a imagem não chicotear quando o robô gira; o mouse orbita em volta do robô (offsets de azimute e elevação,
+    elevação limitada a [-25°, +65°] para não entrar no piso) e a roda do mouse muda a distância (0,3 a 10 m).
+  - `"fpv"` (primeira pessoa): câmera em `FPV_OFFSET` = (0,04; 0; 0,17) m no frame do corpo (sobre a tampa, acima do
+    dribbler, 2 cm acima do topo da tampa), olhando no rumo do robô e `FPV_PITCH` = 15° para baixo, rígida (sem
+    filtro). Como a câmera orbital precisa de um centro, ele fica `FPV_LOOK` = 3 m à frente (o `distance` só fixa os
+    planos de corte: 3 mm e 3 km). O campo de visão passa a `FPV_FOV` = 70° (os presets usam 45°). O arrasto do
+    mouse vira a cabeça (offsets, elevação em [-70°, +70°]); a roda não faz nada. Com o pitch de 15° a borda da
+    tampa aparece como um "capô" na base do quadro; a bola presa no dribbler fica embaixo dessa borda e não aparece
+    (nem olhando para baixo: vê-se o topo da tampa).
+- **Widget** (`view3d.View3D`): `set_camera_mode("chase" | "fpv" | None)`, atributo `camera_mode`, ações `Chase` e
+  `FPV` na toolbar (grupo exclusivo opcional: clicar de novo desliga), teclas `3` e `1` (toggle), `preset_changed`
+  emite o nome do modo (barra de status do MainWindow). Um preset ou `Fit` (`F`) volta à câmera livre e restaura o
+  fov. A cada `update_state` com o robô selecionado presente, `_ride_robot` primeiro lê o que o mouse fez desde o
+  quadro anterior (diferença entre `opts["azimuth"/"elevation"/"distance"]` e o que foi escrito no último quadro,
+  `_cam_applied`) e passa a `RobotCamera.nudge`, depois escreve a pose nova em `opts`; sem robô selecionado ou com
+  ele fora de campo a câmera fica onde está (ou segue o `Follow`). Trocar de robô (`set_selected`) zera só o rumo
+  filtrado e mantém os offsets e o zoom do usuário. Ligar o modo com um estado conhecido aplica a câmera na hora
+  (`update_state(force=True)`), mesmo com a simulação parada.
+- Renders reais no PC (`_to_delete\gl_probe_cam.py`, olhados): `_to_delete\glcam_chase.png` (robô selecionado em baixo
+  no quadro, bola à frente, anel de seleção, outros robôs), `glcam_chase_orbit.png` (depois de orbitar 35° e afastar
+  1,4x), `glcam_chase_lag.png` (robô girado 90° de uma vez: azimute 237,9 → 293,9 → 315,0 → 323,0° em quadros de
+  0,117 s, alvo 327,9°), `glcam_fpv.png` (capô da tampa na base, bola, robôs, gol e linhas à frente),
+  `glcam_fpv_down.png` e `glcam_fpv_ball_in_mouth.png` (olhando para baixo só se vê o topo da tampa).
+- Testes (`tests/test_gui_view3d.py`): `test_chase_camera_sits_behind_the_robot_and_lags_its_heading` (posição
+  atrás e acima, lag de primeira ordem com o valor analítico, caminho curto em ±π, offsets e limites do mouse,
+  `reset(keep_user)`), `test_fpv_camera_sits_on_the_cover_above_the_dribbler_looking_ahead` (câmera na posição do
+  corpo, rumo e pitch, sem lag, virar a cabeça sem mover a câmera) e, com Qt offscreen,
+  `test_view3d_robot_cameras_ride_the_selected_robot` (modos, toolbar exclusiva, mouse entre quadros, fov, preset e
+  Fit saindo do modo, sem robô selecionado). Nada da física muda; a aba Robot não foi tocada.
+
 ## Correção 03/09/2026 — `ZeroDivisionError` do pyqtgraph ao trocar de robô
 
 Sintoma (Windows, pyqtgraph 0.14.0, modo Debug): ao selecionar um robô, o console repete
