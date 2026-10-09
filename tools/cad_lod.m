@@ -19,7 +19,9 @@ function out = cad_lod(varargin)
 %   shell close to full resolution and spends few faces on what is barely seen.
 %
 %   Options: 'OutDir' (assets folder), 'Targets', 'FaceTargets' (struct, same budgets as the exporter:
-%   chassis_lod 12000, wheel_lod 1200, kicker_lod 1500, dribbler_lod 3500), 'Elevations' (deg, default
+%   chassis_lod 12000, wheel_lod 5000 (82 parts, 20 rollers: below ~3000 faces the rollers come out as
+%   spiky crystals; the GUI draws the four wheels of a robot from one item, so the faces are cheap),
+%   kicker_lod 1500, dribbler_lod 3500), 'Elevations' (deg, default
 %   [90 60 30 10 -30]: the field view looks from above, the Robot tab also from below), 'Azimuths' (deg, default
 %   0:30:330), 'Pixels' (render size, default 900), 'MinPixels' (a part is visible when it owns at least this many
 %   pixels in some view, default 6). At most 256 parts per mesh (16 x 16 colour codes).
@@ -31,7 +33,7 @@ function out = cad_lod(varargin)
 ip = inputParser;
 ip.addParameter('OutDir', fullfile(fileparts(fileparts(mfilename('fullpath'))), 'src', 'dtssl', 'physics', 'assets'), @ischar);
 ip.addParameter('Targets', {'chassis', 'wheel', 'kicker', 'dribbler'}, @iscell);
-ip.addParameter('FaceTargets', struct('chassis_lod', 12000, 'wheel_lod', 1200, 'kicker_lod', 1500, 'dribbler_lod', 3500), @isstruct);
+ip.addParameter('FaceTargets', struct('chassis_lod', 12000, 'wheel_lod', 5000, 'kicker_lod', 1500, 'dribbler_lod', 3500), @isstruct);
 ip.addParameter('Elevations', [90 60 30 10 -30], @isnumeric);
 ip.addParameter('Azimuths', 0:30:330, @isnumeric);
 ip.addParameter('Pixels', 900, @isnumeric);

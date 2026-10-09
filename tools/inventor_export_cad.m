@@ -44,7 +44,7 @@ function out = inventor_export_cad(varargin)
 %                     appearance of the PCBs (motor boards, main board, processor board), a light cream in the CAD,
 %                     is drawn moss green (31 77 46), darker than the field, as circuit boards usually are
 %     'FaceTargets'   struct of face budgets, fields chassis, chassis_lod, wheel, wheel_lod, kicker, kicker_lod,
-%                     dribbler, dribbler_lod (0 = keep every face); default 60000/12000, 8000/1200, 0/1500, 0/3500;
+%                     dribbler, dribbler_lod (0 = keep every face); default 60000/12000, 8000/5000, 0/1500, 0/3500;
 %                     the *_lod budgets are handed to tools/cad_lod.m
 %     'AxleZmm'       wheel-axle plane height in the Inventor frame (default 24.15: the wheel axle of the v2025 CAD,
 %                     measured on Direct_Transmission_new:1; the MJCF places the meshes at z = wheel.r above the floor)
@@ -72,7 +72,7 @@ ip.addParameter('DecalPattern', '^Papier', @ischar);
 ip.addParameter('MinPartMm', 4, @isnumeric);
 ip.addParameter('ColourOverrides', {'^Part Studio 1 - Capa_2025_V3', [15 15 15]}, @iscell);
 ip.addParameter('AppearanceOverrides', {'^BoardColor$', [31 77 46]}, @iscell);
-ip.addParameter('FaceTargets', struct('chassis', 60000, 'chassis_lod', 12000, 'wheel', 8000, 'wheel_lod', 1200, ...
+ip.addParameter('FaceTargets', struct('chassis', 60000, 'chassis_lod', 12000, 'wheel', 8000, 'wheel_lod', 5000, ...
                                       'kicker', 0, 'kicker_lod', 1500, 'dribbler', 0, 'dribbler_lod', 3500), @isstruct);
 ip.addParameter('AxleZmm', 24.15, @isnumeric);
 ip.addParameter('Close', true, @islogical);
