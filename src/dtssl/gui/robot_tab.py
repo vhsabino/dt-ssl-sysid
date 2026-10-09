@@ -7,7 +7,8 @@ the record's speeds) or, at the flip of a switch and whenever GL is unavailable,
 (chassis, dribbler face, the four wheels coloured by their speed, commanded and resulting body-velocity arrows,
 the ball when the sensor sees it); below it the state table
 (pose, body velocities commanded / resulting, command age, watchdog, dribbler, ball sensor, kicks). Middle:
-the four wheel speeds as bars (commanded vs resulting, rad/s) and their last seconds as curves. Right: the
+the four wheel speeds as bars (commanded vs resulting, rad/s) and their last seconds as curves, one plot per
+motor sharing the time axis (like the body-velocity plots of the main window). Right: the
 "hardware" block: battery and capacitor, ball sensor, and, when a real robot is reporting over the radio
 (:class:`dtssl.bridge.telemetry.TelemetryReceiver`), its per-motor PWM / error / current table.
 
@@ -26,7 +27,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6.QtCore import Signal
 
 from dtssl.bridge.telemetry import N_WHEELS, RobotTelemetry
-from dtssl.gui.plots import RingBuffer, _flush, _safe_axes
+from dtssl.gui.plots import MIN_X_RANGE_S, MIN_Y_RANGE, RingBuffer, _flush, _safe_axes
 from dtssl.gui.robot_view3d import RobotView3D
 
 TEAM_COLORS = {"blue": QtGui.QColor(41, 121, 255), "yellow": QtGui.QColor(255, 214, 0)}
@@ -208,36 +209,58 @@ class WheelBars(QtWidgets.QWidget):
         p.end()
 
 
-class WheelPlot(pg.PlotWidget):
-    """Last ``window_s`` seconds of the four wheel speeds (resulting: solid; commanded: dashed)."""
+class WheelPlot(pg.GraphicsLayoutWidget):
+    """Last ``window_s`` seconds of the four wheel speeds, one plot per motor (rows ``m1``..``m4`` sharing the
+    time axis, like the body-velocity plots): resulting solid in the wheel's colour, commanded dashed, and the
+    real robot's wheel (radio) in pink while it reports."""
 
     def __init__(self, window_s: float = 10.0, rate_hz: float = 60.0, parent=None):
-        super().__init__(parent, axisItems=_safe_axes())
+        super().__init__(parent)
         self.window_s = float(window_s)
-        self.buf = RingBuffer(int(window_s * rate_hz) + 2, 1 + 2 * N_WHEELS)
-        self.setLabel("left", "rodas", units="rad/s")
-        self.setLabel("bottom", "t", units="s")
-        self.showGrid(x=True, y=True, alpha=0.2)
-        self.getViewBox().setLimits(minXRange=0.25, minYRange=1e-3)
-        self.addLegend(offset=(4, 4))
-        self.curves_meas = [self.plot([], [], pen=pg.mkPen(c, width=2), name=f"m{i + 1}")
-                            for i, c in enumerate(WHEEL_COLORS)]
-        self.curves_cmd = [self.plot([], [], pen=pg.mkPen(c, width=1, style=QtCore.Qt.DashLine))
-                           for c in WHEEL_COLORS]
+        self.buf = RingBuffer(int(window_s * rate_hz) + 2, 1 + 3 * N_WHEELS)     # t, meas x4, cmd x4, real x4
+        self.plots: list[pg.PlotItem] = []
+        self.curves_meas: list[pg.PlotDataItem] = []
+        self.curves_cmd: list[pg.PlotDataItem] = []
+        self.curves_real: list[pg.PlotDataItem] = []
+        for i, c in enumerate(WHEEL_COLORS):
+            p = self.addPlot(row=i, col=0, axisItems=_safe_axes())
+            p.getViewBox().setLimits(minXRange=MIN_X_RANGE_S, minYRange=MIN_Y_RANGE)
+            p.setLabel("left", f"m{i + 1}", units="rad/s")
+            p.getAxis("left").enableAutoSIPrefix(False)
+            p.showGrid(x=True, y=True, alpha=0.25)
+            p.setMenuEnabled(False)
+            p.hideButtons()
+            p.setDownsampling(auto=True, mode="peak")
+            p.setClipToView(True)
+            if i > 0:
+                p.setXLink(self.plots[0])
+            self.curves_cmd.append(p.plot(pen=pg.mkPen(c, width=1, style=QtCore.Qt.DashLine)))
+            self.curves_meas.append(p.plot(pen=pg.mkPen(c, width=2)))
+            rc = p.plot(pen=pg.mkPen(REAL_COLOR, width=2), connect="finite")
+            rc.setVisible(False)
+            self.curves_real.append(rc)
+            self.plots.append(p)
+            self.ci.layout.setRowStretchFactor(i, 1)
+        self.plots[-1].setLabel("bottom", "t", units="s")
         self._last_t: float | None = None
 
-    def append(self, t: float, cmd, meas) -> None:
+    def append(self, t: float, cmd, meas, real=None) -> None:
+        """One sample: commanded and resulting wheel speeds of the twin (rad/s), and the real robot's when it
+        reports (``None`` leaves a gap in the pink curve)."""
         if self._last_t is not None and t <= self._last_t:
             return
         self._last_t = t
-        row = [t] + [_flush(v) for v in (meas or (0.0,) * N_WHEELS)] + [_flush(v) for v in (cmd or (0.0,) * N_WHEELS)]
+        row = ([t] + [_flush(v) for v in (meas or (0.0,) * N_WHEELS)] + [_flush(v) for v in (cmd or (0.0,) * N_WHEELS)]
+               + [_flush(v) for v in (real if real is not None else (np.nan,) * N_WHEELS)])
         self.buf.append(row)
 
     def clear_data(self) -> None:
         self.buf.clear()
         self._last_t = None
-        for c in self.curves_meas + self.curves_cmd:
+        for c in self.curves_meas + self.curves_cmd + self.curves_real:
             c.setData([], [])
+        for c in self.curves_real:
+            c.setVisible(False)
 
     def redraw(self) -> None:
         d = self.buf.data()
@@ -247,8 +270,13 @@ class WheelPlot(pg.PlotWidget):
         for i in range(N_WHEELS):
             self.curves_meas[i].setData(t, d[:, 1 + i])
             self.curves_cmd[i].setData(t, d[:, 1 + N_WHEELS + i])
+            real = d[:, 1 + 2 * N_WHEELS + i]
+            has_real = bool(np.isfinite(real).any())
+            self.curves_real[i].setVisible(has_real)
+            if has_real:
+                self.curves_real[i].setData(t, real)
         t_end = float(t[-1])
-        self.setXRange(t_end - self.window_s, t_end, padding=0.0)
+        self.plots[0].setXRange(t_end - self.window_s, t_end, padding=0.0)
 
 
 class _Gauge(QtWidgets.QWidget):
@@ -467,7 +495,8 @@ class RobotTab(QtWidgets.QWidget):
         """New records for the selected robot (call at the display rate; cheap when hidden)."""
         self.twin, self.real = twin, real
         if twin is not None:
-            self.wheel_plot.append(twin.t, twin.wheel_cmd, twin.wheel_meas)
+            self.wheel_plot.append(twin.t, twin.wheel_cmd, twin.wheel_meas,
+                                   real.wheel_meas if real is not None else None)
         if self.view3d is not None:
             self.view3d.set_record(twin, real)              # integrates the wheel angles; draws only if visible
         if not self.isVisible():

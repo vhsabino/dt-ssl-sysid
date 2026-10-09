@@ -13,6 +13,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PySide6")
 pytest.importorskip("pyqtgraph")
 
+import pyqtgraph as pg  # noqa: E402
 from PySide6 import QtCore, QtWidgets  # noqa: E402
 
 from dtssl.bridge.proto import RCFeedback  # noqa: E402
@@ -58,15 +59,24 @@ def test_widgets_build_and_paint(qapp):
     bars.set_values((10.0, 20.0, 30.0, 40.0), (5.0, -5.0, 200.0, 0.0), (1.0, 1.0, 1.0, 1.0))
     assert bars.grab().width() == 300
     plot = WheelPlot(window_s=2.0)
+    assert len(plot.plots) == 4 and [p.getAxis("left").labelText for p in plot.plots] == ["m1", "m2", "m3", "m4"]
     for k in range(200):
         plot.append(k / 60.0, (1.0, 2.0, 3.0, 4.0), (1.5, 2.5, 3.5, 4.5))
     plot.append(1.0, None, None)                                         # not monotonic: ignored
     assert len(plot.buf) == int(2.0 * 60) + 2                             # capped at window * rate (+2)
     plot.redraw()
-    lo, hi = plot.getViewBox().viewRange()[0]
+    lo, hi = plot.plots[0].getViewBox().viewRange()[0]
     assert hi == pytest.approx(199 / 60.0) and lo == pytest.approx(199 / 60.0 - 2.0)
+    for p in plot.plots[1:]:                                              # one time axis for the four motors
+        assert p.getViewBox().linkedView(pg.ViewBox.XAxis) is plot.plots[0].getViewBox()
+    assert plot.curves_meas[2].yData[-1] == 3.5 and plot.curves_cmd[2].yData[-1] == 3.0
+    assert not any(c.isVisible() for c in plot.curves_real)              # no real robot: no pink curve
+    plot.append(200 / 60.0, (1.0,) * 4, (1.5,) * 4, (9.0, 8.0, 7.0, 6.0))   # the radio reports
+    plot.redraw()
+    assert all(c.isVisible() for c in plot.curves_real) and plot.curves_real[3].yData[-1] == 6.0
+    assert np.isnan(plot.curves_real[3].yData[-2])                       # a gap before the first real sample
     plot.clear_data()
-    assert len(plot.buf) == 0
+    assert len(plot.buf) == 0 and not any(c.isVisible() for c in plot.curves_real)
 
 
 def test_tab_renders_twin_and_real_records(qapp):
