@@ -21,6 +21,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6.QtCore import Qt, Signal
 
 from dtssl.gui import scene3d as S
+from dtssl.gui.glshading import headlight_shader
 from dtssl.physics.mjcf import WheelGeometry, load_ball_spec, load_wheel_geometry
 from dtssl.sim.entities import WorldState
 from dtssl.sim.world import FieldGeometry, RobotSpec
@@ -55,10 +56,10 @@ class _RobotItems:
     """GL items of one robot: chassis, 4 wheels, kicker and dribbler (CAD only, fixed to the chassis), id plate
     (+ selection ring)."""
 
-    def __init__(self, view, key: tuple[str, int], meshes: S.RobotMeshes, spec: RobotSpec):
+    def __init__(self, view, key: tuple[str, int], meshes: S.RobotMeshes, spec: RobotSpec, shader="shaded"):
         team, rid = key
         self.key = key
-        opts = dict(smooth=False, computeNormals=True, shader="shaded", drawEdges=False, glOptions="opaque")
+        opts = dict(smooth=False, computeNormals=True, shader=shader, drawEdges=False, glOptions="opaque")
         col = S.CHASSIS_RGBA if meshes.cad else S.PRIMITIVE_RGBA
         self.chassis = gl.GLMeshItem(**_mesh_kwargs(meshes.chassis, col), **opts)
         self.wheels = [gl.GLMeshItem(**_mesh_kwargs(meshes.wheel, S.WHEEL_RGBA), **opts) for _ in range(4)]
@@ -141,6 +142,7 @@ class View3D(QtWidgets.QWidget):
         self.view.setBackgroundColor((22, 22, 26, 255))
         self.view.opts["fov"] = 45
         lay.addWidget(self.view, 1)
+        self._shader = headlight_shader()           # CAD-style light (shared with the Robot tab), see glshading
         self._build_toolbar()
         self._build_static()
         self.set_preset("iso")
@@ -199,7 +201,8 @@ class View3D(QtWidgets.QWidget):
         self.view.addItem(goals)
         self._field_items += [lines, goals]
         md = gl.MeshData.sphere(rows=10, cols=16, radius=self.ball_radius)
-        self.ball = gl.GLMeshItem(meshdata=md, smooth=True, color=S.BALL_RGBA, shader="shaded", glOptions="opaque")
+        self.ball = gl.GLMeshItem(meshdata=md, smooth=True, color=S.BALL_RGBA, shader=self._shader,
+                                  glOptions="opaque")
         self.view.addItem(self.ball)
         self._field_items.append(self.ball)
         self._meshes = None
@@ -313,7 +316,7 @@ class View3D(QtWidgets.QWidget):
         for key in poses:
             items = self._robots.get(key)
             if items is None:
-                items = _RobotItems(self.view, key, meshes, self.spec)
+                items = _RobotItems(self.view, key, meshes, self.spec, self._shader)
                 self._robots[key] = items
             if key in fr.hidden:
                 items.set_visible(False)

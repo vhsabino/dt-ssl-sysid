@@ -27,6 +27,7 @@ from PySide6.QtCore import Qt, Signal
 
 from dtssl.bridge.telemetry import RobotTelemetry
 from dtssl.gui import scene3d as S
+from dtssl.gui.glshading import headlight_shader
 from dtssl.physics.mjcf import WheelGeometry, load_ball_spec, load_wheel_geometry
 from dtssl.sim.world import RobotSpec
 
@@ -49,43 +50,11 @@ WHEEL_HOT_FWD = (1.0, 0.32, 0.32)
 WHEEL_HOT_BACK = (0.25, 0.61, 1.0)
 WHEEL_COLD = (0.62, 0.62, 0.66)
 WHEEL_MAX_RAD_S = 120.0
-HEADLIGHT_SHADER = "dtssl_headlight"
+_headlight_shader = headlight_shader             # the CAD-style light now lives in dtssl.gui.glshading (shared with the field view)
 
 
 def _qmatrix(m: np.ndarray) -> QtGui.QMatrix4x4:
     return QtGui.QMatrix4x4(*[float(v) for v in np.asarray(m, dtype=float).reshape(16)])
-
-
-def _headlight_shader():
-    """CAD-style lighting: a light above and to the right of the viewer, both faces lit, 35 % ambient
-    (pyqtgraph's ``shaded`` lights from behind the part, which leaves a single part almost black). Built from
-    the vertex shader of pyqtgraph's own ``shaded`` program (so it follows the pyqtgraph version) plus this
-    fragment shader; registered once under :data:`HEADLIGHT_SHADER`. Returns ``"shaded"`` when anything is
-    off, so drawing never depends on it."""
-    try:
-        from pyqtgraph.opengl import shaders as sh
-
-        prog = sh.ShaderProgram.names.get(HEADLIGHT_SHADER)
-        if prog is None:
-            base = sh.ShaderProgram.names["shaded"]
-            vert = [s for s in base.shaders if isinstance(s, sh.VertexShader)][0]
-            frag = sh.FragmentShader("""
-                #ifdef GL_ES
-                precision mediump float;
-                #endif
-                varying vec4 v_color;
-                varying vec3 v_normal;
-                void main() {
-                    float p = abs(dot(v_normal, normalize(vec3(0.35, 0.5, 0.8))));
-                    vec3 rgb = v_color.rgb * (0.35 + 0.7 * p);
-                    gl_FragColor = vec4(rgb, v_color.a);
-                }
-            """)
-            prog = sh.ShaderProgram(HEADLIGHT_SHADER, [vert, frag])
-        return prog
-    except Exception as e:  # noqa: BLE001 - unexpected pyqtgraph internals: keep the stock shader
-        log.warning("robot 3D view: headlight shader unavailable (%s); using 'shaded'", e)
-        return "shaded"
 
 
 def wheel_rgba(omega: float | None) -> tuple[float, float, float, float]:
