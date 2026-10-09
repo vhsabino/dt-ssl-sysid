@@ -27,6 +27,7 @@ from PySide6.QtCore import Qt, Signal
 
 from dtssl.bridge.telemetry import RobotTelemetry
 from dtssl.gui import scene3d as S
+from dtssl.gui.glmesh import mesh_data, mesh_item
 from dtssl.gui.glshading import headlight_shader
 from dtssl.physics.mjcf import WheelGeometry, load_ball_spec, load_wheel_geometry
 from dtssl.sim.world import RobotSpec
@@ -68,8 +69,9 @@ def wheel_rgba(omega: float | None) -> tuple[float, float, float, float]:
 
 
 def wheel_face_colors(base: np.ndarray, omega: float | None) -> np.ndarray:
-    """Per-face colours of a CAD wheel tinted by its speed: the CAD colours at rest, blended toward the red
-    (forward) / blue (backward) of :func:`wheel_rgba` as the speed approaches ``WHEEL_MAX_RAD_S``."""
+    """Colours of a CAD wheel (per face or per vertex, whatever ``base`` is) tinted by its speed: the CAD
+    colours at rest, blended toward the red (forward) / blue (backward) of :func:`wheel_rgba` as the speed
+    approaches ``WHEEL_MAX_RAD_S``."""
     out = np.array(base, dtype=float, copy=True)
     if omega is None or abs(float(omega)) < 1e-9:
         return out
@@ -77,16 +79,6 @@ def wheel_face_colors(base: np.ndarray, omega: float | None) -> np.ndarray:
     hot = np.asarray(WHEEL_HOT_FWD if omega >= 0 else WHEEL_HOT_BACK, dtype=float)
     out[:, :3] += (hot - out[:, :3]) * a
     return out
-
-
-def _mesh_kwargs(mesh: S.Mesh, color) -> dict:
-    """``GLMeshItem`` geometry arguments: the per-face CAD colours when the mesh has them, else one ``color``."""
-    kw = dict(vertexes=mesh.vertices, faces=mesh.faces)
-    if mesh.colors is not None:
-        kw["faceColors"] = mesh.colors
-    else:
-        kw["color"] = color
-    return kw
 
 
 class _ArcballView(gl.GLViewWidget if gl is not None else object):
@@ -243,14 +235,13 @@ class RobotView3D(QtWidgets.QWidget):
         self._items = []
         meshes = self._robot_meshes()
         self._shader = _headlight_shader()
-        opts = dict(smooth=False, computeNormals=True, shader=self._shader, drawEdges=False, glOptions="opaque")
         col = CHASSIS_RGBA if meshes.cad else PRIMITIVE_RGBA
-        self.chassis = gl.GLMeshItem(**_mesh_kwargs(meshes.chassis, col), **opts)
-        self.wheels = [gl.GLMeshItem(**_mesh_kwargs(meshes.wheel, S.WHEEL_RGBA), **opts) for _ in self.wheel.angles]
-        self._wheel_mesh = meshes.wheel                   # CAD per-face colours in .colors (None for primitives)
+        self.chassis = mesh_item(meshes.chassis, col, self._shader)
+        self.wheels = [mesh_item(meshes.wheel, S.WHEEL_RGBA, self._shader) for _ in self.wheel.angles]
+        self._wheel_mesh = meshes.wheel                   # CAD colours in .colors / .vertex_colors (None: primitives)
         self._wheel_tint = [None] * len(self.wheels)      # last speed level drawn per wheel (1/32 steps)
         # kicker and dribbler (CAD only): fixed to the chassis, drawn with its transform and their CAD colours
-        self.mechanisms = [gl.GLMeshItem(**_mesh_kwargs(m, CHASSIS_RGBA), **opts) for m in meshes.mechanisms.values()]
+        self.mechanisms = [mesh_item(m, CHASSIS_RGBA, self._shader) for m in meshes.mechanisms.values()]
         self.plate = None
         self._plate_key: tuple[str, int] | None = None
         md = gl.MeshData.sphere(rows=10, cols=16, radius=self.ball_radius)
@@ -286,8 +277,7 @@ class RobotView3D(QtWidgets.QWidget):
             return
         meshes = self._robot_meshes()
         pm = S.id_plate_mesh(key[0], key[1], meshes.z_top + S.PLATE_Z_OVER_TOP)
-        self.plate = gl.GLMeshItem(vertexes=pm.vertices, faces=pm.faces, faceColors=pm.colors, smooth=False,
-                                   computeNormals=True, shader=self._shader, drawEdges=False, glOptions="opaque")
+        self.plate = mesh_item(pm, S.CHASSIS_RGBA, self._shader)
         self.view.addItem(self.plate)
         self._items.append(self.plate)
 
@@ -414,7 +404,9 @@ class RobotView3D(QtWidgets.QWidget):
                                                      omega >= 0)
                 if level != self._wheel_tint[i]:
                     self._wheel_tint[i] = level
-                    it.setMeshData(vertexes=wm.vertices, faces=wm.faces, faceColors=wheel_face_colors(wm.colors, omega))
+                    tinted = S.Mesh(wm.vertices, wm.faces, wheel_face_colors(wm.colors, omega), wm.normals,
+                                    wheel_face_colors(wm.vertex_colors, omega) if wm.smooth else None)
+                    it.setMeshData(meshdata=mesh_data(tinted))
         self.ball.setVisible(bool(tw is not None and tw.has_ball))
         if tw is not None:
             self.arrow_cmd.setData(pos=S.arrow_segments(tw.cmd_vx or 0.0, tw.cmd_vy or 0.0, self._top_z() + 0.03,

@@ -5,10 +5,14 @@ can be unit-tested without a GL context:
 
 * :func:`parse_obj` reads the CAD meshes shipped in ``dtssl.physics.assets`` (the same OBJ files the
   MuJoCo ``visual="cad"`` mode uses: chassis, wheel, kicker and dribbler tessellated with their Inventor colours
-  by ``tools/inventor_export_cad.m``; the per-part ``usemtl`` groups become per-face colours, so every
-  ``GLMeshItem`` is drawn with ``faceColors``); the kicker and dribbler are fixed to the chassis
-  (:func:`mechanism_meshes`). :class:`RobotMeshes` also offers the primitive fallback (D-shaped prism + wheel
-  cylinders) when the CAD is not wanted.
+  by ``tools/inventor_export_cad.m``; the per-part ``usemtl`` groups become per-face colours); the kicker and
+  dribbler are fixed to the chassis (:func:`mechanism_meshes`). :class:`RobotMeshes` also offers the primitive
+  fallback (D-shaped prism + wheel cylinders) when the CAD is not wanted.
+* :func:`smooth_mesh` prepares a mesh for smooth shading: vertices split at the edges sharper than
+  ``SMOOTH_ANGLE_DEG`` (:func:`split_smoothing_groups`), area-weighted :func:`vertex_normals` and the face
+  colours carried per vertex, so rollers and the curved cover shade as round surfaces while box edges stay
+  sharp. :func:`body_mesh` merges everything that moves with the chassis (chassis, kicker, dribbler, id plate)
+  into one mesh, so the field view draws a robot with two GL items (see :mod:`dtssl.gui.glmesh`).
 * :func:`robot_transform` / :func:`wheel_transform` give the 4x4 matrices of the chassis and of each
   wheel for a pose ``(x, y, theta)`` and the wheel spin angles; :class:`WheelSpin` integrates the spin
   from the body velocity through the inverse kinematics ``omega_i r = -sin(phi_i) vx + cos(phi_i) vy + R w``
@@ -76,13 +80,81 @@ class Mesh:
     vertices: np.ndarray            # (n, 3) float
     faces: np.ndarray               # (m, 3) int
     colors: np.ndarray | None = None    # (m, 4) per-face RGBA or None
+    normals: np.ndarray | None = None   # (n, 3) per-vertex normals, set by smooth_mesh (None: flat shading)
+    vertex_colors: np.ndarray | None = None     # (n, 4) RGBA per vertex, set by smooth_mesh from `colors`
 
     @property
     def n_faces(self) -> int:
         return int(len(self.faces))
 
+    @property
+    def smooth(self) -> bool:
+        return self.normals is not None
+
     def bbox(self) -> tuple[np.ndarray, np.ndarray]:
         return self.vertices.min(0), self.vertices.max(0)
+
+
+SMOOTH_ANGLE_DEG = 35.0     # edges with a larger dihedral angle stay sharp when a mesh is smoothed
+
+
+def split_smoothing_groups(vertices: np.ndarray, faces: np.ndarray,
+                           angle_deg: float = SMOOTH_ANGLE_DEG) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Duplicate vertices so that faces share a vertex only across edges whose dihedral angle is below
+    ``angle_deg``: a vertex normal averaged over the faces of the new mesh then smooths a cylinder or a
+    curved cover and keeps the edges of a box sharp. Returns ``(vertices, faces, corner)`` where ``corner[i]``
+    is a face corner ``3 * face + k`` that the new vertex ``i`` came from (to carry per-face data over)."""
+    from scipy.sparse import coo_matrix
+    from scipy.sparse.csgraph import connected_components
+
+    v = np.asarray(vertices, dtype=float)
+    f = np.asarray(faces, dtype=np.int64)
+    m = len(f)
+    fn = np.cross(v[f[:, 1]] - v[f[:, 0]], v[f[:, 2]] - v[f[:, 0]])
+    fn /= np.maximum(np.linalg.norm(fn, axis=1, keepdims=True), 1e-20)
+    a, b = f, np.roll(f, -1, axis=1)                                # edge of corner (i, k): f[i, k] -> f[i, k+1]
+    key = np.stack([np.minimum(a, b), np.maximum(a, b)], axis=-1).reshape(-1, 2)
+    swapped = (a > b).ravel()
+    order = np.lexsort((key[:, 1], key[:, 0]))
+    ks = key[order]
+    same = np.nonzero(np.all(ks[1:] == ks[:-1], axis=1))[0]
+    ca, cb = order[same], order[same + 1]                            # corners whose edges coincide
+    fa, fb = ca // 3, cb // 3
+    ok = np.einsum("ij,ij->i", fn[fa], fn[fb]) >= math.cos(math.radians(angle_deg))
+    ca, cb, fa, fb = ca[ok], cb[ok], fa[ok], fb[ok]
+    nxt_a, nxt_b = 3 * fa + (ca % 3 + 1) % 3, 3 * fb + (cb % 3 + 1) % 3     # the other corner of each edge
+    sa, sb = swapped[ca], swapped[cb]
+    lo_a, hi_a = np.where(sa, nxt_a, ca), np.where(sa, ca, nxt_a)        # corners of the lower / upper vertex
+    lo_b, hi_b = np.where(sb, nxt_b, cb), np.where(sb, cb, nxt_b)
+    rows, cols = np.concatenate([lo_a, hi_a]), np.concatenate([lo_b, hi_b])
+    n = 3 * m
+    graph = coo_matrix((np.ones(len(rows)), (rows, cols)), shape=(n, n))
+    _, labels = connected_components(graph, directed=False)
+    _, first, inv = np.unique(labels, return_index=True, return_inverse=True)
+    corner = first.astype(np.int64)
+    return v[f.ravel()[corner]], inv.reshape(m, 3).astype(np.int64), corner
+
+
+def vertex_normals(vertices: np.ndarray, faces: np.ndarray) -> np.ndarray:
+    """Area-weighted average of the face normals around each vertex (unit vectors, (n, 3))."""
+    v = np.asarray(vertices, dtype=float)
+    f = np.asarray(faces, dtype=np.int64)
+    fn = np.cross(v[f[:, 1]] - v[f[:, 0]], v[f[:, 2]] - v[f[:, 0]])      # |fn| = 2 x the face area
+    n = np.zeros_like(v)
+    for k in range(3):
+        np.add.at(n, f[:, k], fn)
+    return n / np.maximum(np.linalg.norm(n, axis=1, keepdims=True), 1e-20)
+
+
+def smooth_mesh(mesh: Mesh, angle_deg: float = SMOOTH_ANGLE_DEG) -> Mesh:
+    """The mesh ready for smooth shading: vertices split at the edges sharper than ``angle_deg``
+    (:func:`split_smoothing_groups`), per-vertex ``normals`` and, when the mesh has per-face colours, the
+    same colours per vertex (``vertex_colors``). Faces keep their order, so ``colors`` stays valid."""
+    if mesh.smooth:
+        return mesh
+    v, f, corner = split_smoothing_groups(mesh.vertices, mesh.faces, angle_deg)
+    vc = None if mesh.colors is None else np.asarray(mesh.colors, dtype=float)[corner // 3]
+    return Mesh(v, f, mesh.colors, vertex_normals(v, f), vc)
 
 
 def parse_obj(data: bytes | str, materials: dict[str, tuple[float, float, float]] | None = None,
@@ -173,19 +245,28 @@ def cylinder_mesh_z(radius: float, half_height: float, n: int = 24) -> Mesh:
 
 
 def _translate(m: Mesh, d) -> Mesh:
-    return Mesh(m.vertices + np.asarray(d, dtype=float), m.faces, m.colors)
+    return Mesh(m.vertices + np.asarray(d, dtype=float), m.faces, m.colors, m.normals, m.vertex_colors)
 
 
-def merge_meshes(parts: list[Mesh]) -> Mesh:
-    verts, faces, cols, off = [], [], [], 0
+def merge_meshes(parts: list[Mesh], default_rgba=(0.5, 0.5, 0.5, 1.0)) -> Mesh:
+    """One mesh out of several (faces in the given order). Per-face colours survive when any part has them
+    (``default_rgba`` for the others); normals and per-vertex colours survive only when every part is smooth."""
+    verts, faces, cols, norms, vcols, off = [], [], [], [], [], 0
     has_col = any(p.colors is not None for p in parts)
+    smooth = all(p.smooth for p in parts)
     for p in parts:
         verts.append(p.vertices)
         faces.append(p.faces + off)
         if has_col:
-            cols.append(p.colors if p.colors is not None else np.tile((0.5, 0.5, 0.5, 1.0), (p.n_faces, 1)))
+            cols.append(p.colors if p.colors is not None else np.tile(default_rgba, (p.n_faces, 1)))
+        if smooth:
+            norms.append(p.normals)
+            if has_col:
+                vcols.append(p.vertex_colors if p.vertex_colors is not None
+                             else np.tile(default_rgba, (len(p.vertices), 1)))
         off += len(p.vertices)
-    return Mesh(np.vstack(verts), np.vstack(faces), np.vstack(cols) if has_col else None)
+    return Mesh(np.vstack(verts), np.vstack(faces), np.vstack(cols) if has_col else None,
+                np.vstack(norms) if smooth else None, np.vstack(vcols) if smooth and has_col else None)
 
 
 def id_plate_mesh(team: str, rid: int, z_top: float) -> Mesh:
@@ -214,15 +295,31 @@ class RobotMeshes:
     mechanisms: dict[str, Mesh] = field(default_factory=dict)   # kicker/dribbler, drawn with the chassis transform
 
     @classmethod
-    def build(cls, wheel: WheelGeometry, spec: RobotSpec, cad: bool = True, lod: bool = True) -> RobotMeshes:
+    def build(cls, wheel: WheelGeometry, spec: RobotSpec, cad: bool = True, lod: bool = True,
+              smooth: bool = True) -> RobotMeshes:
+        """``smooth`` (default) prepares every mesh for smooth shading (:func:`smooth_mesh`: cylinders and
+        the curved cover shade as round surfaces, box edges stay sharp); ``False`` keeps the raw meshes
+        (flat shading)."""
+        prep = smooth_mesh if smooth else (lambda m: m)
         if cad:
             chassis, wh, meta = cad_meshes(lod=lod)
             # the id plate sits where the CAD has its pattern decals (cover top), not on the bbox top
-            return cls(chassis, wh, wheel.r + cad_plate_z(meta), wheel.r, True,
-                       lod and "chassis_lod" in meta, mechanism_meshes(lod=lod))
+            return cls(prep(chassis), prep(wh), wheel.r + cad_plate_z(meta), wheel.r, True,
+                       lod and "chassis_lod" in meta, {k: prep(m) for k, m in mechanism_meshes(lod=lod).items()})
         chassis = d_prism_mesh(spec.radius, spec.dribbler_offset, 0.008, spec.height)
         wh = cylinder_mesh(wheel.r * 0.92, wheel.hub_half_width)
-        return cls(chassis, wh, spec.height, 0.0, False)
+        return cls(prep(chassis), prep(wh), spec.height, 0.0, False)
+
+
+def body_mesh(meshes: RobotMeshes, team: str, rid: int) -> Mesh:
+    """Everything of a robot that moves with the chassis as one mesh in the chassis frame: chassis, kicker
+    and dribbler (CAD) and the id plate (its body-frame height minus ``z_chassis``), so the 3D field view
+    draws a robot with two GL items (body + wheels) instead of eight: with 22 robots the Python cost per
+    item in ``pyqtgraph`` is what caps the frame rate, not the triangles."""
+    plate = id_plate_mesh(team, rid, meshes.z_top + PLATE_Z_OVER_TOP - meshes.z_chassis)
+    if meshes.chassis.smooth:
+        plate = smooth_mesh(plate)
+    return merge_meshes([meshes.chassis, *meshes.mechanisms.values(), plate], default_rgba=CHASSIS_RGBA)
 
 
 # --------------------------------------------------------------------------------------
@@ -555,7 +652,8 @@ def compute_frame(poses: dict[tuple[str, int], RobotPose], ball_xyz: tuple[float
 
 __all__ = [
     "Mesh", "parse_obj", "cad_meshes", "mechanism_meshes", "MECHANISM_KEYS", "d_prism_mesh", "cylinder_mesh",
-    "disc_mesh", "merge_meshes",
+    "disc_mesh", "merge_meshes", "split_smoothing_groups", "vertex_normals", "smooth_mesh", "SMOOTH_ANGLE_DEG",
+    "body_mesh",
     "id_plate_mesh", "RobotMeshes", "rot_z", "rot_x", "translate", "robot_transform", "wheel_transform",
     "WheelSpin", "floor_quads", "apron_quads", "quad_mesh", "circle_points", "field_segments", "goal_frames",
     "RobotPose",

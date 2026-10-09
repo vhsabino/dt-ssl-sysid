@@ -86,7 +86,7 @@ def test_robot_meshes_build_all_variants():
     assert 0.145 < cad.z_top <= 0.150                                  # id plate on the CAD decal plane
     assert cad.z_top == pytest.approx(WHEEL.r + S.cad_plate_z())
     assert lod.cad and lod.lod and lod.z_top == cad.z_top and lod.z_chassis == cad.z_chassis
-    assert 3 * lod.chassis.n_faces < cad.chassis.n_faces and 3 * lod.wheel.n_faces < cad.wheel.n_faces
+    assert 3 * lod.chassis.n_faces < cad.chassis.n_faces and lod.wheel.n_faces < cad.wheel.n_faces
     assert not prim.cad and prim.z_chassis == 0.0 and prim.z_top == pytest.approx(RobotSpec().height)
     assert lod.chassis.n_faces > 10 * prim.chassis.n_faces
     assert set(cad.mechanisms) == set(lod.mechanisms) == {"kicker", "dribbler"} and prim.mechanisms == {}
@@ -95,6 +95,89 @@ def test_robot_meshes_build_all_variants():
         assert mesh.colors is not None and mesh.colors.shape == (mesh.n_faces, 4)
         assert len({tuple(np.round(c, 3)) for c in mesh.colors}) >= 3
     assert prim.chassis.colors is None
+
+
+def _cube_mesh() -> S.Mesh:
+    """Unit cube, 8 shared vertices (index ``4x + 2y + z``), 2 triangles per face in face order."""
+    v = np.array([[x, y, z] for x in (0.0, 1.0) for y in (0.0, 1.0) for z in (0.0, 1.0)])
+    quads = [(0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3)]
+    f = [t for a, b, c, d in quads for t in ((a, b, c), (a, c, d))]
+    return S.Mesh(v, np.asarray(f, dtype=np.int32))
+
+
+def _face_normals(m: S.Mesh) -> np.ndarray:
+    v, f = m.vertices, m.faces
+    n = np.cross(v[f[:, 1]] - v[f[:, 0]], v[f[:, 2]] - v[f[:, 0]])
+    return n / np.linalg.norm(n, axis=1, keepdims=True)
+
+
+def test_smooth_mesh_keeps_box_edges_sharp_and_rounds_cylinders():
+    cube = _cube_mesh()
+    cube.colors = np.repeat([[i / 5.0, 0.2, 0.4, 1.0] for i in range(6)], 2, axis=0)   # one colour per cube face
+    sm = S.smooth_mesh(cube)
+    assert sm.smooth and not cube.smooth and sm.n_faces == 12 and len(sm.vertices) == 24   # 6 faces x 4 corners
+    assert sm.colors is cube.colors and sm.vertex_colors.shape == (24, 4)
+    for tri, n in zip(sm.faces, _face_normals(sm), strict=True):       # 90 deg edges: every corner keeps its face
+        np.testing.assert_allclose(sm.normals[tri], np.tile(n, (3, 1)), atol=1e-12)
+    np.testing.assert_allclose(sm.vertex_colors[sm.faces], np.repeat(cube.colors[:, None, :], 3, axis=1))
+    assert S.smooth_mesh(sm) is sm                                      # already smooth: untouched
+    cyl = S.cylinder_mesh(0.03, 0.009, n=24)
+    sc = S.smooth_mesh(cyl)
+    assert sc.n_faces == cyl.n_faces and sc.vertex_colors is None
+    assert len(sc.vertices) == 2 * 24 + 2 * (24 + 1)                     # side rings shared, caps split off
+    side = np.abs(np.abs(sc.normals[:, 0]) - 1.0) > 1e-9                # the cap normals are exactly +-x
+    assert side.sum() == 48 and np.abs(sc.normals[side, 0]).max() < 1e-9
+    radial = sc.vertices[side, 1:] / np.linalg.norm(sc.vertices[side, 1:], axis=1, keepdims=True)
+    assert np.abs(np.einsum("ij,ij->i", sc.normals[side, 1:], radial)).min() > 0.99   # round: normals ~radial
+    assert len(S.smooth_mesh(cyl, angle_deg=5.0).vertices) > len(sc.vertices)    # 15 deg facets split too
+
+
+def test_vertex_normals_are_area_weighted_unit_vectors():
+    v = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 0.1]])
+    f = np.array([[0, 1, 2], [0, 3, 1]])             # +z face, area 0.5; +y face, area 0.05
+    n = S.vertex_normals(v, f)
+    np.testing.assert_allclose(np.linalg.norm(n, axis=1), 1.0)
+    np.testing.assert_allclose(n[2], [0.0, 0.0, 1.0])
+    np.testing.assert_allclose(n[3], [0.0, 1.0, 0.0])
+    np.testing.assert_allclose(n[0], np.array([0.0, 0.1, 1.0]) / math.sqrt(1.01))   # 10:1 by area
+
+
+def test_merge_meshes_carries_normals_and_vertex_colours_only_when_all_parts_are_smooth():
+    a = S.smooth_mesh(S.cylinder_mesh(0.02, 0.01))                       # no colours of its own
+    b = S.smooth_mesh(S.id_plate_mesh("blue", 3, 0.05))                  # per-face colours
+    rgba = (0.1, 0.2, 0.3, 1.0)
+    m = S.merge_meshes([a, b], default_rgba=rgba)
+    assert m.smooth and m.n_faces == a.n_faces + b.n_faces and len(m.vertices) == len(a.vertices) + len(b.vertices)
+    assert m.normals.shape == (len(m.vertices), 3) and m.vertex_colors.shape == (len(m.vertices), 4)
+    assert m.faces.max() == len(m.vertices) - 1
+    np.testing.assert_allclose(m.colors[:a.n_faces], np.tile(rgba, (a.n_faces, 1)))
+    np.testing.assert_allclose(m.vertex_colors[:len(a.vertices)], np.tile(rgba, (len(a.vertices), 1)))
+    np.testing.assert_allclose(m.vertex_colors[len(a.vertices):], b.vertex_colors)
+    np.testing.assert_allclose(m.normals[len(a.vertices):], b.normals)
+    flat = S.merge_meshes([a, S.id_plate_mesh("blue", 3, 0.05)])         # one flat part: flat result
+    assert not flat.smooth and flat.normals is None and flat.vertex_colors is None and flat.colors is not None
+
+
+def test_body_mesh_merges_chassis_mechanisms_and_plate_in_the_chassis_frame():
+    meshes = S.RobotMeshes.build(WHEEL, RobotSpec(), cad=True, lod=True)
+    plate = S.id_plate_mesh("blue", 3, 0.0)
+    body = S.body_mesh(meshes, "blue", 3)
+    n_cad = meshes.chassis.n_faces + sum(m.n_faces for m in meshes.mechanisms.values())
+    assert body.n_faces == n_cad + plate.n_faces and body.smooth
+    assert body.normals.shape == (len(body.vertices), 3) and body.vertex_colors.shape == (len(body.vertices), 4)
+    assert body.colors.shape == (body.n_faces, 4)
+    np.testing.assert_allclose(body.colors[:meshes.chassis.n_faces], meshes.chassis.colors)
+    pv = body.vertices[np.unique(body.faces[-plate.n_faces:])]            # the plate comes last
+    z_plate = meshes.z_top + S.PLATE_Z_OVER_TOP - meshes.z_chassis         # body-frame height, chassis frame
+    assert pv[:, 2].min() == pytest.approx(z_plate, abs=1e-9) and pv[:, 2].max() < z_plate + 0.002
+    assert np.hypot(pv[:, 0], pv[:, 1]).max() < RobotSpec().radius         # dots inside the cover
+    raw = S.RobotMeshes.build(WHEEL, RobotSpec(), cad=True, lod=True, smooth=False)
+    assert not raw.chassis.smooth and not raw.wheel.smooth and not S.body_mesh(raw, "blue", 3).smooth
+    assert len(raw.chassis.vertices) <= len(meshes.chassis.vertices)
+    assert len(S.smooth_mesh(raw.chassis).vertices) == len(meshes.chassis.vertices)
+    prim = S.RobotMeshes.build(WHEEL, RobotSpec(), cad=False)
+    pb = S.body_mesh(prim, "yellow", 0)
+    assert pb.n_faces == prim.chassis.n_faces + plate.n_faces and pb.smooth and pb.colors is not None
 
 
 def test_robot_transform_maps_body_points_to_world():

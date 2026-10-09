@@ -140,18 +140,22 @@ def test_tab_selector_and_view_switch(qapp):
 
 
 def _wheel_colour(v, i: int) -> np.ndarray:
-    """RGB drawn on wheel ``i``: the mean of the per-face tint (CAD meshes) or the item colour (primitives)."""
+    """RGB drawn on wheel ``i``: the mean of the tint (CAD meshes: per vertex when the mesh is smooth, per face
+    otherwise) or the item colour (primitives)."""
     if v._wheel_mesh.colors is None:
         return np.asarray(v.wheels[i].opts["color"], dtype=float)[:3]
-    return np.asarray(v.wheels[i].opts["meshdata"].faceColors(), dtype=float)[:, :3].mean(0)
+    md = v.wheels[i].opts["meshdata"]
+    cols = md.vertexColors() if v._wheel_mesh.smooth else md.faceColors()
+    return np.asarray(cols, dtype=float)[:, :3].mean(0)
 
 
 def _expected_wheel_colour(v, omega: float) -> np.ndarray:
     from dtssl.gui.robot_view3d import wheel_face_colors, wheel_rgba
 
-    if v._wheel_mesh.colors is None:
+    wm = v._wheel_mesh
+    if wm.colors is None:
         return np.asarray(wheel_rgba(omega))[:3]
-    return wheel_face_colors(v._wheel_mesh.colors, omega)[:, :3].mean(0)
+    return wheel_face_colors(wm.vertex_colors if wm.smooth else wm.colors, omega)[:, :3].mean(0)
 
 
 def test_robot_view3d_records_rotation_and_presets(qapp):

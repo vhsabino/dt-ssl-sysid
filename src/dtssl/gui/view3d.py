@@ -6,8 +6,12 @@ The view is built from :class:`~dtssl.sim.entities.WorldState` only, so it works
 :mod:`dtssl.gui.scene3d`. Mouse: left drag orbits, middle drag (or Shift) pans, wheel zooms
 (``GLViewWidget`` defaults). Toolbar: camera presets (``iso``/``top``/``side``/``goal``), *Follow*
 (camera centre tracks the selected robot), *CAD* (meshes vs the primitive shapes), *HQ* (full-resolution
-meshes instead of the light LOD pair: ~5x more triangles), *Wheels* (spin the wheels from the body velocity
+meshes instead of the light LOD pair: ~3x more triangles), *Wheels* (spin the wheels from the body velocity
 through the inverse kinematics), *Fit* (``F``).
+
+Each robot is two GL items (body + the four wheels as instances of one item, :mod:`dtssl.gui.glmesh`) plus
+the selection ring: with 22 robots the Python cost per item in ``pyqtgraph`` is what caps the frame rate, not
+the triangles. The meshes are smooth-shaded (:func:`dtssl.gui.scene3d.smooth_mesh`).
 
 ``pyqtgraph.opengl`` needs ``PyOpenGL`` (extra ``dtssl[gui]``) and a GL-capable Qt platform; when either
 is missing the widget shows a label with the reason instead of failing (the 2D field view is unaffected).
@@ -21,6 +25,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6.QtCore import Qt, Signal
 
 from dtssl.gui import scene3d as S
+from dtssl.gui.glmesh import InstancedMeshItem, instancing_available, mesh_item
 from dtssl.gui.glshading import headlight_shader
 from dtssl.physics.mjcf import WheelGeometry, load_ball_spec, load_wheel_geometry
 from dtssl.sim.entities import WorldState
@@ -42,36 +47,26 @@ def _qmatrix(m: np.ndarray) -> QtGui.QMatrix4x4:
     return QtGui.QMatrix4x4(*[float(v) for v in np.asarray(m, dtype=float).reshape(16)])
 
 
-def _mesh_kwargs(mesh: S.Mesh, color) -> dict:
-    """``GLMeshItem`` geometry arguments: the per-face CAD colours when the mesh has them, else one ``color``."""
-    kw = dict(vertexes=mesh.vertices, faces=mesh.faces)
-    if mesh.colors is not None:
-        kw["faceColors"] = mesh.colors
-    else:
-        kw["color"] = color
-    return kw
-
-
 class _RobotItems:
-    """GL items of one robot: chassis, 4 wheels, kicker and dribbler (CAD only, fixed to the chassis), id plate
-    (+ selection ring)."""
+    """GL items of one robot: the body (chassis + kicker + dribbler + id plate as one mesh, chassis frame,
+    :func:`scene3d.body_mesh`), the four wheels (one :class:`InstancedMeshItem` when pyqtgraph allows it, else
+    four items) and the selection ring. Few items per robot on purpose: see :mod:`dtssl.gui.glmesh`."""
 
     def __init__(self, view, key: tuple[str, int], meshes: S.RobotMeshes, spec: RobotSpec, shader="shaded"):
         team, rid = key
         self.key = key
-        opts = dict(smooth=False, computeNormals=True, shader=shader, drawEdges=False, glOptions="opaque")
         col = S.CHASSIS_RGBA if meshes.cad else S.PRIMITIVE_RGBA
-        self.chassis = gl.GLMeshItem(**_mesh_kwargs(meshes.chassis, col), **opts)
-        self.wheels = [gl.GLMeshItem(**_mesh_kwargs(meshes.wheel, S.WHEEL_RGBA), **opts) for _ in range(4)]
-        # kicker and dribbler (CAD only): fixed to the chassis, drawn with its transform and their CAD colours
-        self.mechanisms = [gl.GLMeshItem(**_mesh_kwargs(m, S.CHASSIS_RGBA), **opts)
-                           for m in meshes.mechanisms.values()]
-        plate = S.id_plate_mesh(team, rid, meshes.z_top + S.PLATE_Z_OVER_TOP)
-        self.plate = gl.GLMeshItem(vertexes=plate.vertices, faces=plate.faces, faceColors=plate.colors, **opts)
+        self.body = mesh_item(S.body_mesh(meshes, team, rid), col, shader)
+        if instancing_available():
+            self.wheel_item = mesh_item(meshes.wheel, S.WHEEL_RGBA, shader, cls=InstancedMeshItem)
+            self.wheels = [self.wheel_item]
+        else:
+            self.wheel_item = None
+            self.wheels = [mesh_item(meshes.wheel, S.WHEEL_RGBA, shader) for _ in range(4)]
         ring = S.circle_points(0.0, 0.0, spec.radius + 0.012, 48, 0.004)
         self.ring = gl.GLLinePlotItem(pos=ring, color=S.SELECT_RGBA, width=2.0, antialias=True, mode="line_strip")
         self.ring.setVisible(False)
-        self.items = [self.chassis, *self.wheels, *self.mechanisms, self.plate, self.ring]
+        self.items = [self.body, *self.wheels, self.ring]
         for it in self.items:
             view.addItem(it)
         self._visible = True
@@ -85,13 +80,12 @@ class _RobotItems:
                 self.ring.setVisible(False)
 
     def apply(self, chassis_T: np.ndarray, wheel_Ts: list[np.ndarray], body_T: np.ndarray, selected: bool) -> None:
-        qc = _qmatrix(chassis_T)
-        self.chassis.setTransform(qc)
-        for it in self.mechanisms:
-            it.setTransform(qc)
-        for it, T in zip(self.wheels, wheel_Ts, strict=True):
-            it.setTransform(_qmatrix(T))
-        self.plate.setTransform(_qmatrix(body_T))
+        self.body.setTransform(_qmatrix(chassis_T))
+        if self.wheel_item is not None:
+            self.wheel_item.set_instances([_qmatrix(T) for T in wheel_Ts])
+        else:
+            for it, T in zip(self.wheels, wheel_Ts, strict=True):
+                it.setTransform(_qmatrix(T))
         self.ring.setTransform(_qmatrix(body_T))
         self.ring.setVisible(selected and self._visible)
 
