@@ -214,6 +214,13 @@ mostra o robô selecionado (o mesmo da toolbar, das teclas `,`/`.` e do clique n
 resultante, idade do comando, watchdog, dribbler, sensor de bola, chutes do mundo), as quatro rodas em barras
 (comando × resultante, rad/s) e nos últimos 10 s como curvas, e o bloco de hardware (bateria, capacitor, IR).
 
+Desde 09/10/2026 as curvas das rodas são quatro gráficos, um por motor (`WheelPlot` passou de `PlotWidget` a
+`GraphicsLayoutWidget` com linhas `m1`..`m4` de eixo do tempo ligado, como os gráficos de vx, vy e ω da janela
+principal): as quatro velocidades sobrepostas num gráfico só não se liam. Em cada linha, resultante cheia na cor da
+roda, comando tracejado na mesma cor e, quando o rádio reporta, a roda do robô real em rosa (`append(t, cmd, meas,
+real)`, NaN quando não há registro real: a curva rosa fica com buraco, `connect="finite"`, e some quando não há nada
+na janela). Render de conferência (offscreen): `_to_delete\rtab_wheel_plot.png`.
+
 De onde vem cada valor (`dtssl/bridge/telemetry.py`, um `RobotTelemetry` por fonte):
 
 - **gêmeo** (`twin_telemetry`): do `WorldState` e do último `RobotCmd`; as velocidades por roda pela cinemática inversa
