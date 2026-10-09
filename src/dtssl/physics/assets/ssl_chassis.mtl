@@ -54,9 +54,9 @@ newmtl m_eaeaea
 Kd 0.9176 0.9176 0.9176
 Ka 0 0 0
 Ks 0 0 0
-newmtl m_f7f9d1
-# BoardColor
-Kd 0.9686 0.9765 0.8196
+newmtl m_1f4d2e
+# BoardColor (override)
+Kd 0.1216 0.3020 0.1804
 Ka 0 0 0
 Ks 0 0 0
 newmtl m_fdfeff

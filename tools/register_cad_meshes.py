@@ -1,10 +1,12 @@
 """Register the CAD meshes written by ``tools/inventor_export_cad.m`` in ``src/dtssl/physics/assets/meshes.json``.
 
-The four meshes (``ssl_chassis``, ``ssl_wheel``, ``ssl_kicker``, ``ssl_dribbler`` + their ``_lod`` twins) are
-tessellated out of the Inventor assembly ``robot_v2025_v3.iam`` by the MATLAB exporter, which writes OBJ files with one
-``g`` group per part, one ``usemtl`` per colour (materials in ``ssl_<tag>.mtl``) and a comment header that records the
-provenance and one ``# part`` line per part. This script only *reads* those files (numpy, no CAD package needed) and
-derives what ``dtssl.physics.mjcf`` and the GUI need:
+The four meshes (``ssl_chassis``, ``ssl_wheel``, ``ssl_kicker``, ``ssl_dribbler``) are tessellated out of the
+Inventor assembly ``robot_v2025_v3.iam`` by the MATLAB exporter, which writes OBJ files with one ``g`` group per part,
+one ``usemtl`` per colour (materials in ``ssl_<tag>.mtl``) and a comment header that records the provenance and one
+``# part`` line per part. Their ``_lod`` twins (``tools/cad_lod.m``) keep the same format but only the parts seen from
+outside, decimated with a face budget shared by visible area (an ``# interior`` header line lists the parts left out).
+This script only *reads* those files (numpy, no CAD package needed) and derives what ``dtssl.physics.mjcf`` and the
+GUI need:
 
 * counts, bounding boxes, md5 and the header provenance of every OBJ;
 * the material table of every mesh (``{m_rrggbb: {rgb, name}}``, RGB in 0-1);
@@ -223,7 +225,8 @@ def register(assets: Path = ASSETS) -> dict:
     """Build the whole ``meshes.json`` dict from the OBJ/MTL files in ``assets``."""
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     meta: dict = dict(
-        generated=stamp, generator="tools/register_cad_meshes.py (meshes by tools/inventor_export_cad.m)", units="m",
+        generated=stamp, units="m",
+        generator="tools/register_cad_meshes.py (meshes by tools/inventor_export_cad.m, LOD by tools/cad_lod.m)",
         frame="dtssl MJCF body frame: dribbler at +x, wheels at 60/135/225/300 deg; Inventor -> MJCF = R_z(+90 deg), "
               "z origin on the wheel-axle plane (Inventor z = 24.15 mm); wheel mesh in its own axle frame (+x outward)",
         axle_z_inventor_mm=AXLE_Z_MM,
@@ -239,7 +242,8 @@ def register(assets: Path = ASSETS) -> dict:
             parts = parts_of(obj)
             pts = obj["vertices"]
             lo, hi = pts.min(0), pts.max(0)
-            src = [ln[2:] for ln in obj["header"] if not ln.startswith(("# part ", "# materials", "# skipped"))]
+            src = [ln[2:] for ln in obj["header"]
+                   if not ln.startswith(("# part ", "# materials", "# skipped", "# interior"))]
             m_src = re.search(r"^source (?P<file>.+?), target", src[1]) if len(src) > 1 else None
             if m_src:
                 sources[m_src["file"]] = "tools/inventor_export_cad.m (Inventor COM API, CalculateFacets)"

@@ -6,7 +6,8 @@ function out = inventor_export_cad(varargin)
 %   ComponentOccurrence.SurfaceBodies(i).CalculateFacets (proxies, i.e. already in the TOP-LEVEL assembly frame)
 %   and writes four meshes in the dtssl MJCF body frame
 %       p_mjcf [m] = R_z(+90 deg) * (p_inventor [mm] - [0 0 AxleZmm]) / 1000      (x' = -y, y' = x)
-%   each as a full OBJ plus a decimated LOD OBJ (MATLAB reducepatch, part by part so colours survive):
+%   each as a full OBJ plus a LOD OBJ for the GUI 3D views (tools/cad_lod.m: only the parts seen from outside,
+%   reducepatch part by part with a face budget shared by visible area, so colours survive):
 %     ssl_chassis.obj   everything that is not a mechanism, a wheel, a fastener, a decal or a tiny SMD part
 %     ssl_wheel.obj     ONE wheel sub-assembly (option 'WheelPath') in its own frame: axle along +x (outward),
 %                       roller mid-plane at x = 0; the MJCF places it at (R cos phi, R sin phi, wheel.r), euler z = phi
@@ -38,8 +39,13 @@ function out = inventor_export_cad(varargin)
 %     'ColourOverrides' N x 2 cell {regexp on the leaf name, [r g b]}: colour used instead of the appearance. Default:
 %                     the cover part (Capa_2025_V3) is black, because in Inventor it is wrapped in a black decal with
 %                     the sponsor logos (decals are images on faces, not appearances, so the API reports its grey base)
+%     'AppearanceOverrides' N x 2 cell {regexp on the appearance display name, [r g b]}: colour used instead of that
+%                     appearance on every part that carries it (a leaf-name override wins). Default: 'BoardColor', the
+%                     appearance of the PCBs (motor boards, main board, processor board), a light cream in the CAD,
+%                     is drawn moss green (31 77 46), darker than the field, as circuit boards usually are
 %     'FaceTargets'   struct of face budgets, fields chassis, chassis_lod, wheel, wheel_lod, kicker, kicker_lod,
-%                     dribbler, dribbler_lod (0 = keep every face); default 60000/12000, 8000/1200, 0/1500, 0/3500
+%                     dribbler, dribbler_lod (0 = keep every face); default 60000/12000, 8000/1200, 0/1500, 0/3500;
+%                     the *_lod budgets are handed to tools/cad_lod.m
 %     'AxleZmm'       wheel-axle plane height in the Inventor frame (default 24.15: the wheel axle of the v2025 CAD,
 %                     measured on Direct_Transmission_new:1; the MJCF places the meshes at z = wheel.r above the floor)
 %     'Close'         true (default) closes the assembly (no save) at the end if this call opened it; Inventor itself
@@ -65,6 +71,7 @@ ip.addParameter('SkipPattern', '^(DIN|ISO|Copper|R0805|C0805K|SOT23|LED-GULLR|1X
 ip.addParameter('DecalPattern', '^Papier', @ischar);
 ip.addParameter('MinPartMm', 4, @isnumeric);
 ip.addParameter('ColourOverrides', {'^Part Studio 1 - Capa_2025_V3', [15 15 15]}, @iscell);
+ip.addParameter('AppearanceOverrides', {'^BoardColor$', [31 77 46]}, @iscell);
 ip.addParameter('FaceTargets', struct('chassis', 60000, 'chassis_lod', 12000, 'wheel', 8000, 'wheel_lod', 1200, ...
                                       'kicker', 0, 'kicker_lod', 1500, 'dribbler', 0, 'dribbler_lod', 3500), @isstruct);
 ip.addParameter('AxleZmm', 24.15, @isnumeric);
@@ -164,11 +171,18 @@ while ~isempty(stack)
     if isempty(F), continue; end
     try, ap = occ.Appearance; catch, ap = []; end
     [rgb, apName] = appearance_rgb(ap);
-    for k = 1:size(o.ColourOverrides, 1)
-        if ~isempty(regexp(name, o.ColourOverrides{k, 1}, 'once'))
-            rgb = o.ColourOverrides{k, 2}; apName = [apName ' (override)']; break %#ok<AGROW>
+    overridden = false;
+    for k = 1:size(o.AppearanceOverrides, 1)
+        if ~isempty(regexp(apName, o.AppearanceOverrides{k, 1}, 'once'))
+            rgb = o.AppearanceOverrides{k, 2}; overridden = true; break
         end
     end
+    for k = 1:size(o.ColourOverrides, 1)
+        if ~isempty(regexp(name, o.ColourOverrides{k, 1}, 'once'))
+            rgb = o.ColourOverrides{k, 2}; overridden = true; break
+        end
+    end
+    if overridden, apName = [apName ' (override)']; end %#ok<AGROW>
     Lm = (Rz * (V - [0 0 o.AxleZmm]).').';
     leaves(end+1) = struct('cls', cls, 'path', path, 'V', V, 'F', F, 'rgb', rgb, 'app', apName, ...
                            'box', [min(Lm); max(Lm)], 'occ', []); %#ok<AGROW>
@@ -233,11 +247,10 @@ for ti = 1:numel(o.Targets)
     note = sprintf('%d parts, %d faces (full resolution)', numel(sel), nfull);
     if nf < nfull, note = sprintf('%d parts, %d -> %d faces (reducepatch per part)', numel(sel), nfull, nf); end
     write_obj(fn, selFull, [hdr(1:3), {note}, hdr(4:end)], sprintf('ssl_%s.mtl', tag));
-    selLod = decimate_parts(selFull, o.FaceTargets.([tag '_lod']));
-    nl = sum(arrayfun(@(l) size(l.F, 1), selLod));
-    fnl = fullfile(o.OutDir, sprintf('ssl_%s_lod.obj', tag));
-    write_obj(fnl, selLod, [hdr(1:3), {sprintf('%d parts, %d -> %d faces (LOD for the GUI 3D views: reducepatch per part of ssl_%s.obj)', ...
-                                                numel(sel), nf, nl, tag)}, hdr(4:end)], sprintf('ssl_%s.mtl', tag));
+    if exist('cad_lod', 'file') ~= 2, addpath(fileparts(mfilename('fullpath'))); end
+    lod = cad_lod('Targets', {tag}, 'OutDir', o.OutDir, 'FaceTargets', o.FaceTargets);   % exterior-only LOD
+    fnl = lod.file_lod;
+    nl = lod.faces_lod;
     allV = vertcat(selFull.V);
     out(end+1) = struct('tag', tag, 'parts', {{sel.path}}, 'skipped', {skipped.(tag)}, 'materials', mtl, 'file', fn, ...
         'file_lod', fnl, 'faces', nf, 'faces_lod', nl, 'bbox_mjcf_mm', [min(allV); max(allV)] * 1000, ...

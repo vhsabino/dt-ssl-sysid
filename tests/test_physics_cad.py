@@ -48,9 +48,10 @@ def test_assets_present_and_meta_consistent():
         assert used <= set(meta[key]["materials"])                   # every colour of the OBJ is in the MTL
         for m in meta[key]["materials"].values():
             assert len(m["rgb"]) == 3 and all(0.0 <= c <= 1.0 for c in m["rgb"]) and m["name"]
-    for key in mjcf.CAD_KEYS:                                          # LOD: same parts, decimated
-        assert meta[f"{key}_lod"]["n_parts"] == meta[key]["n_parts"]
+    for key in mjcf.CAD_KEYS:                       # LOD: the parts seen from outside (tools/cad_lod.m), decimated
+        assert 0 < meta[f"{key}_lod"]["n_parts"] <= meta[key]["n_parts"]
         assert meta[f"{key}_lod"]["faces"] < 0.4 * meta[key]["faces"]
+        assert set(meta[f"{key}_lod"]["materials"]) <= set(meta[key]["materials"])
         assert len(meta[key]["materials"]) == N_SUBMESH[key]        # (the bar has a colour of its own)
     assert set(mjcf.mesh_assets()) == set(OBJ_FILES) | set(MTL_FILES)
     for f in OBJ_FILES + MTL_FILES:
