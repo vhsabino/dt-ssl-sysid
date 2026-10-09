@@ -258,7 +258,8 @@ não há GL ou com `--no-3d`):
   corpo comandada (laranja) e resultante (ciano) por cima da tampa; tríade do frame de corpo (x vermelho = dribbler).
 - **Iluminação**: o `shaded` do pyqtgraph ilumina por trás da peça (uma peça sozinha fica quase preta): `RobotView3D`
   registra `dtssl_headlight`, o *vertex shader* do próprio `shaded` (segue a versão do pyqtgraph) com um *fragment*
-  de luz frontal e 35 % de ambiente; se algo falhar, cai no `shaded`. Malhas CAD em resolução cheia por default (é
+  de luz frontal e 35 % de ambiente; se algo falhar, cai no `shaded` (desde 09/10/2026 o shader mora em
+  `gui/glshading.py` e a vista 3D do campo usa o mesmo). Malhas CAD em resolução cheia por default (é
   um robô só; `HQ` desliga se pesar no WSLg), placa SSL com o id do robô.
 - **Seletor na aba**: combo com todos os robôs presentes dos dois times mais `<`/`>`; emite `robot_requested` e o
   `MainWindow` chama `controller.select`, então vale para toda a GUI (campo 2D, aba 3D, plots), igual ao clique no
@@ -276,7 +277,7 @@ As duas vistas 3D (campo, `view3d._RobotItems`; aba Robot, `RobotView3D._build_i
 dribbler do CAD como itens estáticos presos ao chassi: `scene3d.mechanism_meshes(lod)` lê `ssl_kicker*.obj` e
 `ssl_dribbler*.obj` de `physics/assets` (mesmo frame do OBJ do chassi, origem z no plano dos eixos das rodas) e
 `RobotMeshes.mechanisms` os carrega junto (vazio no modo primitivo); os `GLMeshItem` recebem a transformada do
-chassi a cada quadro. Campo com 12 robôs usa os LOD (1 490 + 3 506 faces por robô); a aba Robot usa a resolução cheia
+chassi a cada quadro. Campo com 12 robôs usa os LOD (1 490 + 3 486 faces por robô desde a LOD de 09/10); a aba Robot usa a resolução cheia
 (4 990 + 14 862). Nada se move ainda nas vistas da GUI (o dribbler físico do MuJoCo, `dribbler="bar"`, gira a barra
 só no modelo; a GUI continua desenhando o CAD estático). Origem e proveniência das malhas: `docs/refactor_notes/physics.md`,
 seção "Malhas do CAD".
@@ -366,6 +367,30 @@ debug, com 6 robôs de cada lado na B e 11 na A, e verificar em que modos faz se
   combo, vistas, combos de robô, Replay desabilita e desenha a B, `--field divA` na abertura), `tests/test_world_twin.py`,
   `tests/test_physics_world.py`, `tests/test_physics_mjcf.py` e `tests/test_bridge_proto.py` (mundo, MJCF, pacote de
   geometria e CLIs na Divisão A).
+
+## Manchas brancas na vista 3D do campo e verde das placas (09/10/2026)
+
+Sintoma (captura do Victor, modo Debug, aba do campo em 3D): os robôs pretos apareciam salpicados de manchas brancas,
+"um brilho", e as placas dos motores vistas pelos recortes das rodas tinham um verde muito claro.
+
+- **Causa das manchas**: não era a luz, era a LOD. Renderizando de verdade no PC (`_to_delete\gl_probe.py`, GL do
+  Windows, `grab_image()`), a malha cheia com o `shaded` sai limpa e a LOD com o mesmo shader mostra as manchas. A LOD
+  antiga decimava cada peça pela mesma razão e `reducepatch` mantém os vértices na superfície, então as cordas da
+  tampa e da placa quase branca sob ela (`Gehäuse_Unterplatte`) afundavam ~1 mm uma pela outra e a placa clara e as
+  peças de alumínio furavam a tampa preta. Correção nos *assets*: `tools/cad_lod.m` (LOD só das peças vistas de fora,
+  orçamento de faces por área visível; detalhes em `physics.md`, "LOD para as vistas 3D").
+- **Luz da vista do campo**: `view3d.View3D` usava o `shaded` do pyqtgraph, que ilumina por trás (as faces voltadas
+  para a câmera ficavam em 20 %, o que realçava qualquer face clara). O `dtssl_headlight` da aba Robot foi movido para
+  `src/dtssl/gui/glshading.py` (`headlight_shader()`, mesma queda para `shaded` se falhar) e a vista do campo passa o
+  shader à bola e aos `_RobotItems` (parâmetro `shader`, default `shaded`); `robot_view3d.py` importa dali.
+- **Verde das placas**: as PCBs (`Motor_board_v3_0_BOARD` × 4, `MainBoard_SSL_2024_F7_BOARD`,
+  `processor_board_v1_0_BOARD`) carregam no Inventor a aparência `BoardColor`, creme (247, 249, 209). Nos arquivos
+  `ssl_chassis.obj`/`_lod.obj`/`.mtl` o material virou `m_1f4d2e` "BoardColor (override)", verde musgo (31, 77, 46),
+  mais escuro que o piso (`FLOOR_RGBA` 0,13/0,47/0,20) e que a borda; o exportador ganhou `AppearanceOverrides` com
+  esse default para a próxima exportação. Vale para a GUI (os dois modos) e para o `visual="cad"` do MuJoCo.
+- Conferido em renders reais no PC (`_to_delete\gl_after_closeup_lod.png`, close dos robôs na LOD, e
+  `gl_after_iso_divA.png`, campo da Divisão A com 22 robôs): sem manchas na LOD, placas verde-musgo. Testes: `tests/test_physics_cad.py`
+  (`n_parts` da LOD ≤ da malha cheia), `test_physics_dribbler.py`, `test_gui_view3d.py`, `test_gui_robot_tab.py`.
 
 ## Correção 03/09/2026 — `ZeroDivisionError` do pyqtgraph ao trocar de robô
 

@@ -157,15 +157,16 @@ repositório só como arquivo de origem antigo).
 uma vez, tessela cada corpo folha visível com `SurfaceBodies(i).CalculateFacets` (tolerância de corda 0,1 mm; os
 *proxies* já vêm no frame da montagem principal) e escreve quatro malhas no frame de corpo do MJCF
 (p' = R_z(+90°)·(p − [0 0 24,15 mm]) / 1000: x' = −y, y' = x, origem z no plano dos eixos das rodas, logo os geoms
-ficam em `pos = (0, 0, wheel.r)`), cada uma com o par `_lod` para a GUI (decimação `reducepatch` **por peça**, para
-as cores sobreviverem):
+ficam em `pos = (0, 0, wheel.r)`), cada uma com o par `_lod` para a GUI, escrito por `tools/cad_lod.m` (só as peças
+vistas de fora, decimação `reducepatch` **por peça** com o orçamento de faces repartido pela área visível, para as
+cores sobreviverem; ver "LOD para as vistas 3D" abaixo):
 
 | Malha | O que entra | Peças | Faces (cheia / LOD) | Cores |
 |---|---|---|---|---|
-| `ssl_chassis.obj` | tudo o que não é mecanismo, roda, fixador (DIN/ISO), decalque ou peça SMD menor que 4 mm (`SkipPattern`, `MinPartMm`) | 218 (554 omitidas) | 60 188 / 14 080 | 13 |
-| `ssl_wheel.obj` | uma roda, `Direct_Transmission_new:1/Wheel_v2025_new:1` (`WheelPath`), no frame da roda: eixo em +x (saída), plano médio dos roletes em x = 0; as outras três ficam fora do chassi | 82 | 8 088 / 2 238 | 5 |
-| `ssl_kicker.obj` | `kicker_assembly_5mm:1` (chute reto + chip), frame do chassi | 12 | 4 990 / 1 490 | 3 |
-| `ssl_dribbler.obj` | `Dribbler_Robocup2025v3:1` (barra, motor, engrenagens, placas laterais, suporte do chip, PCBs IR) | 32 | 14 862 / 3 506 | 9 |
+| `ssl_chassis.obj` | tudo o que não é mecanismo, roda, fixador (DIN/ISO), decalque ou peça SMD menor que 4 mm (`SkipPattern`, `MinPartMm`) | 218 (554 omitidas); 209 na LOD | 60 188 / 11 855 | 13 |
+| `ssl_wheel.obj` | uma roda, `Direct_Transmission_new:1/Wheel_v2025_new:1` (`WheelPath`), no frame da roda: eixo em +x (saída), plano médio dos roletes em x = 0; as outras três ficam fora do chassi | 82; 75 na LOD | 8 088 / 1 798 | 5 |
+| `ssl_kicker.obj` | `kicker_assembly_5mm:1` (chute reto + chip), frame do chassi | 12; 12 na LOD | 4 990 / 1 490 | 3 |
+| `ssl_dribbler.obj` | `Dribbler_Robocup2025v3:1` (barra, motor, engrenagens, placas laterais, suporte do chip, PCBs IR) | 32; 30 na LOD | 14 862 / 3 486 | 9 |
 
 Cores: cada folha recebe a cor base (difusa) da sua própria aparência, `ComponentOccurrence.Appearance` (aparência da
 peça ou *override* da ocorrência), lida do *asset* pelas chaves do esquema (`generic_diffuse`, `plasticvinyl_color`,
@@ -173,7 +174,12 @@ peça ou *override* da ocorrência), lida do *asset* pelas chaves do esquema (`g
 um *override* numa submontagem não se propaga (a submontagem da tampa tem *override* "green" e é desenhada preta),
 texturas são ignoradas e decalques são imagens sobre faces, não aparências. Por isso a tampa (`Capa_2025_V3`), que
 no CAD é envolvida por um decalque preto com os patrocinadores, recebe preto por nome (`ColourOverrides`); a barra
-`Dribblerschnecke` ("Gummi - schwarz", textura) fica no cinza claro base, igual ao viewport. Conferido contra o
+`Dribblerschnecke` ("Gummi - schwarz", textura) fica no cinza claro base, igual ao viewport. As PCBs (quatro placas de
+motor, placa principal e placa do processador) têm a aparência `BoardColor`, um creme claro (247, 249, 209) que nas
+vistas 3D parecia um verde desbotado; `AppearanceOverrides` (por nome de aparência, 09/10/2026) as pinta de verde musgo
+(31, 77, 46), material `m_1f4d2e` "BoardColor (override)", mais escuro que o verde do campo (`FLOOR_RGBA`
+0,13/0,47/0,20), como as placas de circuito costumam ser (aplicado nos arquivos sem reexportar: `usemtl`, linhas
+`# part` e bloco do `.mtl` renomeados). Conferido contra o
 render do viewport (`Camera.SaveAsBitmap`): tampa e chassi pretos, módulo do dribbler cinza/branco, cubos das rodas
 pretos, roletes cinza, capacitor branco. As faces saem agrupadas por peça (`g <caminho>`) e por cor (`usemtl m_rrggbb`;
 materiais em `ssl_<tag>.mtl`, `Kd` 0 a 1, compartilhado pelo `_lod`). O cabeçalho de cada OBJ guarda a proveniência
@@ -181,6 +187,28 @@ materiais em `ssl_<tag>.mtl`, `Kd` 0 a 1, compartilhado pelo `_lod`). O cabeçal
 os dados do eixo da roda (ângulo no CAD 60,000°, centro (39,8; 68,9) mm, raio externo 30,38 mm) e uma linha
 `# part <caminho> | lo | hi | mtl | aparência` por peça (mm, frame MJCF). A exportação completa leva ~41 s com a
 montagem aberta.
+
+### LOD para as vistas 3D (`tools/cad_lod.m`, 09/10/2026)
+
+Até 08/10 o exportador decimava cada peça da LOD pela mesma razão (`reducepatch` por peça, ~20 % das faces). Como
+`reducepatch` mantém os vértices sobre a superfície, as cordas da tampa curva (`Capa_2025_V3`, 662 faces) e da placa
+sob ela (`Gehäuse_Unterplatte`, quase branca, "Clear - Light") afundavam ~1 mm uma pela outra e pelas peças de baixo,
+e a placa clara e as peças de alumínio apareciam como manchas brancas sobre os robôs pretos da vista 3D do campo (a
+malha cheia, usada no modo HQ, não tem o defeito; renders de antes e depois em `_to_delete\gl_probe_closeup_shaded_lod.png`
+e `_to_delete\gl_after_closeup_lod.png`). `tools/cad_lod.m` substitui essa etapa: lê o `ssl_<tag>.obj` cheio, renderiza
+cada peça com uma cor chapada (sem iluminação, ortográfico, figura invisível, `print -RGBImage`) de 5 elevações × 12
+azimutes (de cima, como a vista do campo, e de baixo, como a aba Robô), conta os pixels que cada peça mostra, descarta
+as que ninguém vê (`MinPixels` 6) e reparte o orçamento de faces (`FaceTargets`, os mesmos do exportador) em proporção
+à área visível, com piso de 24 faces por peça e 4 passadas de redistribuição. O cabeçalho do `_lod` mantém as
+convenções do exportador (linhas `# part` das peças mantidas, na ordem dos grupos) e ganha uma linha `# interior`
+com as peças deixadas de fora; `register_cad_meshes.py` a ignora na proveniência e grava `generator` com
+"LOD by tools/cad_lod.m". Resultado: chassi 209 de 218 peças, 60 188 → 11 855 faces; roda 75 de 82, 8 088 → 1 798;
+chute 12 de 12, 4 990 → 1 490; dribbler 30 de 32, 14 862 → 3 486 (~12 s por malha). Os pixels em que a peça da LOD
+difere da peça da malha cheia caem de 1,89 M para 93 k nas 24 vistas de conferência (`_to_delete\lod_artefacts.m`),
+e os que restam são peças pretas sobre peças pretas. `inventor_export_cad.m` chama `cad_lod` para o par `_lod` de
+cada alvo; para refazer só a LOD: `addpath tools; cad_lod(); python tools/register_cad_meshes.py`. O teste
+`test_assets_present_and_meta_consistent` passou a exigir `n_parts` da LOD ≤ da malha cheia e materiais contidos nos
+da malha cheia.
 
 `python tools/register_cad_meshes.py` (só numpy) lê os OBJ/MTL e grava `src/dtssl/physics/assets/meshes.json`:
 por malha `file`, `mtl`, `n_parts`, `n_skipped`, `faces_source`, `faces`, `vertices`, `bbox`, `md5`, `source`,
