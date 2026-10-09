@@ -48,6 +48,7 @@ from dtssl.physics.mjcf import (
     read_obj,
 )
 from dtssl.sim.world import FieldGeometry, RobotSpec
+from dtssl.units import wrap_to_pi
 
 CAMERA_PRESETS: dict[str, tuple[float, float, float]] = {   # elevation (deg), azimuth (deg), distance (m)
     "iso": (42.0, -60.0, 12.5),
@@ -55,6 +56,16 @@ CAMERA_PRESETS: dict[str, tuple[float, float, float]] = {   # elevation (deg), a
     "side": (12.0, -90.0, 10.0),
     "goal": (18.0, 180.0, 11.0),
 }
+# cameras riding on the selected robot (RobotCamera): third person behind it, first person on its cover
+CHASE_DISTANCE = 1.1               # m from the look-at point, behind and above the robot (mouse wheel changes it)
+CHASE_ELEVATION = 20.0             # deg above the horizon (mouse drag orbits around the robot)
+CHASE_AHEAD = 0.25                 # the camera looks this far ahead of the robot (m): the robot sits low in the frame
+CHASE_HEIGHT = 0.10                # m above the floor of the look-at point
+CHASE_YAW_TAU = 0.12               # s: first-order lag of the camera heading behind the robot heading
+FPV_OFFSET = (0.04, 0.0, 0.17)     # camera position in the body frame (m): on the cover, above the dribbler
+FPV_PITCH = 15.0                   # deg below the horizon (mouse drag turns the head)
+FPV_LOOK = 3.0                     # m: distance of the orbit centre ahead of the camera (sets the clip planes only)
+FPV_FOV = 70.0                     # deg, wider than the orbit presets
 LINE_Z = 0.003                     # field markings above the floor (avoids z-fighting at grazing angles)
 PLATE_Z_OVER_TOP = 0.0015          # id plate thickness above the cover (m)
 PLATE_RADIUS = 0.025
@@ -650,6 +661,83 @@ def compute_frame(poses: dict[tuple[str, int], RobotPose], ball_xyz: tuple[float
     return fr
 
 
+# --------------------------------------------------------------------------------------
+# Cameras riding on a robot
+# --------------------------------------------------------------------------------------
+@dataclass
+class CameraPose:
+    """Orbit parameters of pyqtgraph's ``GLViewWidget``: the camera sits ``distance`` from ``center`` in the
+    direction (``elevation``, ``azimuth``) and looks at ``center``."""
+
+    center: tuple[float, float, float]
+    azimuth: float          # deg
+    elevation: float        # deg
+    distance: float         # m
+
+    def position(self) -> np.ndarray:
+        el, az = math.radians(self.elevation), math.radians(self.azimuth)
+        u = np.array([math.cos(el) * math.cos(az), math.cos(el) * math.sin(az), math.sin(el)])
+        return np.asarray(self.center, dtype=float) + self.distance * u
+
+
+class RobotCamera:
+    """Camera riding on a robot, as the orbit parameters the ``GLViewWidget`` takes (:class:`CameraPose`).
+
+    * ``"chase"`` (third person, as in a video game): behind and above the robot, turning with its heading
+      through a first-order lag (``CHASE_YAW_TAU``) so the picture does not whip when the robot spins; the
+      look-at point is a little ahead of the robot so it sits low in the frame. The mouse orbits around the
+      robot (:meth:`nudge` offsets) and the wheel changes the distance.
+    * ``"fpv"`` (first person): on the cover above the dribbler (``FPV_OFFSET`` in the body frame), looking
+      ahead and ``FPV_PITCH`` down, rigidly attached (no lag); the mouse turns the head.
+
+    Pure numpy: the widget feeds poses and mouse deltas and copies the result into ``opts``."""
+
+    def __init__(self, mode: str = "chase"):
+        if mode not in ("chase", "fpv"):
+            raise ValueError(f"unknown robot camera mode {mode!r}")
+        self.mode = mode
+        self.yaw: float | None = None
+        self.az_offset = 0.0
+        self.el_offset = 0.0
+        self.distance = CHASE_DISTANCE
+
+    def reset(self, keep_user: bool = False) -> None:
+        """Forget the smoothed heading (the next pose is taken at once) and, unless ``keep_user``, the mouse
+        offsets and the zoom."""
+        self.yaw = None
+        if not keep_user:
+            self.az_offset = self.el_offset = 0.0
+            self.distance = CHASE_DISTANCE
+
+    def nudge(self, d_azimuth: float, d_elevation: float, distance: float | None = None) -> None:
+        """Mouse input since the last frame: orbit (chase) or turn the head (fpv) by the given degrees, and
+        the zoomed distance (chase only)."""
+        self.az_offset = (self.az_offset + float(d_azimuth) + 180.0) % 360.0 - 180.0
+        lo, hi = (-25.0, 65.0) if self.mode == "chase" else (-70.0, 70.0)
+        self.el_offset = float(np.clip(self.el_offset + float(d_elevation), lo, hi))
+        if distance is not None and self.mode == "chase":
+            self.distance = float(np.clip(distance, 0.3, 10.0))
+
+    def update(self, x: float, y: float, theta: float, dt: float) -> CameraPose:
+        """Camera for the robot at ``(x, y, theta)``; ``dt`` (s) advances the heading lag of the chase mode."""
+        if self.yaw is None or self.mode == "fpv":
+            self.yaw = float(theta)
+        elif dt > 0.0:
+            self.yaw = wrap_to_pi(self.yaw + wrap_to_pi(float(theta) - self.yaw) * (1.0 - math.exp(-dt / CHASE_YAW_TAU)))
+        yaw = self.yaw
+        if self.mode == "fpv":
+            # the orbit camera sits at centre + distance * u: put it on the cover and the centre ahead of it
+            ox, oy, oz = FPV_OFFSET
+            cam = np.array([x + ox * math.cos(yaw) - oy * math.sin(yaw), y + ox * math.sin(yaw) + oy * math.cos(yaw), oz])
+            az, el = math.degrees(yaw) + 180.0 + self.az_offset, FPV_PITCH + self.el_offset
+            pose = CameraPose((0.0, 0.0, 0.0), az, el, FPV_LOOK)
+            centre = cam - pose.position()          # = cam - distance * u
+            return CameraPose((float(centre[0]), float(centre[1]), float(centre[2])), az, el, FPV_LOOK)
+        centre = (x + CHASE_AHEAD * math.cos(yaw), y + CHASE_AHEAD * math.sin(yaw), CHASE_HEIGHT)
+        return CameraPose(centre, math.degrees(yaw) + 180.0 + self.az_offset, CHASE_ELEVATION + self.el_offset,
+                          self.distance)
+
+
 __all__ = [
     "Mesh", "parse_obj", "cad_meshes", "mechanism_meshes", "MECHANISM_KEYS", "d_prism_mesh", "cylinder_mesh",
     "disc_mesh", "merge_meshes", "split_smoothing_groups", "vertex_normals", "smooth_mesh", "SMOOTH_ANGLE_DEG",
@@ -657,7 +745,9 @@ __all__ = [
     "id_plate_mesh", "RobotMeshes", "rot_z", "rot_x", "translate", "robot_transform", "wheel_transform",
     "WheelSpin", "floor_quads", "apron_quads", "quad_mesh", "circle_points", "field_segments", "goal_frames",
     "RobotPose",
-    "SceneFrame", "compute_frame", "CAMERA_PRESETS", "CHASSIS_RGBA", "WHEEL_RGBA", "PRIMITIVE_RGBA",
+    "SceneFrame", "compute_frame", "CAMERA_PRESETS", "CameraPose", "RobotCamera",
+    "CHASE_DISTANCE", "CHASE_ELEVATION", "CHASE_AHEAD", "CHASE_HEIGHT", "CHASE_YAW_TAU",
+    "FPV_OFFSET", "FPV_PITCH", "FPV_LOOK", "FPV_FOV", "CHASSIS_RGBA", "WHEEL_RGBA", "PRIMITIVE_RGBA",
     "FLOOR_RGBA", "BOUNDARY_RGBA", "APRON_RGBA", "APRON_WIDTH", "LINE_RGBA", "BALL_RGBA", "SELECT_RGBA",
     "PLATE_Z_OVER_TOP", "LINE_Z",
     "ROBOT_VIEW_PRESETS", "ROBOT_VIEW_DISTANCE", "AXIS_RGBA", "arcball_point", "axis_angle", "rotation_between",

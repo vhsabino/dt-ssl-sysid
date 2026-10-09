@@ -367,6 +367,70 @@ def test_robot_part_transforms_and_arrow_segments():
     assert S.arrow_segments(0.0, 0.0, 0.2, 0.1).shape == (0, 3)
 
 
+def _look(cp: S.CameraPose) -> tuple[float, float]:
+    """(heading, pitch-down) in rad of the direction the orbit camera looks (from its position to the centre)."""
+    d = np.asarray(cp.center) - cp.position()
+    return math.atan2(d[1], d[0]), math.atan2(-d[2], math.hypot(d[0], d[1]))
+
+
+def test_chase_camera_sits_behind_the_robot_and_lags_its_heading():
+    cam = S.RobotCamera("chase")
+    cp = cam.update(1.0, 2.0, math.pi / 2, 0.0)                         # robot facing +y
+    assert cp.elevation == S.CHASE_ELEVATION and cp.distance == S.CHASE_DISTANCE
+    assert cp.azimuth % 360 == pytest.approx(270.0)                       # camera on the -y side: behind
+    np.testing.assert_allclose(cp.center, [1.0, 2.0 + S.CHASE_AHEAD, S.CHASE_HEIGHT], atol=1e-12)
+    pos = cp.position()
+    assert pos[0] == pytest.approx(1.0) and pos[1] < 2.0 and pos[2] > S.CHASE_HEIGHT
+    assert _look(cp)[0] == pytest.approx(math.pi / 2)
+    # the robot turns 90 deg at once: the camera heading follows through a first-order lag, then settles
+    cp2 = cam.update(1.0, 2.0, math.pi, S.CHASE_YAW_TAU)
+    assert math.degrees(math.pi / 2) < (cp2.azimuth - 180.0) % 360 < 180.0
+    assert (cp2.azimuth - 180.0) % 360 == pytest.approx(90.0 + 90.0 * (1.0 - math.exp(-1.0)), abs=1e-9)
+    for _ in range(100):
+        cp3 = cam.update(1.0, 2.0, math.pi, 0.1)
+    assert (cp3.azimuth - 180.0) % 360 == pytest.approx(180.0, abs=1e-6)
+    # across +-pi the short way: 179 deg -> -179 deg is a 2 deg turn
+    cam.reset()
+    cam.update(0.0, 0.0, math.radians(179.0), 0.0)
+    cp4 = cam.update(0.0, 0.0, math.radians(-179.0), 10.0)
+    assert (cp4.azimuth - 180.0) % 360 == pytest.approx(181.0, abs=1e-6)
+    assert cam.yaw == pytest.approx(math.radians(-179.0), abs=1e-6)
+    # mouse: orbit around the robot and zoom; a preset-like reset forgets it, keep_user keeps it
+    cam.nudge(30.0, -5.0, 2.0)
+    cp5 = cam.update(0.0, 0.0, math.radians(-179.0), 1.0)
+    assert cp5.azimuth == pytest.approx(cp4.azimuth + 30.0) and cp5.elevation == S.CHASE_ELEVATION - 5.0
+    assert cp5.distance == 2.0
+    cam.nudge(0.0, -100.0, 50.0)                                          # clipped: never under the floor
+    assert cam.el_offset == -25.0 and cam.distance == 10.0
+    cam.reset(keep_user=True)
+    assert cam.yaw is None and cam.distance == 10.0 and cam.az_offset == 30.0
+    cam.reset()
+    assert cam.distance == S.CHASE_DISTANCE and cam.az_offset == 0.0 and cam.el_offset == 0.0
+    with pytest.raises(ValueError):
+        S.RobotCamera("orbit")
+
+
+def test_fpv_camera_sits_on_the_cover_above_the_dribbler_looking_ahead():
+    cam = S.RobotCamera("fpv")
+    th = 0.7
+    cp = cam.update(0.5, -0.3, th, 1 / 60)
+    ox, oy, oz = S.FPV_OFFSET
+    exp = [0.5 + ox * math.cos(th) - oy * math.sin(th), -0.3 + ox * math.sin(th) + oy * math.cos(th), oz]
+    np.testing.assert_allclose(cp.position(), exp, atol=1e-9)             # on the robot, in its frame
+    assert cp.distance == S.FPV_LOOK and cp.elevation == S.FPV_PITCH
+    heading, pitch = _look(cp)
+    assert heading == pytest.approx(th) and pitch == pytest.approx(math.radians(S.FPV_PITCH))
+    assert oz > 0.15 and 0.0 < ox < RobotSpec().dribbler_offset               # above the cover, behind the mouth
+    cp2 = cam.update(0.5, -0.3, th + 1.0, 1e-3)                            # rigid: a sudden turn follows at once
+    assert _look(cp2)[0] == pytest.approx(th + 1.0)
+    cam.nudge(-20.0, 40.0, 7.0)                                            # look right and down; no zoom in fpv
+    cp3 = cam.update(0.5, -0.3, th + 1.0, 1e-3)
+    heading, pitch = _look(cp3)
+    assert heading == pytest.approx(th + 1.0 - math.radians(20.0)) and pitch == pytest.approx(math.radians(55.0))
+    assert cp3.distance == S.FPV_LOOK
+    np.testing.assert_allclose(cp3.position(), cp2.position(), atol=1e-9)   # the head turns, the camera stays
+
+
 @pytest.mark.requires_gui
 def test_view3d_builds_and_accepts_frames_without_a_context(qapp):
     from dtssl.gui.view3d import View3D
@@ -415,6 +479,51 @@ def test_view3d_camera_presets_and_follow(qapp):
     assert (c.x(), c.y()) == pytest.approx((2.0, -1.5), abs=1e-6)
     v.fit()
     assert not v.follow and v.camera()["center"].x() == 0.0
+    v.close()
+
+
+@pytest.mark.requires_gui
+def test_view3d_robot_cameras_ride_the_selected_robot(qapp):
+    from dtssl.gui.view3d import View3D
+
+    w = _world()
+    v = View3D(w.field, spec=w.spec)
+    w.teleport_robot("yellow", 0, 1.0, 0.5, math.pi / 2)
+    ws = w.step()
+    v.update_state(ws, ("yellow", 0), ws.t, force=True)
+    fov = v.view.opts["fov"]
+    v.set_camera_mode("chase")                                       # moves at once from the last state
+    assert v.camera_mode == "chase" and v.act_chase.isChecked() and not v.act_fpv.isChecked()
+    cam = v.camera()
+    assert cam["azimuth"] % 360 == pytest.approx(270.0, abs=1e-6) and cam["distance"] == S.CHASE_DISTANCE
+    assert cam["center"].x() == pytest.approx(1.0, abs=1e-6) and cam["center"].y() == pytest.approx(0.5 + S.CHASE_AHEAD)
+    v.view.orbit(30.0, 0.0)                                           # mouse between two frames: orbit + zoom
+    v.view.opts["distance"] *= 2.0
+    v.update_state(w.step(), ("yellow", 0), force=True)
+    cam2 = v.camera()
+    assert (cam2["azimuth"] - cam["azimuth"]) % 360 == pytest.approx(30.0, abs=1e-6)
+    assert cam2["distance"] == pytest.approx(2.0 * S.CHASE_DISTANCE)
+    v.act_fpv.trigger()                                               # toolbar: exclusive with Chase
+    assert v.camera_mode == "fpv" and v.act_fpv.isChecked() and not v.act_chase.isChecked()
+    assert v.view.opts["fov"] == S.FPV_FOV
+    cam3 = v.camera()
+    assert cam3["distance"] == S.FPV_LOOK and cam3["elevation"] == S.FPV_PITCH
+    assert cam3["center"].y() > 0.5 + 1.0                              # looks ahead (+y) of the robot
+    v.set_preset("top")                                               # a preset leaves the robot camera
+    assert v.camera_mode is None and v.view.opts["fov"] == fov and not v.act_fpv.isChecked()
+    assert v.camera()["elevation"] == S.CAMERA_PRESETS["top"][0]
+    v.act_chase.trigger()
+    assert v.camera_mode == "chase"
+    v.act_chase.trigger()                                             # unchecking it: back to the free camera
+    assert v.camera_mode is None
+    v.set_camera_mode("fpv")
+    v.fit()
+    assert v.camera_mode is None and not v.follow
+    v.update_state(w.step(), None, force=True)                        # nothing selected
+    v.set_camera_mode("chase")                                       # ... so the camera stays put
+    assert v.camera_mode == "chase" and v.camera()["elevation"] == S.CAMERA_PRESETS["iso"][0]
+    v.update_state(w.step(), ("yellow", 0), force=True)              # a robot again: it rides
+    assert v.camera()["elevation"] == S.CHASE_ELEVATION
     v.close()
 
 

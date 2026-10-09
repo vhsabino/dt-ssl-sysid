@@ -5,9 +5,12 @@ The view is built from :class:`~dtssl.sim.entities.WorldState` only, so it works
 (``fopdt``, ``ideal``, ``mujoco-*``) and in Replay; geometry and transforms come from
 :mod:`dtssl.gui.scene3d`. Mouse: left drag orbits, middle drag (or Shift) pans, wheel zooms
 (``GLViewWidget`` defaults). Toolbar: camera presets (``iso``/``top``/``side``/``goal``), *Follow*
-(camera centre tracks the selected robot), *CAD* (meshes vs the primitive shapes), *HQ* (full-resolution
-meshes instead of the light LOD pair: ~3x more triangles), *Wheels* (spin the wheels from the body velocity
-through the inverse kinematics), *Fit* (``F``).
+(camera centre tracks the selected robot), *Chase* (``3``: third-person camera behind the selected robot, as
+in a video game; drag orbits around it, wheel zooms) and *FPV* (``1``: first-person camera on the robot's
+cover above the dribbler; drag turns the head), both :class:`dtssl.gui.scene3d.RobotCamera`, *CAD* (meshes
+vs the primitive shapes), *HQ* (full-resolution meshes instead of the light LOD pair: ~3x more triangles),
+*Wheels* (spin the wheels from the body velocity through the inverse kinematics), *Fit* (``F``, back to the
+free camera).
 
 Each robot is two GL items (body + the four wheels as instances of one item, :mod:`dtssl.gui.glmesh`) plus
 the selection ring: with 22 robots the Python cost per item in ``pyqtgraph`` is what caps the frame rate, not
@@ -107,6 +110,9 @@ class View3D(QtWidgets.QWidget):
         self.follow = False
         self.spin_wheels = True
         self.selected: tuple[str, int] | None = None
+        self.camera_mode: str | None = None               # None (free orbit), "chase" or "fpv"
+        self._camera: S.RobotCamera | None = None
+        self._cam_applied: tuple[float, float, float] | None = None   # (azimuth, elevation, distance) last written
         self.frames = 0
         self.available = gl is not None
         self.error = GL_IMPORT_ERROR
@@ -134,7 +140,8 @@ class View3D(QtWidgets.QWidget):
             return
         self.view = gl.GLViewWidget()
         self.view.setBackgroundColor((22, 22, 26, 255))
-        self.view.opts["fov"] = 45
+        self._orbit_fov = 45
+        self.view.opts["fov"] = self._orbit_fov
         lay.addWidget(self.view, 1)
         self._shader = headlight_shader()           # CAD-style light (shared with the Robot tab), see glshading
         self._build_toolbar()
@@ -154,6 +161,19 @@ class View3D(QtWidgets.QWidget):
         self.act_follow.setCheckable(True)
         self.act_follow.setToolTip("keep the camera centred on the selected robot")
         self.act_follow.toggled.connect(self.set_follow)
+        self.camera_group = QtGui.QActionGroup(self)
+        self.camera_group.setExclusionPolicy(QtGui.QActionGroup.ExclusionPolicy.ExclusiveOptional)
+        self.act_chase = tb.addAction("Chase")
+        self.act_chase.setCheckable(True)
+        self.act_chase.setToolTip("third-person camera behind the selected robot (3): drag to orbit around it, "
+                                  "wheel to zoom; a preset or Fit leaves it")
+        self.act_fpv = tb.addAction("FPV")
+        self.act_fpv.setCheckable(True)
+        self.act_fpv.setToolTip("first-person camera on the selected robot, above the dribbler (1): drag to look "
+                                "around; a preset or Fit leaves it")
+        for act, mode in ((self.act_chase, "chase"), (self.act_fpv, "fpv")):
+            self.camera_group.addAction(act)
+            act.toggled.connect(lambda on, m=mode: self._on_camera_action(m, on))
         self.act_cad = tb.addAction("CAD")
         self.act_cad.setCheckable(True)
         self.act_cad.setChecked(self.cad)
@@ -255,6 +275,8 @@ class View3D(QtWidgets.QWidget):
         self.spin_wheels = bool(on)
 
     def set_selected(self, key: tuple[str, int] | None) -> None:
+        if key != self.selected and self._camera is not None:
+            self._camera.reset(keep_user=True)            # a new robot: take its heading at once
         self.selected = key
 
     def set_ball_visible(self, on: bool) -> None:
@@ -265,16 +287,55 @@ class View3D(QtWidgets.QWidget):
     def set_preset(self, name: str) -> None:
         if self.view is None:
             return
+        self.set_camera_mode(None)
         el, az, dist = S.CAMERA_PRESETS[name]
         centre = self._follow_centre() if self.follow else QtGui.QVector3D(0.0, 0.0, 0.0)
         self.view.setCameraPosition(pos=centre, distance=dist, elevation=el, azimuth=az)
         self.preset_changed.emit(name)
         self.view.update()
 
+    def set_camera_mode(self, mode: str | None) -> None:
+        """``"chase"`` / ``"fpv"``: ride the selected robot (:class:`scene3d.RobotCamera`); ``None``: the free
+        orbit camera of the presets. The camera moves at once when a state is known."""
+        if self.view is None or mode == self.camera_mode:
+            return
+        self.camera_mode = mode
+        self._camera = S.RobotCamera(mode) if mode is not None else None
+        self._cam_applied = None
+        self.view.opts["fov"] = S.FPV_FOV if mode == "fpv" else self._orbit_fov
+        for act, m in ((self.act_chase, "chase"), (self.act_fpv, "fpv")):
+            if act.isChecked() != (mode == m):
+                act.setChecked(mode == m)
+        if mode is not None:
+            self.preset_changed.emit(mode)
+            if self._last_ws is not None:
+                self.update_state(self._last_ws, self.selected, self._last_t, force=True)
+        self.view.update()
+
+    def _on_camera_action(self, mode: str, on: bool) -> None:
+        if on:
+            self.set_camera_mode(mode)
+        elif self.camera_mode == mode:
+            self.set_camera_mode(None)
+
+    def _ride_robot(self, p: S.RobotPose, dt: float) -> None:
+        """Chase / FPV: fold the mouse input since the last frame into the camera offsets, then put the camera
+        on the robot for this frame."""
+        o = self.view.opts
+        if self._cam_applied is not None:
+            az0, el0, d0 = self._cam_applied
+            self._camera.nudge(o["azimuth"] - az0, o["elevation"] - el0,
+                               None if o["distance"] == d0 else float(o["distance"]))
+        cp = self._camera.update(p.x, p.y, p.theta, dt)
+        o["center"] = QtGui.QVector3D(*cp.center)
+        o["azimuth"], o["elevation"], o["distance"] = cp.azimuth, cp.elevation, cp.distance
+        self._cam_applied = (cp.azimuth, cp.elevation, cp.distance)
+
     def fit(self) -> None:
         if self.view is None:
             return
         self.set_follow(False)
+        self.set_camera_mode(None)
         el, az, dist = S.CAMERA_PRESETS["iso"]
         dist *= (self.field.length + 2 * self.field.boundary_width) / 9.6          # preset tuned for Div B
         self.view.setCameraPosition(pos=QtGui.QVector3D(0.0, 0.0, 0.0), distance=dist, elevation=el, azimuth=az)
@@ -295,7 +356,7 @@ class View3D(QtWidgets.QWidget):
     def update_state(self, ws: WorldState, selected: tuple[str, int] | None = None, t: float | None = None,
                      force: bool = False) -> None:
         """Move every item to ``ws``; skipped while the widget is hidden (inactive tab) unless ``force``."""
-        self.selected = selected
+        self.set_selected(selected)
         self._last_ws = ws
         tt = float(ws.t if t is None else t)
         dt = 0.0 if self._last_t is None else max(0.0, min(tt - self._last_t, 0.5))
@@ -324,7 +385,9 @@ class View3D(QtWidgets.QWidget):
                 items.set_visible(False)
         bx, by, bz = fr.ball
         self.ball.setTransform(_qmatrix(S.translate(bx, by, bz + self.ball_radius)))
-        if self.follow:
+        if self._camera is not None and selected in poses and poses[selected].present:
+            self._ride_robot(poses[selected], dt)
+        elif self.follow:
             self.view.opts["center"] = self._follow_centre()
         self.frames += 1
         self.view.update()
@@ -340,6 +403,11 @@ class View3D(QtWidgets.QWidget):
     def keyPressEvent(self, ev: QtGui.QKeyEvent) -> None:
         if ev.key() == Qt.Key_F:
             self.fit()
+            ev.accept()
+            return
+        if ev.key() in (Qt.Key_1, Qt.Key_3):                    # toggle the first / third person camera
+            mode = "fpv" if ev.key() == Qt.Key_1 else "chase"
+            self.set_camera_mode(None if self.camera_mode == mode else mode)
             ev.accept()
             return
         ev.ignore()
