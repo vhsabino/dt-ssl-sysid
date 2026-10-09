@@ -287,10 +287,11 @@ por material no OBJ (`usemtl m_rrggbb` + `ssl_<tag>.mtl`). `scene3d.parse_obj(da
 (RGBA por face) e `_asset_mesh(key, lod)` lê o OBJ com o MTL de `meshes.json`, então `cad_meshes()` e
 `mechanism_meshes()` vêm coloridas (preto da tampa e do chassi, cinza e branco do módulo do dribbler, cubos pretos e
 roletes cinza nas rodas); `MECHANISM_RGBA` deixou de existir (`MECHANISM_KEYS`). `view3d._mesh_kwargs` e
-`robot_view3d._mesh_kwargs` passam `faceColors` ao `GLMeshItem` quando a malha tem cores (senão `color` liso, como
-nas primitivas). Na aba Robot as rodas continuam coloridas pela velocidade: `robot_view3d.wheel_face_colors(base,
+`robot_view3d._mesh_kwargs` passavam `faceColors` ao `GLMeshItem` quando a malha tem cores (senão `color` liso, como
+nas primitivas); desde 09/10 isso mora em `gui/glmesh.py` (`mesh_item`/`mesh_data`: cores por vértice nas malhas
+suavizadas, por face nas demais). Na aba Robot as rodas continuam coloridas pela velocidade: `robot_view3d.wheel_face_colors(base,
 omega)` tinge as cores do CAD para o vermelho (frente) ou azul (ré) em 32 níveis e a malha só é reenviada à GPU
-(`setMeshData(..., faceColors=...)`) quando o nível muda. Placa de id: `RobotMeshes.build` usa
+(`setMeshData(meshdata=mesh_data(tinted))`) quando o nível muda. Placa de id: `RobotMeshes.build` usa
 `wheel.r + mjcf.cad_plate_z()` (plano do decalque do padrão no CAD, 148,7 mm acima do piso) em vez do topo da bbox
 (154,5 mm): as bolinhas deixaram de flutuar sobre a tampa. Testes: `tests/test_gui_view3d.py`
 (`test_cad_meshes_match_the_physics_assets` confere as 13 cores do chassi, `test_mechanism_meshes_match_the_physics_assets`,
@@ -391,6 +392,55 @@ Sintoma (captura do Victor, modo Debug, aba do campo em 3D): os robôs pretos ap
 - Conferido em renders reais no PC (`_to_delete\gl_after_closeup_lod.png`, close dos robôs na LOD, e
   `gl_after_iso_divA.png`, campo da Divisão A com 22 robôs): sem manchas na LOD, placas verde-musgo. Testes: `tests/test_physics_cad.py`
   (`n_parts` da LOD ≤ da malha cheia), `test_physics_dribbler.py`, `test_gui_view3d.py`, `test_gui_robot_tab.py`.
+
+## Polígonos das rodas no modo CAD e 60 Hz na vista do campo (09/10/2026, tarde)
+
+Sintoma (captura do Victor, aba do campo em 3D, modo CAD sem HQ, close de uma roda): roletes como cristais pontiagudos
+e cubo sextavado, "os polígonos da roda estão horríveis". Pedido: melhorar sem comprometer os 60 Hz.
+
+- **Diagnóstico da roda**: a LOD da roda tinha 1 200 faces para 82 peças (75 visíveis), e cada um dos 20 roletes caía
+  no piso de 24 faces do `cad_lod` (um rolete de 24 triângulos é um cristal); além disso tudo era desenhado com
+  sombreamento chapado (normal por face), que marca cada faceta. Grade de candidatos renderizada no PC
+  (`_to_delete\wheel_probe_grid.png`, orçamentos 1 200/3 000/5 000/9 000 × chapado/suave): a partir de 3 000 faces
+  os roletes ficam redondos e o sombreamento suave apaga as facetas que sobram. Escolha: `wheel_lod` 5 000
+  (`tools/cad_lod.m` e `inventor_export_cad.m`; `ssl_wheel_lod.obj` regenerado: 4 968 faces, 2 496 vértices, 5 cores,
+  `meshes.json` atualizado).
+- **Diagnóstico dos 60 Hz** (medido no PC, Intel Iris Xe, GL do Windows, `glFinish` por quadro): o custo do quadro na
+  vista do campo é dominado pelo Python do pyqtgraph por item visível, cerca de 0,08 ms por `GLMeshItem` seja qual for
+  o tamanho da malha (estado GL, matrizes, uniformes e atributos a cada `paint`); os triângulos custam poucos ms e a
+  resolução quase nada. A Divisão A com 22 robôs tinha 8 itens por robô (chassi, 4 rodas, chute, dribbler, placa),
+  183 itens visíveis e 22,3 ms por quadro (41 fps): já estava abaixo dos 60 Hz antes desta mudança. Então rodas mais
+  ricas só cabem se o número de itens cair.
+- **Sombreamento suave por grupos de suavização** (`scene3d.smooth_mesh`, aplicado por `RobotMeshes.build(smooth=True)`
+  a todas as malhas, CAD e primitivas): `split_smoothing_groups` duplica os vértices nas arestas cujo ângulo diedro
+  passa de `SMOOTH_ANGLE_DEG` (35°; componentes conexas do grafo de cantos de face com `scipy.sparse.csgraph`),
+  `vertex_normals` faz a média ponderada por área das normais das faces e as cores por face passam a cores por vértice
+  (`Mesh.normals`, `Mesh.vertex_colors`; `Mesh.colors` por face continua válido, a ordem das faces não muda). Cilindros,
+  roletes e a tampa curva ficam redondos e as arestas de caixas continuam vivas; a normal por vértice do pyqtgraph
+  (`MeshData.vertexNormals`, laço em Python por vértice) não é usada. O shader `dtssl_headlight` ilumina os dois lados,
+  então o sentido das normais das primitivas (para dentro no `cylinder_mesh`) não aparece.
+- **Dois itens GL por robô** (`gui/glmesh.py`): `scene3d.body_mesh(meshes, team, rid)` funde chassi, chute, dribbler e
+  placa de id num só `Mesh` no frame do chassi (a placa entra em `z_top + PLATE_Z_OVER_TOP - z_chassis`) e
+  `InstancedMeshItem` desenha a malha da roda nas quatro transformadas com um único `paint` (VBOs do `GLMeshItem` do
+  pyqtgraph 0.14 ligados uma vez, só `u_mvp`/`u_normal` mudam entre os `glDrawElements`; `set_instances(QMatrix4x4...)`
+  a cada quadro). `instancing_available()` confere a API (`upload_vertex_buffers`, `parseMeshData`, `currentModelView`,
+  `currentProjection`); sem ela (pyqtgraph < 0.14) a vista volta a quatro itens de roda. `FastMeshData` substitui o
+  cálculo de normais do pyqtgraph pelo de `scene3d`. `mesh_item(mesh, color, shader, cls=)` é o construtor comum das
+  duas vistas (`view3d._RobotItems`, `robot_view3d._build_items`/`_ensure_plate`/`redraw`); a aba Robot continua com
+  um item por parte (um robô só), com as rodas tingidas por vértice quando a malha é suave.
+- **Medido no PC depois** (`_to_delete\gl_probe3.py`, mesmas condições): Divisão A, LOD, 51 itens visíveis, 11,5 ms por
+  quadro (87 fps) contra 22,3 ms (41 fps) antes, com a roda de 4 968 faces; HQ (malhas cheias) 21,5 ms (46 fps) contra
+  45 ms; `update_state` com 22 robôs 2,0 ms por chamada; primeira construção dos 22 robôs 92 ms. Renders olhados:
+  `_to_delete\gl3_wheel_lod.png` (roda LOD: roletes redondos, cubo redondo, sombreamento suave),
+  `_to_delete\gl3_closeup_lod.png` (dois robôs: placas, mecanismos e tampa corretos, sem artefatos de sombreamento),
+  `_to_delete\gl3_wheel_hq.png`, `_to_delete\gl3_iso_divA.png`.
+- Testes: `test_gui_view3d.py` ganha `test_smooth_mesh_keeps_box_edges_sharp_and_rounds_cylinders` (cubo: 24 vértices e
+  normais iguais às das faces; cilindro: anel lateral compartilhado, tampas separadas, normais radiais),
+  `test_vertex_normals_are_area_weighted_unit_vectors`, `test_merge_meshes_carries_normals_and_vertex_colours_only_when_all_parts_are_smooth`
+  e `test_body_mesh_merges_chassis_mechanisms_and_plate_in_the_chassis_frame`; a razão de faces da LOD da roda passou
+  a `< cheia` (`test_robot_meshes_build_all_variants`) e `< 70 %` (`test_physics_cad.py`); `test_gui_robot_tab.py` lê a
+  cor da roda em `vertexColors()` quando a malha é suave. Suavizar as malhas custa uma vez por construção (scipy),
+  não por quadro. Física, θ, `config/` e `data/` intocados; a mudança é só desenho.
 
 ## Correção 03/09/2026 — `ZeroDivisionError` do pyqtgraph ao trocar de robô
 

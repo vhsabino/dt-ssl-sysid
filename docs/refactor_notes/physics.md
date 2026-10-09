@@ -164,7 +164,7 @@ cores sobreviverem; ver "LOD para as vistas 3D" abaixo):
 | Malha | O que entra | Peças | Faces (cheia / LOD) | Cores |
 |---|---|---|---|---|
 | `ssl_chassis.obj` | tudo o que não é mecanismo, roda, fixador (DIN/ISO), decalque ou peça SMD menor que 4 mm (`SkipPattern`, `MinPartMm`) | 218 (554 omitidas); 209 na LOD | 60 188 / 11 855 | 13 |
-| `ssl_wheel.obj` | uma roda, `Direct_Transmission_new:1/Wheel_v2025_new:1` (`WheelPath`), no frame da roda: eixo em +x (saída), plano médio dos roletes em x = 0; as outras três ficam fora do chassi | 82; 75 na LOD | 8 088 / 1 798 | 5 |
+| `ssl_wheel.obj` | uma roda, `Direct_Transmission_new:1/Wheel_v2025_new:1` (`WheelPath`), no frame da roda: eixo em +x (saída), plano médio dos roletes em x = 0; as outras três ficam fora do chassi | 82; 75 na LOD | 8 088 / 4 968 | 5 |
 | `ssl_kicker.obj` | `kicker_assembly_5mm:1` (chute reto + chip), frame do chassi | 12; 12 na LOD | 4 990 / 1 490 | 3 |
 | `ssl_dribbler.obj` | `Dribbler_Robocup2025v3:1` (barra, motor, engrenagens, placas laterais, suporte do chip, PCBs IR) | 32; 30 na LOD | 14 862 / 3 486 | 9 |
 
@@ -202,13 +202,16 @@ as que ninguém vê (`MinPixels` 6) e reparte o orçamento de faces (`FaceTarget
 à área visível, com piso de 24 faces por peça e 4 passadas de redistribuição. O cabeçalho do `_lod` mantém as
 convenções do exportador (linhas `# part` das peças mantidas, na ordem dos grupos) e ganha uma linha `# interior`
 com as peças deixadas de fora; `register_cad_meshes.py` a ignora na proveniência e grava `generator` com
-"LOD by tools/cad_lod.m". Resultado: chassi 209 de 218 peças, 60 188 → 11 855 faces; roda 75 de 82, 8 088 → 1 798;
-chute 12 de 12, 4 990 → 1 490; dribbler 30 de 32, 14 862 → 3 486 (~12 s por malha). Os pixels em que a peça da LOD
+"LOD by tools/cad_lod.m". Resultado: chassi 209 de 218 peças, 60 188 → 11 855 faces; roda 75 de 82, 8 088 → 4 968
+(orçamento `wheel_lod` 5 000 desde 09/10 à tarde: com 1 200 faces os 20 roletes caíam no piso de 24 faces e viravam
+cristais pontiagudos, a partir de ~3 000 ficam redondos; a roda é a malha mais repetida, 4 por robô, mas é desenhada de
+um item só, ver `gui.md` "Polígonos das rodas"); chute 12 de 12, 4 990 → 1 490; dribbler 30 de 32, 14 862 → 3 486 (~12 s
+por malha). Os pixels em que a peça da LOD
 difere da peça da malha cheia caem de 1,89 M para 93 k nas 24 vistas de conferência (`_to_delete\lod_artefacts.m`),
 e os que restam são peças pretas sobre peças pretas. `inventor_export_cad.m` chama `cad_lod` para o par `_lod` de
 cada alvo; para refazer só a LOD: `addpath tools; cad_lod(); python tools/register_cad_meshes.py`. O teste
-`test_assets_present_and_meta_consistent` passou a exigir `n_parts` da LOD ≤ da malha cheia e materiais contidos nos
-da malha cheia.
+`test_assets_present_and_meta_consistent` passou a exigir `n_parts` da LOD ≤ da malha cheia, materiais contidos nos
+da malha cheia e faces da LOD abaixo de 40 % das da malha cheia (70 % na roda).
 
 `python tools/register_cad_meshes.py` (só numpy) lê os OBJ/MTL e grava `src/dtssl/physics/assets/meshes.json`:
 por malha `file`, `mtl`, `n_parts`, `n_skipped`, `faces_source`, `faces`, `vertices`, `bbox`, `md5`, `source`,
