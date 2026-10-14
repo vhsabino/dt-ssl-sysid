@@ -21,6 +21,7 @@ artefatos de `results/` (nunca o dataset), com o cabeçalho listando as fontes. 
 | `tables/tab_journal_baselines.tex` | `... tables=baselines` | `epos_eang_three_models_20260810_1022.md`; `negcontrol_perevent_20260810_1035.md`; `eval_rsim_delay_ablation_20260809_2154.md`; `backends_holdout_20260907_1515.{md,csv}`; `protocol_holdout_20260910_0211.json`, `_20260918_1326.json`, `_20260920_1143.json` |
 | `tables/tab_journal_robustness.tex` | `... tables=robustness` | `ablation_orderfree_20260810_1021.md`; `causal_ic_check_20260810_1102.md`; `gate_window_vs_event_20260810_1743.md`; `negcontrol_perevent_20260810_1035.md`; `eval_rsim_delay_ablation_20260809_2154.md`; `loo_translational_20260810_1743.md` |
 | `tables/tab_journal_closed_loop.tex` | `... tables=closed_loop` | `closed_loop_stats_20260907_2137.json`; CHANGELOG 2026-09-07 21:37 (leitura post hoc 5/5) |
+| `tables/tab_journal_coupling.tex` | `... tables=coupling` | `coupled_mimo_check_20261014_1211.json` (primária), `coupled_mimo_check_control-fopdt_20261014_1211.json` (C-), `coupled_mimo_check_control-mujoco-rollers-delay_20261014_1216.json` (C+); CHANGELOG 2026-10-14 12:11 |
 | `figures/fig_journal_identifiability.pdf` | `dtssl fig fig_journal_identifiability` | os três `.json` de C1 e C1b v2 acima; `r3_closedloop_omega_fit_20260810_1036.md`; `config/twin_params.json` |
 | `figures/fig_journal_league_sims.pdf` | `dtssl fig fig_journal_league_sims` | `protocol_holdout_20260910_0211.json`, `_20260918_1326.json`, `_20260920_1143.json` |
 | `figures/fig_journal_closed_loop.pdf` | `dtssl fig fig_journal_closed_loop` (`--kw source=data` reconstrói as ECDFs exatas com o dataset; o padrão desenha os quantis do artefato) | `closed_loop_stats_20260907_2137.json` |
@@ -128,11 +129,16 @@ material que ainda não existe.
   em direção a 1,0016?), M3 (uso: o acoplado reduz e_pos no harness com o gate do artigo?), controles
   C- (gerador FOPDT desacoplado, sem acoplamento espúrio) e C+ (gerador `mujoco-rollers-delay`, o
   acoplamento conhecido é recuperado).
-- Fontes: `docs/PREREGISTRO_MIMO_CHECK_20260923.md` (as duas redações possíveis estão no §8 do
-  pré-registro); artefatos `results/coupled_mimo_check_<carimbo>.{md,json}` quando o Victor rodar os
-  três comandos no PC; entrada correspondente no CHANGELOG.
-- Estado: pendente (execução no PC; ainda sem nenhum número real). Nada entra na seção antes da
-  entrada no CHANGELOG.
+- Fontes: `docs/PREREGISTRO_MIMO_CHECK_20260923.md`; artefatos `results/coupled_mimo_check_20261014_1211.{md,json,csv}`
+  (primária), `results/coupled_mimo_check_control-fopdt_20261014_1211.*` (C-) e
+  `results/coupled_mimo_check_control-mujoco-rollers-delay_20261014_1216.*` (C+); CHANGELOG 2026-10-14 12:11;
+  tabela `tables/tab_journal_coupling.tex` (`journal_tables --kw tables=coupling`).
+- Resultado (executado em 14/10/2026, os três comandos do §7 do pré-registro, sem alteração): M1 não importa
+  (ganho de fit < 1 p.p. em todo DOF, termos cruzados < 6 % do RMS direto); M2 falsificada (G_ww 1,419 → 1,414
+  contra 1,0016; premissa reproduzida, +41,7 %); M3 não melhora (6/10, p 0,46); C- OK; C+ com premissa não
+  reproduzida (+7,2 %, abaixo dos 10 %), leitura post hoc marcada no CHANGELOG e na seção.
+- Estado: rascunho da seção escrito em 14/10 a partir dos artefatos (texto e tabela gerada); revisar a voz e
+  decidir se a leitura post hoc do C+ fica na seção ou vai para as limitações.
 
 ### 8 Results III: fidelity against physics and league simulators (`sections/08_results_fidelity.tex`)
 
@@ -243,7 +249,6 @@ material que ainda não existe.
 | Título do periódico (opção 1 vs opção 2 do plano) e contribuições (seis ou menos) | orientadora | seções 1 e 12 |
 | Baseline sintonizada (C3) ou rSim com parâmetros ajustados | orientadora | seção 8, WP3 |
 | Faixa B no camera-ready (D1) | orientadora | camera-ready |
-| Rodar a checagem MIMO (três comandos do §7 do pré-registro) | Victor | seção 7 |
 | Fonte verificada para o ER-Force; lista de incluídos da SLR | Victor / SLR | seção 2 |
 | Autoria, CRediT, declaração de IA, agradecimentos e financiamento | Victor + orientadora | seção 12 |
 | Repositório público e DOI (WP5) | Victor | seção 12 |

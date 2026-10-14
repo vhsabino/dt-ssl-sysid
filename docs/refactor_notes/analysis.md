@@ -231,3 +231,24 @@ marcador `_BROKEN_` que o `results/` do repositório tem.
    `eval_twin_vs_rsim`); passar `ruff --fix` na varredura final.
 8. `h5py` foi instalado no ambiente (`pip install h5py`) para `negcontrol_perevent`; está no
    extra `dtssl[mat]`.
+
+## Checagem MIMO pré-registrada (WP2) executada e tabela `coupling` do periódico (14/10/2026)
+
+- `dtssl analysis run coupled_mimo_check` rodou no PC nos três braços do §7 de
+  `docs/PREREGISTRO_MIMO_CHECK_20260923.md` (C-, primária, C+), sem alteração do módulo nem do
+  pré-registro; artefatos `results/coupled_mimo_check_20261014_1211.*`,
+  `results/coupled_mimo_check_control-fopdt_20261014_1211.*` e
+  `results/coupled_mimo_check_control-mujoco-rollers-delay_20261014_1216.*`, entrada 2026-10-14 12:11 do
+  `results/CHANGELOG.md` com os vereditos (M1 não importa, M2 falsificada, M3 não melhora, C- OK, C+ com a
+  premissa não reproduzida e leitura post hoc marcada).
+- `journal_artifacts.py`: chaves `mimo`, `mimo_cminus`, `mimo_cplus` em `ARTEFACTS` e leitor `coupling()`
+  (fits pooled e por evento, ganhos estáticos, razões cruzadas, vereditos, atrasos por par, bootstrap, harness
+  e controles). `journal_tables.py`: `table_coupling` (`tables=coupling`, `tab:coupling`, `table*` com as
+  linhas de M2, M3 e dos controles em `\multicolumn{4}{l}`), `TABLES` com seis nomes.
+- Testes: `tests/test_journal_artifacts.py::test_mimo_numbers` fixa os números da entrada do CHANGELOG
+  (pulado sem os artefatos); `test_journal_tables_write_latex` confere a tabela nova. 22 passados no PC
+  (9 do arquivo + 13 do `test_coupled_mimo_check.py`); ruff limpo nos três arquivos.
+- Fora do git: `latex_journal/tables/tab_journal_coupling.tex` gerado e o rascunho de
+  `latex_journal/sections/07_results_coupling.tex` (texto em inglês a partir dos artefatos; a pasta
+  `latex_journal/` continua não versionada, como o chat do artigo a deixou). Compilação verificada na nuvem
+  com um invólucro `article` (sem `elsarticle` no sandbox): 0 erros, 0 referências indefinidas.
