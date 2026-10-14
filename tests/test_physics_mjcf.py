@@ -37,6 +37,20 @@ def test_field_xml_structure():
     assert "wall_xpos" not in xml2
 
 
+def test_world_floor_friction_option_defaults_to_0_9():
+    """``floor_friction`` (C3 tuning) reaches the floor plane and nothing else; the default is unchanged."""
+    scene = Scene.default(1, 0)
+    for route in ("a", "b"):
+        floor = next(g for g in ET.fromstring(mjcf.build_world_xml(scene, route)).iter("geom")
+                     if g.get("name") == "floor")
+        assert floor.get("friction").startswith("0.9")
+    root = ET.fromstring(mjcf.build_world_xml(scene, "b", floor_friction=0.55))
+    floor = next(g for g in root.iter("geom") if g.get("name") == "floor")
+    assert floor.get("friction").startswith("0.55")
+    others = [g.get("friction") for g in root.iter("geom") if g.get("name") != "floor" and g.get("friction")]
+    assert others and not any(f.startswith("0.55") for f in others)
+
+
 def test_ball_xml_parameters():
     ball = mjcf.load_ball_spec()
     assert ball.radius == pytest.approx(0.0215) and ball.mass == pytest.approx(0.046)

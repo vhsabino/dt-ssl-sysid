@@ -168,7 +168,7 @@ class MuJoCoWorld(World):
                  boundary: bool = True, chassis: str = "mesh", visual: str = "primitive",
                  dribbler: str = "spring", dribbler_opt: DribblerOptions | None = None,
                  limits_path: str | Path | None = None, twin_params_path: str | Path | None = None,
-                 n_active: int | None = None, **unknown):
+                 n_active: int | None = None, floor_friction: float = 0.9, **unknown):
         if unknown:
             _log.warning("MuJoCoWorld: ignoring unknown options %s", sorted(unknown))
         self._mj = self._import_mujoco()
@@ -208,6 +208,7 @@ class MuJoCoWorld(World):
         self.route_b = rb
         self.pi = pi_gains or PIGains()
         self.boundary = bool(boundary)
+        self.floor_friction = float(floor_friction)       # floor plane sliding friction (route b tuning, C3)
         self.chassis = chassis
         self.visual = mjcf.normalize_visual(visual)      # 'primitive' | 'cad' (drawing only, SPEC §4.6)
         self.dribbler = mjcf.normalize_dribbler(dribbler)  # 'spring' | 'bar' (physical mechanism)
@@ -288,7 +289,8 @@ class MuJoCoWorld(World):
         return mjcf.build_world_xml(scene, self.route, fld=self._field, spec=self._spec, wheel=self.wheel,
                                     ball=self.ball_spec, solver=self.solver, route_a=self.route_a,
                                     route_b=self.route_b, boundary=self.boundary, chassis=self.chassis,
-                                    visual=self.visual, dribbler=self.dribbler, dribbler_opt=self.dribbler_opt)
+                                    visual=self.visual, dribbler=self.dribbler, dribbler_opt=self.dribbler_opt,
+                                    floor_friction=self.floor_friction)
 
     # ------------------------------------------------------------------ World API
     @property

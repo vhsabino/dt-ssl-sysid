@@ -1327,12 +1327,16 @@ def world_root(scene: Scene, route: str, fld: FieldGeometry | None = None, spec:
                solver: SolverOptions | None = None, route_a: RouteAOptions | None = None,
                route_b: RouteBOptions | None = None, boundary: bool = True,
                chassis: str = "mesh", visual: str = "primitive", dribbler: str = "spring",
-               dribbler_opt: DribblerOptions | None = None) -> ET.Element:
+               dribbler_opt: DribblerOptions | None = None, floor_friction: float = 0.9) -> ET.Element:
+    """``floor_friction``: sliding friction of the floor plane (default 0.9 as always). Geoms of equal priority
+    combine friction by the maximum, so the roller-floor contact of route b sees
+    ``max(floor_friction, RouteBOptions.roller_friction)``; the ball keeps its own (priority 1)."""
     route = normalize_route(route)
     bar = normalize_dribbler(dribbler) == "bar"
     fld = fld or load_field_geometry()
     ball = ball or BallSpec()
-    frs = [field_fragment(fld, boundary), ball_fragment(ball, (scene.ball.x, scene.ball.y), mouth=bar)]
+    frs = [field_fragment(fld, boundary, floor_friction=float(floor_friction)),
+           ball_fragment(ball, (scene.ball.x, scene.ball.y), mouth=bar)]
     solver = solver or SolverOptions()
     if bar and dribbler_opt is None:
         dribbler_opt = DribblerOptions.from_cad()
