@@ -46,6 +46,7 @@ Proveniência de cada número do projeto: `results/CHANGELOG.md`.
 | `CORTES_SUGERIDOS.md` / `CORTES_PARA_6_PAGINAS.md` | candidatos e plano de cortes para caber em 6 páginas (07–10/08). |
 | `PLANO_ACCEPT_SBR2026.md` / `PLANO_V2_EXECUTADO.md` / `PLANO_V3_EXECUTADO.md` | planos derivados das revisões independentes e o que foi executado em 10/08 (V2 encerra R1 — a matriz `K_inv` está correta). |
 | `GUIA_ANONIMIZACAO_REPO.md` | checklist verificado de anonimização do pacote público (double-blind); hoje automatizado por `tools/make_release.py`. |
+| `D3_RELEASE_CHECKLIST_20261014.md` | dry-run do pacote de reprodução (D3 / WP5) em 14/10/2026: o que o pacote contém (8,5 MB, artefatos de junho a outubro, pré-registros, CHANGELOG), o que mudou para a varredura fechar (cabeçalhos das malhas CAD, manifesto, scrub), limites e as decisões que faltam (anonimizado ou identificado, dados, DOI, autoria). |
 
 ## Revisões e cartas (HISTÓRICO)
 

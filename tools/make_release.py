@@ -55,6 +55,14 @@ MANIFEST: dict = {
     },
     "files": {                      # single files -> destination
         "docs/PREREGISTRO_OMEGA_20260724.md": "docs/PREREGISTRO_OMEGA_20260724.md",
+        # pre-registrations of the extension (written before each run; PT-BR, kept verbatim)
+        "docs/PREREGISTRO_IDENTIFICABILIDADE_INSILICO_20260907.md": "docs/PREREGISTRO_IDENTIFICABILIDADE_INSILICO_20260907.md",
+        "docs/PREREGISTRO_IDENTIFICABILIDADE_INSILICO_C1B_20260907.md": "docs/PREREGISTRO_IDENTIFICABILIDADE_INSILICO_C1B_20260907.md",
+        "docs/PREREGISTRO_IDENTIFICABILIDADE_INSILICO_C1B_V2_20260907.md": "docs/PREREGISTRO_IDENTIFICABILIDADE_INSILICO_C1B_V2_20260907.md",
+        "docs/PREREGISTRO_C4_MALHA_FECHADA_20260908.md": "docs/PREREGISTRO_C4_MALHA_FECHADA_20260908.md",
+        "docs/PREREGISTRO_C2B_SIMULADORES_LIGA_20260910.md": "docs/PREREGISTRO_C2B_SIMULADORES_LIGA_20260910.md",
+        "docs/PREREGISTRO_C2B2_PREROLAGEM_20260916.md": "docs/PREREGISTRO_C2B2_PREROLAGEM_20260916.md",
+        "docs/PREREGISTRO_MIMO_CHECK_20260923.md": "docs/PREREGISTRO_MIMO_CHECK_20260923.md",
         "pyproject.toml": "pyproject.toml",
         "LICENSE": "LICENSE",
     },
@@ -75,6 +83,40 @@ MANIFEST: dict = {
         "eval_twin_vs_rsim_modeA_20260617_0030.md",
         "identificacao_omega_20260724.md",
         "fit_holdout_vxvy_20260731_024049.csv",
+        # extension (journal manuscript): September and October 2026, every artefact the CHANGELOG cites
+        "backends_holdout_20260907_1515.md",                                   # C2a
+        "backends_holdout_20260907_1515.csv",
+        "identifiability_insilico_20260907_1552.md",                           # C1
+        "identifiability_insilico_20260907_1552.json",
+        "identifiability_insilico_mujoco-velocity_20260907_2038.json",         # C1b sanity (route a)
+        "identifiability_insilico_mujoco-rollers-delay_20260907_2038.json",    # C1b v1 (kept, superseded by v2)
+        "identifiability_insilico_mujoco-rollers_20260907_2041.json",
+        "identifiability_insilico_mujoco-rollers-delay_v2_20260907_2044.md",   # C1b v2
+        "identifiability_insilico_mujoco-rollers-delay_v2_20260907_2044.json",
+        "identifiability_insilico_mujoco-rollers_v2_20260907_2048.md",
+        "identifiability_insilico_mujoco-rollers_v2_20260907_2048.json",
+        "identifiability_insilico_fopdt_v2_20260907_2051.json",
+        "session_report_sessao_01_20260907_2059.md",                           # B3
+        "session_report_sessao_01_20260907_2059.json",
+        "closed_loop_stats_20260907_2137.md",                                  # C4
+        "closed_loop_stats_20260907_2137.json",
+        "protocol_holdout_20260910_0211.md",                                   # C2b
+        "protocol_holdout_20260910_0211.json",
+        "protocol_holdout_20260910_0211.csv",
+        "protocol_holdout_20260918_1326.md",                                   # C2b2 session 1
+        "protocol_holdout_20260918_1326.json",
+        "protocol_holdout_20260918_1326.csv",
+        "protocol_holdout_20260920_1143.md",                                   # C2b2 session 2
+        "protocol_holdout_20260920_1143.json",
+        "protocol_holdout_20260920_1143.csv",
+        "coupled_mimo_check_20261014_1211.md",                                 # WP2 (MIMO) + controls
+        "coupled_mimo_check_20261014_1211.json",
+        "coupled_mimo_check_20261014_1211.csv",
+        "coupled_mimo_check_control-fopdt_20261014_1211.md",
+        "coupled_mimo_check_control-fopdt_20261014_1211.json",
+        "coupled_mimo_check_control-mujoco-rollers-delay_20261014_1216.md",
+        "coupled_mimo_check_control-mujoco-rollers-delay_20261014_1216.json",
+        "CHANGELOG.md",                                                        # provenance of every number
     ],
     "rsim_cache": "results/_cache_rsim_rollouts.pkl",       # converted to .npz
     "figures": [                    # latex/figures/<name> -> figures/<name>
@@ -90,11 +132,22 @@ MANIFEST: dict = {
 FORBIDDEN: tuple[str, ...] = (
     "happy-modest-euler", "vhsabino", "Sabino", "RobôCIn", "RoboCin", "UFPE",
     "ssl-embedded", "eb57531", "C:\\Users",
+    # added 14/10/2026 after the dry run of the extended package: first name alone, the user name in paths
+    # (also JSON-escaped), the team name with a capital I, the lower-case institution, the PC host name
+    "RoboCIn", "Victor", "victo", "ufpe", "WIN-DU3TCF0CCSB",
 )
 
 #: Ordered literal replacements applied to text files (longest / most specific first).
 REPLACEMENTS: tuple[tuple[str, str], ...] = (
     ("/sessions/happy-modest-euler/mnt/digitaltwin", "<repo>"),
+    ("C:\\\\Users\\\\victo\\\\Documents\\\\digitaltwin", "<repo>"),     # JSON-escaped Windows path
+    ("C:\\Users\\victo\\Documents\\digitaltwin", "<repo>"),
+    ("/mnt/c/Users/victo/Documents/digitaltwin", "<repo>"),
+    ("C:\\\\Users\\\\victo", "<home>"),
+    ("C:\\Users\\victo", "<home>"),
+    ("/mnt/c/Users/victo", "<home>"),
+    ("/home/victo", "<home>"),
+    ("WIN-DU3TCF0CCSB", "<host>"),
     ("happy-modest-euler", "anonymous-env"),
     ("https://github.com/vhsabino/dt-ssl-sysid", "https://anonymous.4open.science/r/behavioral-twin-ssl"),
     ("vhsabino", "anonymous"),
@@ -104,6 +157,9 @@ REPLACEMENTS: tuple[tuple[str, str], ...] = (
     ("Victor Sabino", "Anonymous"),
     ("V. Sabino", "Anonymous"),
     ("Sabino", "Anonymous"),
+    ("Victor", "the author"),
+    ("RoboCIn v2025", "SSL v2025"),
+    ("RoboCIn", "the team"),
     ("RobôCIn v2025", "SSL v2025"),
     ("RobôCIn", "the team"),
     ("RoboCin", "the team"),
@@ -125,11 +181,12 @@ REGEX_SCRUBS: tuple[tuple[str, str], ...] = (
 TEXT_SUFFIXES = {".py", ".md", ".txt", ".json", ".toml", ".cfg", ".ini", ".m", ".csv", ".yaml",
                  ".yml", ".tex", ".bib", ".rst", ".html", ".svg", ""}
 
-README = """# A Behavioral Model for Digital Twins of Omnidirectional Soccer Robots: Diagnosing Identifiability from Competition Logs
+README = """# A Behavioral Model for Reality-Gap Mitigation in Digital Twins of Omnidirectional Soccer Robots
 
-Reproduction package. Every number in the paper is produced by the code here
-from the configurations in `config/`, and each claim below names the exact
-command and artefact that backs it.
+Reproduction package of the SBR/LARS 2026 paper and of its journal extension (in
+preparation). Every number is produced by the code here from the configurations in
+`config/`, and each claim below names the exact command and artefact that backs it;
+`results/CHANGELOG.md` is the provenance log of every artefact (one entry per run).
 
 > **Anonymised for double-blind review.** No author, institution or team name
 > appears in this repository or in its commit history.
@@ -198,6 +255,22 @@ provenance header (theta, dataset, seed). Figures: `dtssl fig <name>`.
 
 rSim rollouts are persisted in `results/_cache_rsim_rollouts.npz` so that the
 rSim comparisons do not need to re-simulate.
+
+## Extension (journal manuscript): one command per claim
+
+Each run has a pre-registration in `docs/` written before any number was computed.
+
+| Claim | Command | Artefact |
+|---|---|---|
+| MuJoCo routes a and b against the behavioral plant on the frozen hold-out (C2a) | `dtssl analysis run backends_holdout` (needs mujoco) | `results/backends_holdout_*.md` |
+| In-silico identifiability by excitation regime, linear generator (C1) | `dtssl analysis run identifiability_insilico` | `results/identifiability_insilico_*.json` |
+| In-silico mechanism of the closed-loop yaw bias, physical generators (C1b v2) | `dtssl analysis run identifiability_insilico --kw variant=v2 generator=mujoco-rollers-delay` (and `mujoco-rollers`) | `results/identifiability_insilico_mujoco-*_v2_*.json` |
+| Recorded closed-loop session against the twin, round trip of the harness (B3) | `dtssl analysis run session_report --kw session=results/sessao_01` (session under DVC) | `results/session_report_*.json` |
+| Closed-loop plausibility against the competition logs (C4) | `dtssl analysis run closed_loop_stats` | `results/closed_loop_stats_*.json` |
+| grSim and ER-Force on the hold-out through the ssl-simulation-protocol (C2b) | `tools/external_sims/run_protocol_holdout.sh` (WSL2/Linux, simulators installed), `dtssl analysis run protocol_holdout --kw from_cache=...` | `results/protocol_holdout_*.json` |
+| Pre-rolled league simulators, fair initial condition (C2b2, two sessions) | `tools/external_sims/run_protocol_holdout.sh --delay none --preroll 0.5` | `results/protocol_holdout_2026091*.json`, `_20260920_*.json` |
+| Cross-coupling (MIMO) check with in-silico controls (WP2) | `dtssl analysis run coupled_mimo_check` (+ `--kw control=fopdt` and `control=mujoco-rollers-delay`) | `results/coupled_mimo_check_*.{md,json}` |
+| Journal tables and figures from the artefacts (no recomputation) | `dtssl analysis run journal_tables`, `dtssl fig fig_journal_identifiability` / `fig_journal_league_sims` / `fig_journal_closed_loop` | `latex_journal/tables/`, `latex_journal/figures/` |
 
 ## Definitions used in the paper
 
