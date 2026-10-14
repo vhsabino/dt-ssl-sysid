@@ -4,8 +4,10 @@ import dataclasses
 import numpy as np
 import pytest
 
-from phase0_replay import load_segment
-from phase0_replay.schema import validate_segment
+from dtssl import load_segment
+from dtssl.data.schema import validate_segment
+
+pytestmark = pytest.mark.requires_data   # every test here loads a real event
 
 
 @pytest.fixture(scope="module")

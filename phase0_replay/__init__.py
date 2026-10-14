@@ -1,36 +1,45 @@
-"""phase0_replay — harness de replay do gemeo digital SSL (FOPDT por DOF).
+"""DEPRECATED compatibility shim: ``phase0_replay`` -> ``dtssl`` (refactor of 2026-09-02).
 
-Modulo de carregamento (loader). Le os dois parquets assincronos/irregulares de
-um evento (commands + processed_robots), converte para SI estrito, reamostra
-AMBOS para a grade uniforme Ts = 1/60 s (reproduzindo a etapa de reamostragem do
-pipeline de identificacao em MATLAB, build_idData_per_dof) e devolve um Segment
-canonico. Ver DESIGN.md.
+Keeps old imports (``from phase0_replay.plant import AnalyticFOPDTPlant``) and the
+unpickling of ``results/_cache_rsim_rollouts.pkl`` (pickled ``phase0_replay.rollout.Window``)
+working for one release. New code must import from ``dtssl``. Remove in v2.
 """
-from .schema import Segment, TS_DEFAULT
-from .io import (load_event, load_segment, repo_root, event_dir,
-                 body_velocity_series)
-from .splits import load_holdout_list, load_holdout_segments
-from .resample import matlab_colon, interp_previous, interp_linear_nan
-from .params import DofParam, load_twin_params
-from .plant import Plant, AnalyticFOPDTPlant, IdealKinematicPlant, wrap_to_pi
-from .rollout import (Window, WindowRollout, rollout_segment, free_run,
-                      max_command_delay, DEFAULT_HMAX, DEFAULT_HORIZONS,
-                      DEFAULT_STRIDE)
-from .metrics import (evaluate, build_error_table, classify_bin,
-                      bin_distribution, format_bin_distribution,
-                      load_metrics_config, make_figures, markdown_report,
-                      rank_biserial, ErrorTable)
+from __future__ import annotations
 
-__all__ = [
-    "Segment", "TS_DEFAULT",
-    "load_event", "load_segment", "repo_root", "event_dir", "body_velocity_series",
-    "load_holdout_list", "load_holdout_segments",
-    "matlab_colon", "interp_previous", "interp_linear_nan",
-    "DofParam", "load_twin_params",
-    "Plant", "AnalyticFOPDTPlant", "IdealKinematicPlant", "wrap_to_pi",
-    "Window", "WindowRollout", "rollout_segment", "free_run", "max_command_delay",
-    "DEFAULT_HMAX", "DEFAULT_HORIZONS", "DEFAULT_STRIDE",
-    "evaluate", "build_error_table", "classify_bin", "bin_distribution",
-    "format_bin_distribution", "load_metrics_config", "make_figures",
-    "markdown_report", "rank_biserial", "ErrorTable",
-]
+import importlib
+import sys
+import warnings
+
+_MAP = {
+    "schema": "dtssl.data.schema",
+    "resample": "dtssl.data.resample",
+    "io": "dtssl.data.loader",
+    "validate": "dtssl.data.validate",
+    "splits": "dtssl.data.splits",
+    "params": "dtssl.models.params",
+    "plant": "dtssl.models",
+    "rsim_plant": "dtssl.models.rsim",
+    "rollout": "dtssl.sim.rollout",
+    "metrics": "dtssl.eval.metrics",
+    "report": "dtssl.analysis.loader_report",
+    "holdout_report": "dtssl.analysis.holdout_report",
+    "meeting_overlay": "dtssl.analysis.meeting_overlay",
+    "percurso_completo": "dtssl.analysis.percurso_completo",
+    "percurso_square": "dtssl.analysis.percurso_square",
+    "metrics_report": "dtssl.analysis.metrics_report",
+    "eval_twin_vs_rsim": "dtssl.analysis.eval_twin_vs_rsim",
+}
+
+warnings.warn("phase0_replay is deprecated; import from dtssl instead", DeprecationWarning, stacklevel=2)
+
+for _old, _new in _MAP.items():
+    try:
+        sys.modules[f"{__name__}.{_old}"] = importlib.import_module(_new)
+    except Exception:  # optional deps (robosim) may be missing
+        pass
+
+
+def __getattr__(name):
+    if name in _MAP:
+        return importlib.import_module(_MAP[name])
+    raise AttributeError(name)

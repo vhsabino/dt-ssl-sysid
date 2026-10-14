@@ -1,0 +1,20 @@
+{
+  "_doc": "Robot tab of dtssl gui (dtssl.bridge.telemetry). 'real': the RoboCIn radio telemetry, RCCommunication.Feedback datagrams of rc_communication.proto as received by ssl-unification CommunicationWifi (multicast 224.0.1.99, recv port 19903; commands go out on 19901). enabled=false keeps the receiver off unless `dtssl gui --telemetry`; team = whose robots report (null = the GUI --team); stale_s = a record older than this is not shown; fields = which Feedback group is the commanded vs the measured wheel speed (c_speed / d_speed; swap here if the firmware names them the other way round); units = labels only, as reported by the firmware (correct them here, nothing is converted). 'synthetic': the ILLUSTRATIVE battery/capacitor model of the twin's robots (not identified; the GUI labels it): capacitor empties on a kick and recharges with capacitor_tau_s; battery drains by battery_drain_per_rad * sum|wheel rad/s| * dt.",
+  "real": {
+    "enabled": false,
+    "ip": "224.0.1.99",
+    "port": 19903,
+    "multicast_if": "0.0.0.0",
+    "team": null,
+    "stale_s": 1.0,
+    "fields": {"wheel_meas": "c_speed", "wheel_cmd": "d_speed"},
+    "units": {
+      "wheel_speed": "rad/s (como reportado)",
+      "battery": "V (como reportado)",
+      "capacitor": "V (como reportado)",
+      "current": "A (como reportado)",
+      "pwm": "duty (como reportado)"
+    }
+  },
+  "synthetic": {"illustrative": true, "capacitor_tau_s": 2.5, "battery_full": 1.0, "battery_drain_per_rad": 2e-6}
+}

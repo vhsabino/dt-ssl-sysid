@@ -1,0 +1,14 @@
+{
+  "_doc": "SSL Division B field geometry in millimetres (defaults of ssl-unification DataWorld.h / ssl-vision SSL_GeometryFieldSize; RoboCup SSL rules: playing area 9 x 6 m, goal 1 m wide and 0.18 m deep, defense area 2 x 1 m, penalty mark 6 m from the goal centre, 6 robots per team). Consumed by dtssl.config.load_field / load_field_preset (dtssl.sim.world.FieldGeometry.from_mm) and by the vision publisher (geometry packet). robots_per_team is read by the GUI/CLI (robots on the field at start), not by FieldGeometry. Division A: field_divA.json.",
+  "field_length": 9000,
+  "field_width": 6000,
+  "goal_width": 1000,
+  "goal_depth": 180,
+  "boundary_width": 300,
+  "penalty_area_depth": 1000,
+  "penalty_area_width": 2000,
+  "goal_center_to_penalty_mark": 6000,
+  "center_circle_radius": 500,
+  "line_thickness": 10,
+  "robots_per_team": 6
+}

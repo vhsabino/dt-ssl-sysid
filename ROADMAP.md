@@ -1,5 +1,11 @@
 # ROADMAP — Refatoração do Doutorado (Gêmeo Digital SSL)
 
+> **HISTÓRICO — superseded by `docs/SPEC_DTSSL.md` em 02/09/2026; mantido por rastreabilidade.**
+> Plano de junho/2026 (artigo de qualificação). O artigo foi submetido ao SBR/LARS 2026 (ver
+> `docs/LOG_FINALIZACAO_ARTIGO_20260731.md`), ω foi identificado e promovido em 24/07/2026 (Trilha B, F5,
+> antecipada) e a estrutura do repositório mudou (`automation/` → `matlab/dtssl` + `matlab/legacy`;
+> `slr/incluidos.bib` nunca existiu — a bibliografia é `latex/refs/references.bib`). Estado atual: `CLAUDE.md`.
+
 **Princípio:** refatorar ≠ recomeçar. A metodologia grey-box por DOF (G_i(s) = K_i/(τ_i·s+1)·e^(−Td_i·s), 9 parâmetros, fidelidade observacional comportamental) está validada e **permanece**. Refatoramos: definições formais, revisão de literatura, documentação, automação e escrita.
 
 **Restrição dura:** artigo de qualificação submetido até **31/07/2026**. Hoje: 10/06/2026 → ~7 semanas × 10h = ~70h.

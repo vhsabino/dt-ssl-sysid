@@ -1,0 +1,35 @@
+%==============================================================================
+% TABLE: motion composition of the hold-out validation set. Added 2026-08-07
+% (revisão maior, T5.1) to make the rotational-validation gap auditable as a
+% TABLE rather than as a sentence buried in the text.
+% Source: results/bin_distribution_20260619_000422.md/.csv (original run) and
+%         results/bin_distribution_20260724_155551.md (re-run after the radius
+%         correction and after omega was promoted -- identical 264/1/0).
+% Binning rule: r = a_rot/(a_rot + a_trans); trans < 0.2 ; rot > 0.5 ; mixed in
+% between (config/metrics.json "bins"; phase0_replay/metrics.py classify_bin).
+%==============================================================================
+\begin{table}[t]
+  \caption{Motion composition of the hold-out validation set. Dense windows
+  drive the curves; only non-overlapping windows are scorable, and a bin needs
+  $N_{\min}=10$ independent windows for a verdict. The rotation and mixed bins
+  are structurally unscorable on this population --- a property of competition
+  play, not of the twin.}
+  \label{tab:valcomp}
+  \centering
+  \begin{tabular}{lccc}
+    \toprule
+    Bin & dense & share & $N_{\mathrm{indep}}$ \\
+    \midrule
+    Translation-dominated ($r<0.2$)   & $264$ & $99.6\,\%$ & $49$ \\
+    Mixed ($0.2\le r\le 0.5$)         & $0$   & $0.0\,\%$  & $0$ \\
+    Rotation-dominated ($r>0.5$)      & $1$   & $0.4\,\%$  & $0$ \\
+    \midrule
+    Total                             & $265$ & $100\,\%$  & $49$ \\
+    \bottomrule
+  \end{tabular}
+  \\[2pt]
+  \raggedright\footnotesize Verdicts: translation \textsc{go}; mixed and
+  rotation \textsc{no power} ($N_{\mathrm{indep}}<N_{\min}$). Re-running the
+  classification after $\omega$ was identified, and after the wheel-radius
+  correction, reproduces this distribution exactly.
+\end{table}

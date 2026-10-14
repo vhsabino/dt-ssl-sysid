@@ -1,0 +1,116 @@
+syntax = "proto2";
+
+package RCLog;
+
+import "ssl_vision_wrapper.proto";
+import "ssl_gc_referee_message.proto";
+
+message Point {
+    optional double x = 1;
+    optional double y = 2;
+}
+
+message PolarPoint {
+    optional double x = 1;
+    optional double y = 2;
+    optional double omega = 3;
+}
+
+message PathNode {
+    optional Point position = 1;
+    optional Point velocity = 2;
+    optional double time = 3;
+}
+
+message Log {
+    required uint64 timestamp = 1;
+
+    optional RawReferee rawReferee = 2;
+    optional Referee referee = 3;
+
+    repeated RawFrame raw_frame = 4;
+    optional Frame processed_frame = 5;
+
+    optional Telemetry telemetry = 6;
+    optional RobotsCommand robots_command = 7;
+}
+
+message RawFrame{
+    required uint64 publish_timestamp = 1;
+    optional RoboCupSSL.SSL_WrapperPacket packet = 2;
+}
+
+message RawReferee{
+    required uint64 publish_timestamp = 1;
+    optional RoboCupSSL.Referee packet = 2;
+}
+
+message Referee{
+    required uint64 publish_timestamp = 1;
+    optional string game_state_name  = 2;
+}
+
+message Frame {
+    required uint64 publish_timestamp = 1;
+    optional Ball ball = 2;
+    repeated Robot allies = 3;
+    repeated Robot enemies = 4;
+
+    message Ball {
+        optional Point position = 1;
+        optional Point velocity = 2;
+        optional Point acceleration = 3;
+    }
+
+    message Robot {
+        required int32 id = 1;
+
+        optional PolarPoint position = 2;
+        optional Point velocity = 3;
+    }
+}
+
+message Telemetry {
+    repeated RobotTelemetry telemetries = 1;
+
+    message RobotTelemetry {
+        required uint64 receive_timestamp = 1;
+        required int32 id = 2;
+
+        optional double wheel1 = 3;
+        optional double wheel2 = 4;
+        optional double wheel3 = 5;
+        optional double wheel4 = 6;
+
+        optional PolarPoint position = 7;
+
+        optional PolarPoint velocity = 8;
+
+        optional double dribbler_speed = 9;
+        optional double capacitor_charge = 10;
+        optional bool dribbler_ball_contact = 11;
+        optional double battery = 12;
+        optional int32 count = 13;
+    }
+}
+//TODO: integrate this with behavior packets
+message PeripheralActuation{
+    optional double kick_strength = 1;
+    optional bool front = 2;
+    optional bool chip = 3;
+    optional bool charge = 4;
+    optional bool dribbler = 5;
+    optional double dribbler_velocity = 6;
+}
+
+message RobotsCommand {
+    repeated RobotCommand navigation = 1;
+
+    message RobotCommand {
+        required uint64 publish_timestamp = 1;
+        required int32 id = 2;
+
+        optional PolarPoint move = 3;
+        optional PeripheralActuation actuation = 4;
+    }
+}

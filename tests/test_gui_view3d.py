@@ -1,0 +1,581 @@
+"""3D view: geometry (no Qt) + the pyqtgraph.opengl widget (requires_gui; GL parts skip without a context).
+
+The GL tests run for real on a desktop (``QT_QPA_PLATFORM=windows``/``xcb``) or under ``xvfb-run``; with the
+``offscreen`` platform ``QOpenGLWidget`` has no context and they are skipped (the widget must still build
+and accept frames there, which is what the MainWindow tests exercise).
+"""
+from __future__ import annotations
+
+import math
+import os
+
+import numpy as np
+import pytest
+
+from dtssl.gui import scene3d as S
+from dtssl.physics.mjcf import WheelGeometry
+from dtssl.sim.world import FieldGeometry, RobotSpec
+
+WHEEL = WheelGeometry()
+
+
+# ---------------------------------------------------------------- geometry (pure numpy)
+def _euler_characteristic(m: S.Mesh) -> int:
+    f = m.faces
+    edges = {tuple(sorted((int(a), int(b)))) for tri in f for a, b in ((tri[0], tri[1]), (tri[1], tri[2]), (tri[2], tri[0]))}
+    return len(m.vertices) - len(edges) + len(f)
+
+
+def test_parse_obj_handles_polygons_and_slashes():
+    obj = "# c\nv 0 0 0\nv 1 0 0\nv 1 1 0\nv 0 1 0\nvn 0 0 1\nf 1/1/1 2/2/1 3/3/1 4/4/1\nf 1 2 3\n"
+    m = S.parse_obj(obj)
+    assert m.vertices.shape == (4, 3) and m.faces.shape == (3, 3)      # quad -> 2 triangles + 1
+    assert m.faces.tolist() == [[0, 1, 2], [0, 2, 3], [0, 1, 2]]
+
+
+def test_cad_meshes_match_the_physics_assets():
+    chassis, wheel, meta = S.cad_meshes()
+    assert chassis.n_faces == meta["chassis"]["faces"] and wheel.n_faces == meta["wheel"]["faces"]
+    assert len({tuple(c) for c in chassis.colors}) == len(meta["chassis"]["materials"])   # Inventor colours
+    lo, hi = chassis.bbox()
+    assert hi[2] == pytest.approx(meta["chassis"]["z_top_above_axle"], abs=1e-6)
+    assert 0.07 < hi[0] < 0.08 and lo[0] < -0.085                    # dribbler at +x
+    r = np.hypot(wheel.vertices[:, 1], wheel.vertices[:, 2]).max()
+    assert r == pytest.approx(meta["wheel"]["outer_radius"], abs=1e-6)
+
+
+def test_mechanism_meshes_match_the_physics_assets():
+    """Kicker and dribbler (Inventor assembly) share the chassis frame: the dribbler spans the mouth at the
+    front (+x), the kicker lies on the body x axis behind it; the LOD pair is a decimation of the same parts."""
+    meta = S.cad_meta()
+    full, lod = S.mechanism_meshes(lod=False), S.mechanism_meshes(lod=True)
+    assert set(full) == set(lod) == {"kicker", "dribbler"}
+    for key in full:
+        assert full[key].n_faces == meta[key]["faces"] and lod[key].n_faces == meta[f"{key}_lod"]["faces"]
+        assert 2 * lod[key].n_faces < full[key].n_faces
+        np.testing.assert_allclose(lod[key].bbox()[1], full[key].bbox()[1], atol=0.002)
+    lo, hi = full["dribbler"].bbox()
+    assert 0.07 < hi[0] < 0.085 and lo[0] > 0.04 and abs(hi[1] + lo[1]) < 0.004      # across the mouth, centred
+    lo, hi = full["kicker"].bbox()
+    assert hi[0] < 0.0765 and abs(hi[1] + lo[1]) < 0.002 and hi[1] - lo[1] < 0.06      # behind the front face
+    assert all(m.bbox()[0][2] + WHEEL.r > 0.0 for m in full.values())                  # nothing below the floor
+
+
+def test_primitive_meshes_are_closed_surfaces():
+    for m in (S.d_prism_mesh(0.09, 0.075, 0.008, 0.15), S.cylinder_mesh(0.03, 0.009), S.cylinder_mesh_z(0.02, 0.001)):
+        assert _euler_characteristic(m) == 2                          # genus 0: V - E + F = 2
+        assert m.faces.min() == 0 and m.faces.max() == len(m.vertices) - 1
+
+
+def test_id_plate_mesh_colours_follow_the_rulebook_pattern():
+    m = S.id_plate_mesh("blue", 3, 0.15)
+    assert m.colors is not None and len(m.colors) == m.n_faces
+    cols = {tuple(np.round(c, 2)) for c in m.colors}
+    assert len(cols) == 3                                             # team disc + pink + green
+    assert m.vertices[:, 2].min() >= 0.15 - 1e-9                       # sits on top of the cover
+    m2 = S.id_plate_mesh("yellow", 3 + 16, 0.15)
+    np.testing.assert_allclose(m2.colors[-m.n_faces + 24 * 4:], m.colors[-m.n_faces + 24 * 4:])   # same dots
+    assert not np.allclose(m2.colors[0], m.colors[0])                 # different team disc
+
+
+def test_robot_meshes_build_all_variants():
+    cad = S.RobotMeshes.build(WHEEL, RobotSpec(), cad=True, lod=False)
+    lod = S.RobotMeshes.build(WHEEL, RobotSpec(), cad=True, lod=True)
+    prim = S.RobotMeshes.build(WHEEL, RobotSpec(), cad=False)
+    assert cad.cad and not cad.lod and cad.z_chassis == pytest.approx(WHEEL.r)
+    assert 0.145 < cad.z_top <= 0.150                                  # id plate on the CAD decal plane
+    assert cad.z_top == pytest.approx(WHEEL.r + S.cad_plate_z())
+    assert lod.cad and lod.lod and lod.z_top == cad.z_top and lod.z_chassis == cad.z_chassis
+    assert 3 * lod.chassis.n_faces < cad.chassis.n_faces and lod.wheel.n_faces < cad.wheel.n_faces
+    assert not prim.cad and prim.z_chassis == 0.0 and prim.z_top == pytest.approx(RobotSpec().height)
+    assert lod.chassis.n_faces > 10 * prim.chassis.n_faces
+    assert set(cad.mechanisms) == set(lod.mechanisms) == {"kicker", "dribbler"} and prim.mechanisms == {}
+    assert all(lod.mechanisms[k].n_faces < cad.mechanisms[k].n_faces for k in cad.mechanisms)
+    for mesh in (cad.chassis, cad.wheel, lod.chassis, *cad.mechanisms.values()):   # CAD colours per face
+        assert mesh.colors is not None and mesh.colors.shape == (mesh.n_faces, 4)
+        assert len({tuple(np.round(c, 3)) for c in mesh.colors}) >= 3
+    assert prim.chassis.colors is None
+
+
+def _cube_mesh() -> S.Mesh:
+    """Unit cube, 8 shared vertices (index ``4x + 2y + z``), 2 triangles per face in face order."""
+    v = np.array([[x, y, z] for x in (0.0, 1.0) for y in (0.0, 1.0) for z in (0.0, 1.0)])
+    quads = [(0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3)]
+    f = [t for a, b, c, d in quads for t in ((a, b, c), (a, c, d))]
+    return S.Mesh(v, np.asarray(f, dtype=np.int32))
+
+
+def _face_normals(m: S.Mesh) -> np.ndarray:
+    v, f = m.vertices, m.faces
+    n = np.cross(v[f[:, 1]] - v[f[:, 0]], v[f[:, 2]] - v[f[:, 0]])
+    return n / np.linalg.norm(n, axis=1, keepdims=True)
+
+
+def test_smooth_mesh_keeps_box_edges_sharp_and_rounds_cylinders():
+    cube = _cube_mesh()
+    cube.colors = np.repeat([[i / 5.0, 0.2, 0.4, 1.0] for i in range(6)], 2, axis=0)   # one colour per cube face
+    sm = S.smooth_mesh(cube)
+    assert sm.smooth and not cube.smooth and sm.n_faces == 12 and len(sm.vertices) == 24   # 6 faces x 4 corners
+    assert sm.colors is cube.colors and sm.vertex_colors.shape == (24, 4)
+    for tri, n in zip(sm.faces, _face_normals(sm), strict=True):       # 90 deg edges: every corner keeps its face
+        np.testing.assert_allclose(sm.normals[tri], np.tile(n, (3, 1)), atol=1e-12)
+    np.testing.assert_allclose(sm.vertex_colors[sm.faces], np.repeat(cube.colors[:, None, :], 3, axis=1))
+    assert S.smooth_mesh(sm) is sm                                      # already smooth: untouched
+    cyl = S.cylinder_mesh(0.03, 0.009, n=24)
+    sc = S.smooth_mesh(cyl)
+    assert sc.n_faces == cyl.n_faces and sc.vertex_colors is None
+    assert len(sc.vertices) == 2 * 24 + 2 * (24 + 1)                     # side rings shared, caps split off
+    side = np.abs(np.abs(sc.normals[:, 0]) - 1.0) > 1e-9                # the cap normals are exactly +-x
+    assert side.sum() == 48 and np.abs(sc.normals[side, 0]).max() < 1e-9
+    radial = sc.vertices[side, 1:] / np.linalg.norm(sc.vertices[side, 1:], axis=1, keepdims=True)
+    assert np.abs(np.einsum("ij,ij->i", sc.normals[side, 1:], radial)).min() > 0.99   # round: normals ~radial
+    assert len(S.smooth_mesh(cyl, angle_deg=5.0).vertices) > len(sc.vertices)    # 15 deg facets split too
+
+
+def test_vertex_normals_are_area_weighted_unit_vectors():
+    v = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 0.1]])
+    f = np.array([[0, 1, 2], [0, 3, 1]])             # +z face, area 0.5; +y face, area 0.05
+    n = S.vertex_normals(v, f)
+    np.testing.assert_allclose(np.linalg.norm(n, axis=1), 1.0)
+    np.testing.assert_allclose(n[2], [0.0, 0.0, 1.0])
+    np.testing.assert_allclose(n[3], [0.0, 1.0, 0.0])
+    np.testing.assert_allclose(n[0], np.array([0.0, 0.1, 1.0]) / math.sqrt(1.01))   # 10:1 by area
+
+
+def test_merge_meshes_carries_normals_and_vertex_colours_only_when_all_parts_are_smooth():
+    a = S.smooth_mesh(S.cylinder_mesh(0.02, 0.01))                       # no colours of its own
+    b = S.smooth_mesh(S.id_plate_mesh("blue", 3, 0.05))                  # per-face colours
+    rgba = (0.1, 0.2, 0.3, 1.0)
+    m = S.merge_meshes([a, b], default_rgba=rgba)
+    assert m.smooth and m.n_faces == a.n_faces + b.n_faces and len(m.vertices) == len(a.vertices) + len(b.vertices)
+    assert m.normals.shape == (len(m.vertices), 3) and m.vertex_colors.shape == (len(m.vertices), 4)
+    assert m.faces.max() == len(m.vertices) - 1
+    np.testing.assert_allclose(m.colors[:a.n_faces], np.tile(rgba, (a.n_faces, 1)))
+    np.testing.assert_allclose(m.vertex_colors[:len(a.vertices)], np.tile(rgba, (len(a.vertices), 1)))
+    np.testing.assert_allclose(m.vertex_colors[len(a.vertices):], b.vertex_colors)
+    np.testing.assert_allclose(m.normals[len(a.vertices):], b.normals)
+    flat = S.merge_meshes([a, S.id_plate_mesh("blue", 3, 0.05)])         # one flat part: flat result
+    assert not flat.smooth and flat.normals is None and flat.vertex_colors is None and flat.colors is not None
+
+
+def test_body_mesh_merges_chassis_mechanisms_and_plate_in_the_chassis_frame():
+    meshes = S.RobotMeshes.build(WHEEL, RobotSpec(), cad=True, lod=True)
+    plate = S.id_plate_mesh("blue", 3, 0.0)
+    body = S.body_mesh(meshes, "blue", 3)
+    n_cad = meshes.chassis.n_faces + sum(m.n_faces for m in meshes.mechanisms.values())
+    assert body.n_faces == n_cad + plate.n_faces and body.smooth
+    assert body.normals.shape == (len(body.vertices), 3) and body.vertex_colors.shape == (len(body.vertices), 4)
+    assert body.colors.shape == (body.n_faces, 4)
+    np.testing.assert_allclose(body.colors[:meshes.chassis.n_faces], meshes.chassis.colors)
+    pv = body.vertices[np.unique(body.faces[-plate.n_faces:])]            # the plate comes last
+    z_plate = meshes.z_top + S.PLATE_Z_OVER_TOP - meshes.z_chassis         # body-frame height, chassis frame
+    assert pv[:, 2].min() == pytest.approx(z_plate, abs=1e-9) and pv[:, 2].max() < z_plate + 0.002
+    assert np.hypot(pv[:, 0], pv[:, 1]).max() < RobotSpec().radius         # dots inside the cover
+    raw = S.RobotMeshes.build(WHEEL, RobotSpec(), cad=True, lod=True, smooth=False)
+    assert not raw.chassis.smooth and not raw.wheel.smooth and not S.body_mesh(raw, "blue", 3).smooth
+    assert len(raw.chassis.vertices) <= len(meshes.chassis.vertices)
+    assert len(S.smooth_mesh(raw.chassis).vertices) == len(meshes.chassis.vertices)
+    prim = S.RobotMeshes.build(WHEEL, RobotSpec(), cad=False)
+    pb = S.body_mesh(prim, "yellow", 0)
+    assert pb.n_faces == prim.chassis.n_faces + plate.n_faces and pb.smooth and pb.colors is not None
+
+
+def test_robot_transform_maps_body_points_to_world():
+    T = S.robot_transform(1.0, -2.0, math.pi / 2, z=0.03)
+    p = T @ np.array([0.075, 0.0, 0.0, 1.0])                          # dribbler face
+    np.testing.assert_allclose(p[:3], [1.0, -2.0 + 0.075, 0.03], atol=1e-12)
+
+
+def test_wheel_transform_places_the_wheel_on_the_rim_with_its_axle_radial():
+    x, y, th = 0.5, 0.2, 0.3
+    for i, phi in enumerate(WHEEL.angles):
+        T = S.wheel_transform(x, y, th, WHEEL, i, spin=1.0)
+        centre = (T @ np.array([0.0, 0.0, 0.0, 1.0]))[:3]
+        exp = [x + WHEEL.R * math.cos(th + phi), y + WHEEL.R * math.sin(th + phi), WHEEL.r]
+        np.testing.assert_allclose(centre, exp, atol=1e-12)
+        axle = (T @ np.array([1.0, 0.0, 0.0, 0.0]))[:3]                 # mesh +x -> outward radial u_r
+        np.testing.assert_allclose(axle, [math.cos(th + phi), math.sin(th + phi), 0.0], atol=1e-12)
+
+
+def test_wheel_spin_rolls_without_slip():
+    """Contact point of every wheel is (to first order) stationary while the body moves: the spin sign and
+    magnitude from the inverse kinematics match the wheel transform."""
+    spin = S.WheelSpin(WHEEL)
+    dt = 1e-4
+    for vx, vy, w in ((1.0, 0.0, 0.0), (0.0, 0.7, 0.0), (0.0, 0.0, 2.0), (0.6, -0.3, 1.1)):
+        spin.reset()
+        th0 = 0.4
+        a0 = spin.advance(("blue", 0), vx, vy, w, 0.0)
+        # body pose after dt (world velocity from the body velocity)
+        c, s = math.cos(th0), math.sin(th0)
+        x1, y1, th1 = (c * vx - s * vy) * dt, (s * vx + c * vy) * dt, th0 + w * dt
+        a1 = spin.advance(("blue", 0), vx, vy, w, dt)
+        for i in range(4):
+            bottom = np.array([0.0, 0.0, -WHEEL.r, 1.0])                  # contact point in the wheel mesh frame
+            p0 = (S.wheel_transform(0.0, 0.0, th0, WHEEL, i, float(a0[i])) @ bottom)[:3]
+            p1 = (S.wheel_transform(x1, y1, th1, WHEEL, i, float(a1[i])) @ bottom)[:3]
+            v_contact = (p1 - p0) / dt
+            # the roller axis lets the wheel slide freely along u_r: only the tangential component must vanish
+            phi = float(WHEEL.angles[i]) + th0
+            t = np.array([-math.sin(phi), math.cos(phi), 0.0])
+            assert abs(v_contact @ t) < 5e-3, (vx, vy, w, i, v_contact @ t)
+
+
+def test_wheel_spin_bookkeeping():
+    spin = S.WheelSpin(WHEEL)
+    a = spin.advance(("y", 1), 0.0, 0.0, 10.0, 1.0)
+    assert np.all(a >= 0) and np.all(a < 2 * math.pi)
+    np.testing.assert_allclose(spin.wheel_speeds(0.0, 0.0, 1.0), WHEEL.R / WHEEL.r)
+    same = spin.advance(("y", 1), 5.0, 5.0, 5.0, 0.0)
+    np.testing.assert_allclose(same, a)
+    spin.reset()
+    assert not spin.angles
+
+
+def test_field_geometry_arrays():
+    f = FieldGeometry()
+    frame, inner = S.floor_quads(f)
+    assert frame.shape == (16, 3) and inner.shape == (4, 3)
+    L, W, b = f.half_length, f.half_width, f.boundary_width
+
+    def area(q):
+        return abs(q[1, 0] - q[0, 0]) * abs(q[2, 1] - q[1, 1])
+    assert sum(area(frame[4 * k:4 * k + 4]) for k in range(4)) + area(inner) == pytest.approx(4 * (L + b) * (W + b))
+    segs = S.field_segments(f)
+    assert segs.shape[0] % 2 == 0 and np.all(segs[:, 2] == S.LINE_Z)
+    assert np.abs(segs[:, 0]).max() == pytest.approx(L + f.goal_depth) and np.abs(segs[:, 1]).max() == pytest.approx(W)
+    goals = S.goal_frames(f)
+    assert goals.shape[0] % 2 == 0 and goals[:, 2].max() > 0.1
+    q = S.quad_mesh(frame, S.BOUNDARY_RGBA)
+    assert q.n_faces == 8 and q.colors.shape == (8, 4)
+
+
+def test_compute_frame_draws_parked_robots_still_and_spins_wheels():
+    meshes = S.RobotMeshes.build(WHEEL, RobotSpec(), cad=False)
+    poses = {("blue", 0): S.RobotPose(0.0, 0.0, 0.0, vx=1.0),
+             ("blue", 1): S.RobotPose(1.0, -3.55, 0.0, vx=1.0, present=False)}      # parked outside the walls
+    spin = S.WheelSpin(WHEEL)
+    fr0 = S.compute_frame(poses, (0.1, 0.2, 0.0), meshes, WHEEL, spin, 0.0)
+    fr1 = S.compute_frame(poses, (0.1, 0.2, 0.0), meshes, WHEEL, spin, 1 / 60)
+    assert fr1.hidden == set() and set(fr1.chassis) == {("blue", 0), ("blue", 1)}
+    assert len(fr1.wheels[("blue", 0)]) == 4
+    assert not np.allclose(fr0.wheels[("blue", 0)][0], fr1.wheels[("blue", 0)][0])   # the wheel turned
+    np.testing.assert_allclose(fr0.wheels[("blue", 1)][0], fr1.wheels[("blue", 1)][0])   # parked: wheels still
+    np.testing.assert_allclose(fr1.chassis[("blue", 0)][:3, 3], [0.0, 0.0, meshes.z_chassis])
+    np.testing.assert_allclose(fr1.chassis[("blue", 1)][:3, 3], [1.0, -3.55, meshes.z_chassis])
+    frn = S.compute_frame(poses, (0.0, 0.0, 0.0), meshes, WHEEL, None, 1 / 60)
+    np.testing.assert_allclose(frn.wheels[("blue", 0)][0], S.wheel_transform(0.0, 0.0, 0.0, WHEEL, 0, 0.0))
+    frh = S.compute_frame(poses, (0.0, 0.0, 0.0), meshes, WHEEL, None, 1 / 60, show_absent=False)
+    assert frh.hidden == {("blue", 1)} and set(frh.chassis) == {("blue", 0)}
+    apron = S.apron_quads(FieldGeometry(), S.APRON_WIDTH)
+    assert apron.shape == (16, 3) and np.abs(apron[:, 1]).max() == pytest.approx(3.3 + S.APRON_WIDTH)
+    assert S.quad_mesh(apron, S.APRON_RGBA).n_faces == 8
+
+
+# ---------------------------------------------------------------- widget (requires_gui)
+@pytest.fixture(scope="module")
+def qapp():
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    pytest.importorskip("PySide6")
+    pytest.importorskip("pyqtgraph")
+    from PySide6 import QtCore, QtWidgets
+
+    if QtWidgets.QApplication.instance() is None:       # GL resources shared between widgets (as in app.run)
+        QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_ShareOpenGLContexts, True)
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(["dtssl-tests"])
+    yield app
+
+
+def _world(n_blue=2, n_yellow=1):
+    from dtssl.sim.twin_world import TwinWorld
+
+    return TwinWorld(plant="fopdt", n_blue=n_blue, n_yellow=n_yellow, watchdog_clock="sim")
+
+
+def _pump(app, n=3):
+    for _ in range(n):
+        app.processEvents()
+
+
+def test_arcball_point_maps_the_widget_to_the_unit_sphere():
+    c = S.arcball_point(200, 150, 400, 300)
+    np.testing.assert_allclose(c, [0.0, 0.0, 1.0])                       # centre: towards the viewer
+    r = S.arcball_point(350, 150, 400, 300)                              # right edge of the sphere (radius 150 px)
+    np.testing.assert_allclose(r, [1.0, 0.0, 0.0], atol=1e-12)
+    u = S.arcball_point(200, 75, 400, 300)                               # up = -y pixels
+    assert u[1] > 0 and u[2] > 0 and np.linalg.norm(u) == pytest.approx(1.0)
+    out = S.arcball_point(0, 0, 400, 300)                                # outside: projected on the rim
+    assert np.linalg.norm(out) == pytest.approx(1.0) and out[2] == 0.0
+
+
+def test_axis_angle_and_rotation_between_are_proper_rotations():
+    T = S.axis_angle((0.0, 0.0, 2.0), math.pi / 2)
+    np.testing.assert_allclose(T[:3, :3] @ [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], atol=1e-12)
+    np.testing.assert_allclose(S.axis_angle((0.0, 0.0, 0.0), 1.0), np.eye(4))
+    R = S.rotation_between([1.0, 0.0, 0.0], [0.0, 1.0, 0.0])
+    np.testing.assert_allclose(R[:3, :3] @ [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], atol=1e-12)
+    np.testing.assert_allclose(R[:3, :3] @ R[:3, :3].T, np.eye(3), atol=1e-12)
+    assert np.linalg.det(R[:3, :3]) == pytest.approx(1.0)
+    np.testing.assert_allclose(S.rotation_between([0, 0, 1], [0, 0, 1]), np.eye(4))
+
+
+def test_arcball_drag_turns_the_part_about_the_screen_axis():
+    ab = S.Arcball(centre=(0.0, 0.0, 0.07))
+    assert not ab.dragging and not ab.drag(0, 0, 400, 300, [1, 0, 0], [0, 0, 1], [0, -1, 0])
+    # camera at -y looking at +y: right = +x, up = +z, toward = -y; a horizontal drag to the right turns the
+    # part about the screen "up" axis (= world z), positive (counter-clockwise seen from above)
+    ab.begin(200, 150, 400, 300)
+    assert ab.dragging
+    assert ab.drag(200 + 150 * math.sin(math.radians(30)), 150, 400, 300, [1, 0, 0], [0, 0, 1], [0, -1, 0])
+    ab.end()
+    Rz = S.axis_angle((0, 0, 1), math.radians(30))
+    np.testing.assert_allclose(ab.R, Rz, atol=1e-9)
+    # the transform rotates about the centre: the centre itself does not move
+    T = ab.transform()
+    np.testing.assert_allclose(T @ [0.0, 0.0, 0.07, 1.0], [0.0, 0.0, 0.07, 1.0], atol=1e-12)
+    p = T @ [0.1, 0.0, 0.07, 1.0]
+    np.testing.assert_allclose(p[:2], [0.1 * math.cos(math.radians(30)), 0.1 * math.sin(math.radians(30))], atol=1e-9)
+    ab.spin((0, 0, 1), -math.radians(30))
+    np.testing.assert_allclose(ab.R, np.eye(4), atol=1e-9)
+    ab.reset()
+    np.testing.assert_allclose(ab.transform(), np.eye(4))
+
+
+def test_wheel_angles_integrate_the_record_speeds():
+    wa = S.WheelAngles(4)
+    np.testing.assert_allclose(wa.advance(1.0, (10.0, -10.0, 0.0, 1.0)), 0.0)         # first sample: no dt
+    a = wa.advance(1.1, (10.0, -10.0, 0.0, 1.0))
+    np.testing.assert_allclose(a, [1.0, 2 * math.pi - 1.0, 0.0, 0.1], atol=1e-9)
+    np.testing.assert_allclose(wa.advance(1.0, (10.0,) * 4), a)                       # not monotonic: ignored
+    np.testing.assert_allclose(wa.advance(1.1, None), a)                              # no speeds: hold
+    wa.reset()
+    np.testing.assert_allclose(wa.angles, 0.0)
+
+
+def test_robot_part_transforms_and_arrow_segments():
+    meshes = S.RobotMeshes.build(WHEEL, RobotSpec(), cad=False)
+    T = S.axis_angle((0, 0, 1), math.pi / 2)
+    ch, wh, body = S.robot_part_transforms(T, meshes, WHEEL, [0.0, 0.0, 0.0, 0.0])
+    np.testing.assert_allclose(body, T)
+    np.testing.assert_allclose(ch, T @ S.translate(0.0, 0.0, meshes.z_chassis))
+    assert len(wh) == 4
+    phi = float(WHEEL.angles[0])
+    c = wh[0] @ [0.0, 0.0, 0.0, 1.0]                                                   # wheel 0 centre, turned by T
+    np.testing.assert_allclose(c[:3], [-WHEEL.R * math.sin(phi), WHEEL.R * math.cos(phi), WHEEL.r], atol=1e-12)
+    segs = S.arrow_segments(1.0, 0.0, 0.2, 0.1)
+    assert segs.shape == (6, 3) and segs[1].tolist() == [0.1, 0.0, 0.2]
+    assert S.arrow_segments(0.0, 0.0, 0.2, 0.1).shape == (0, 3)
+
+
+def _look(cp: S.CameraPose) -> tuple[float, float]:
+    """(heading, pitch-down) in rad of the direction the orbit camera looks (from its position to the centre)."""
+    d = np.asarray(cp.center) - cp.position()
+    return math.atan2(d[1], d[0]), math.atan2(-d[2], math.hypot(d[0], d[1]))
+
+
+def test_chase_camera_sits_behind_the_robot_and_lags_its_heading():
+    cam = S.RobotCamera("chase")
+    cp = cam.update(1.0, 2.0, math.pi / 2, 0.0)                         # robot facing +y
+    assert cp.elevation == S.CHASE_ELEVATION and cp.distance == S.CHASE_DISTANCE
+    assert cp.azimuth % 360 == pytest.approx(270.0)                       # camera on the -y side: behind
+    np.testing.assert_allclose(cp.center, [1.0, 2.0 + S.CHASE_AHEAD, S.CHASE_HEIGHT], atol=1e-12)
+    pos = cp.position()
+    assert pos[0] == pytest.approx(1.0) and pos[1] < 2.0 and pos[2] > S.CHASE_HEIGHT
+    assert _look(cp)[0] == pytest.approx(math.pi / 2)
+    # the robot turns 90 deg at once: the camera heading follows through a first-order lag, then settles
+    cp2 = cam.update(1.0, 2.0, math.pi, S.CHASE_YAW_TAU)
+    assert math.degrees(math.pi / 2) < (cp2.azimuth - 180.0) % 360 < 180.0
+    assert (cp2.azimuth - 180.0) % 360 == pytest.approx(90.0 + 90.0 * (1.0 - math.exp(-1.0)), abs=1e-9)
+    for _ in range(100):
+        cp3 = cam.update(1.0, 2.0, math.pi, 0.1)
+    assert (cp3.azimuth - 180.0) % 360 == pytest.approx(180.0, abs=1e-6)
+    # across +-pi the short way: 179 deg -> -179 deg is a 2 deg turn
+    cam.reset()
+    cam.update(0.0, 0.0, math.radians(179.0), 0.0)
+    cp4 = cam.update(0.0, 0.0, math.radians(-179.0), 10.0)
+    assert (cp4.azimuth - 180.0) % 360 == pytest.approx(181.0, abs=1e-6)
+    assert cam.yaw == pytest.approx(math.radians(-179.0), abs=1e-6)
+    # mouse: orbit around the robot and zoom; a preset-like reset forgets it, keep_user keeps it
+    cam.nudge(30.0, -5.0, 2.0)
+    cp5 = cam.update(0.0, 0.0, math.radians(-179.0), 1.0)
+    assert cp5.azimuth == pytest.approx(cp4.azimuth + 30.0) and cp5.elevation == S.CHASE_ELEVATION - 5.0
+    assert cp5.distance == 2.0
+    cam.nudge(0.0, -100.0, 50.0)                                          # clipped: never under the floor
+    assert cam.el_offset == -25.0 and cam.distance == 10.0
+    cam.reset(keep_user=True)
+    assert cam.yaw is None and cam.distance == 10.0 and cam.az_offset == 30.0
+    cam.reset()
+    assert cam.distance == S.CHASE_DISTANCE and cam.az_offset == 0.0 and cam.el_offset == 0.0
+    with pytest.raises(ValueError):
+        S.RobotCamera("orbit")
+
+
+def test_fpv_camera_sits_on_the_cover_above_the_dribbler_looking_ahead():
+    cam = S.RobotCamera("fpv")
+    th = 0.7
+    cp = cam.update(0.5, -0.3, th, 1 / 60)
+    ox, oy, oz = S.FPV_OFFSET
+    exp = [0.5 + ox * math.cos(th) - oy * math.sin(th), -0.3 + ox * math.sin(th) + oy * math.cos(th), oz]
+    np.testing.assert_allclose(cp.position(), exp, atol=1e-9)             # on the robot, in its frame
+    assert cp.distance == S.FPV_LOOK and cp.elevation == S.FPV_PITCH
+    heading, pitch = _look(cp)
+    assert heading == pytest.approx(th) and pitch == pytest.approx(math.radians(S.FPV_PITCH))
+    assert oz > 0.15 and 0.0 < ox < RobotSpec().dribbler_offset               # above the cover, behind the mouth
+    cp2 = cam.update(0.5, -0.3, th + 1.0, 1e-3)                            # rigid: a sudden turn follows at once
+    assert _look(cp2)[0] == pytest.approx(th + 1.0)
+    cam.nudge(-20.0, 40.0, 7.0)                                            # look right and down; no zoom in fpv
+    cp3 = cam.update(0.5, -0.3, th + 1.0, 1e-3)
+    heading, pitch = _look(cp3)
+    assert heading == pytest.approx(th + 1.0 - math.radians(20.0)) and pitch == pytest.approx(math.radians(55.0))
+    assert cp3.distance == S.FPV_LOOK
+    np.testing.assert_allclose(cp3.position(), cp2.position(), atol=1e-9)   # the head turns, the camera stays
+
+
+@pytest.mark.requires_gui
+def test_view3d_builds_and_accepts_frames_without_a_context(qapp):
+    from dtssl.gui.view3d import View3D
+
+    w = _world()
+    v = View3D(w.field, spec=w.spec)
+    assert v.available, v.error
+    v.show()
+    _pump(qapp)
+    ws = w.step()
+    v.update_state(ws, ("blue", 0), ws.t)
+    assert v.frames == 1 and len(v._robots) == 3
+    v.hide()
+    _pump(qapp)
+    v.update_state(w.step(), ("blue", 0))
+    assert v.frames == 1                                              # hidden tab: no work
+    v.show()
+    _pump(qapp)                                                       # showEvent re-applies the last state
+    assert v.frames == 2
+    v.set_hq(True)
+    assert v.hq and v.frames == 3 and not v._meshes.lod                 # rebuild re-applied the last state
+    v.set_cad(False)
+    v.update_state(w.step(), None)
+    assert not v.cad and v.frames == 5                                 # rebuild forced one update + this one
+    v.set_field(FieldGeometry(length=12.0, width=9.0))
+    assert v.field.length == 12.0
+    v.close()
+
+
+@pytest.mark.requires_gui
+def test_view3d_camera_presets_and_follow(qapp):
+    from dtssl.gui.view3d import View3D
+
+    w = _world()
+    v = View3D(w.field, spec=w.spec)
+    ws = w.step()
+    v.update_state(ws, ("yellow", 0), ws.t, force=True)
+    for name, (el, az, dist) in S.CAMERA_PRESETS.items():
+        v.set_preset(name)
+        cam = v.camera()
+        assert (cam["elevation"], cam["azimuth"], cam["distance"]) == (el, az, dist)
+    w.teleport_robot("yellow", 0, 2.0, -1.5, 0.0)
+    v.set_follow(True)
+    v.update_state(w.step(), ("yellow", 0), force=True)
+    c = v.camera()["center"]
+    assert (c.x(), c.y()) == pytest.approx((2.0, -1.5), abs=1e-6)
+    v.fit()
+    assert not v.follow and v.camera()["center"].x() == 0.0
+    v.close()
+
+
+@pytest.mark.requires_gui
+def test_view3d_robot_cameras_ride_the_selected_robot(qapp):
+    from dtssl.gui.view3d import View3D
+
+    w = _world()
+    v = View3D(w.field, spec=w.spec)
+    w.teleport_robot("yellow", 0, 1.0, 0.5, math.pi / 2)
+    ws = w.step()
+    v.update_state(ws, ("yellow", 0), ws.t, force=True)
+    fov = v.view.opts["fov"]
+    v.set_camera_mode("chase")                                       # moves at once from the last state
+    assert v.camera_mode == "chase" and v.act_chase.isChecked() and not v.act_fpv.isChecked()
+    cam = v.camera()
+    assert cam["azimuth"] % 360 == pytest.approx(270.0, abs=1e-6) and cam["distance"] == S.CHASE_DISTANCE
+    assert cam["center"].x() == pytest.approx(1.0, abs=1e-6) and cam["center"].y() == pytest.approx(0.5 + S.CHASE_AHEAD)
+    v.view.orbit(30.0, 0.0)                                           # mouse between two frames: orbit + zoom
+    v.view.opts["distance"] *= 2.0
+    v.update_state(w.step(), ("yellow", 0), force=True)
+    cam2 = v.camera()
+    assert (cam2["azimuth"] - cam["azimuth"]) % 360 == pytest.approx(30.0, abs=1e-6)
+    assert cam2["distance"] == pytest.approx(2.0 * S.CHASE_DISTANCE)
+    v.act_fpv.trigger()                                               # toolbar: exclusive with Chase
+    assert v.camera_mode == "fpv" and v.act_fpv.isChecked() and not v.act_chase.isChecked()
+    assert v.view.opts["fov"] == S.FPV_FOV
+    cam3 = v.camera()
+    assert cam3["distance"] == S.FPV_LOOK and cam3["elevation"] == S.FPV_PITCH
+    assert cam3["center"].y() > 0.5 + 1.0                              # looks ahead (+y) of the robot
+    v.set_preset("top")                                               # a preset leaves the robot camera
+    assert v.camera_mode is None and v.view.opts["fov"] == fov and not v.act_fpv.isChecked()
+    assert v.camera()["elevation"] == S.CAMERA_PRESETS["top"][0]
+    v.act_chase.trigger()
+    assert v.camera_mode == "chase"
+    v.act_chase.trigger()                                             # unchecking it: back to the free camera
+    assert v.camera_mode is None
+    v.set_camera_mode("fpv")
+    v.fit()
+    assert v.camera_mode is None and not v.follow
+    v.update_state(w.step(), None, force=True)                        # nothing selected
+    v.set_camera_mode("chase")                                       # ... so the camera stays put
+    assert v.camera_mode == "chase" and v.camera()["elevation"] == S.CAMERA_PRESETS["iso"][0]
+    v.update_state(w.step(), ("yellow", 0), force=True)              # a robot again: it rides
+    assert v.camera()["elevation"] == S.CHASE_ELEVATION
+    v.close()
+
+
+@pytest.mark.requires_gui
+def test_view3d_renders_the_scene_when_a_context_exists(qapp):
+    from dtssl.gui.view3d import View3D
+
+    w = _world(6, 6)
+    v = View3D(w.field, spec=w.spec)
+    v.resize(640, 480)
+    v.show()
+    _pump(qapp)
+    ws = w.step()
+    v.update_state(ws, ("blue", 0), ws.t, force=True)
+    _pump(qapp)
+    img = v.grab_image()
+    if img is None:
+        pytest.skip("no OpenGL context on this Qt platform (offscreen); run under xvfb or on a desktop")
+    from pyqtgraph import functions as fn
+
+    arr = fn.imageToArray(img, copy=True, transpose=False)[..., :3]
+    assert arr.std() > 10.0                                           # not a blank frame
+    green = (arr[..., 1] > arr[..., 0] + 20) & (arr[..., 1] > arr[..., 2] + 20)
+    assert 0.2 < green.mean() < 0.95                                  # the field is drawn, robots on it
+    v.set_preset("top")
+    _pump(qapp)
+    img2 = v.grab_image()
+    arr2 = fn.imageToArray(img2, copy=True, transpose=False)[..., :3]
+    assert not np.array_equal(arr, arr2)
+    v.close()
+
+
+@pytest.mark.requires_gui
+def test_mainwindow_has_the_3d_tab(qapp):
+    from dtssl.gui.app import MainWindow
+
+    win = MainWindow(backend="fopdt", mode="debug", team="yellow", n_blue=1, n_yellow=1, use_pygame=False,
+                     autostart=False)
+    try:
+        assert win.tabs.count() == 3 and win.view3d is not None and win.tabs.widget(1) is win.view3d   # 2D, 3D, Robot
+        assert win.view3d.selected == win.controller.selected == ("yellow", 0)
+        win.controller.select(("blue", 0))
+        assert win.view3d.selected == ("blue", 0)
+        win.tabs.setCurrentWidget(win.view3d)
+        win.fit_current_view()
+        assert win.view3d.camera()["center"].x() == 0.0
+    finally:
+        win.close()
+    win2 = MainWindow(backend="fopdt", mode="debug", team="yellow", n_blue=1, n_yellow=1, use_pygame=False,
+                      autostart=False, view3d=False)
+    try:
+        assert win2.tabs.count() == 2 and win2.view3d is None                                          # 2D, Robot
+        win2.fit_current_view()
+    finally:
+        win2.close()

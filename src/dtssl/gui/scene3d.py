@@ -1,0 +1,755 @@
+"""Geometry of the 3D view (no Qt/OpenGL here): meshes, transforms, wheel spin, field lines, camera presets.
+
+Everything the :mod:`dtssl.gui.view3d` widget draws is prepared by this module from plain numpy so it
+can be unit-tested without a GL context:
+
+* :func:`parse_obj` reads the CAD meshes shipped in ``dtssl.physics.assets`` (the same OBJ files the
+  MuJoCo ``visual="cad"`` mode uses: chassis, wheel, kicker and dribbler tessellated with their Inventor colours
+  by ``tools/inventor_export_cad.m``; the per-part ``usemtl`` groups become per-face colours); the kicker and
+  dribbler are fixed to the chassis (:func:`mechanism_meshes`). :class:`RobotMeshes` also offers the primitive
+  fallback (D-shaped prism + wheel cylinders) when the CAD is not wanted.
+* :func:`smooth_mesh` prepares a mesh for smooth shading: vertices split at the edges sharper than
+  ``SMOOTH_ANGLE_DEG`` (:func:`split_smoothing_groups`), area-weighted :func:`vertex_normals` and the face
+  colours carried per vertex, so rollers and the curved cover shade as round surfaces while box edges stay
+  sharp. :func:`body_mesh` merges everything that moves with the chassis (chassis, kicker, dribbler, id plate)
+  into one mesh, so the field view draws a robot with two GL items (see :mod:`dtssl.gui.glmesh`).
+* :func:`robot_transform` / :func:`wheel_transform` give the 4x4 matrices of the chassis and of each
+  wheel for a pose ``(x, y, theta)`` and the wheel spin angles; :class:`WheelSpin` integrates the spin
+  from the body velocity through the inverse kinematics ``omega_i r = -sin(phi_i) vx + cos(phi_i) vy + R w``
+  (cosmetic: the physics backends integrate their own wheel angles but the ``WorldState`` API does not
+  expose them, so the 3D view rolls the wheels consistently with the body motion for every backend).
+* :func:`field_segments` returns the field markings as line segments (metres, z = ``LINE_Z``),
+  :func:`floor_quads` the floor rectangles (boundary frame + playing field, non-overlapping),
+  :func:`id_plate_mesh` the SSL id plate (team disc + 4 dots) as a coloured mesh.
+* :data:`CAMERA_PRESETS` are the (elevation, azimuth, distance) tuples of the toolbar presets.
+
+Frames: world = ssl-vision (x to the right goal, y up, z up); robot body frame as in the MJCF (dribbler at
++x, wheels at ``phi = 60/135/225/300`` deg). The chassis OBJ has its z origin on the wheel-axle plane, so the
+chassis sits at ``z = wheel.r`` above the floor (same convention as ``dtssl.physics.mjcf``).
+"""
+from __future__ import annotations
+
+import math
+from dataclasses import dataclass, field
+
+import numpy as np
+
+from dtssl.physics.mjcf import (
+    GREEN_RGBA,
+    ID_DOT_POS,
+    ID_PATTERN,
+    PINK_RGBA,
+    TEAM_RGBA,
+    WheelGeometry,
+    cad_meta,
+    cad_plate_z,
+    mesh_assets,
+    read_mtl,
+    read_obj,
+)
+from dtssl.sim.world import FieldGeometry, RobotSpec
+from dtssl.units import wrap_to_pi
+
+CAMERA_PRESETS: dict[str, tuple[float, float, float]] = {   # elevation (deg), azimuth (deg), distance (m)
+    "iso": (42.0, -60.0, 12.5),
+    "top": (90.0, -90.0, 10.5),
+    "side": (12.0, -90.0, 10.0),
+    "goal": (18.0, 180.0, 11.0),
+}
+# cameras riding on the selected robot (RobotCamera): third person behind it, first person on its cover
+CHASE_DISTANCE = 1.1               # m from the look-at point, behind and above the robot (mouse wheel changes it)
+CHASE_ELEVATION = 20.0             # deg above the horizon (mouse drag orbits around the robot)
+CHASE_AHEAD = 0.25                 # the camera looks this far ahead of the robot (m): the robot sits low in the frame
+CHASE_HEIGHT = 0.10                # m above the floor of the look-at point
+CHASE_YAW_TAU = 0.12               # s: first-order lag of the camera heading behind the robot heading
+FPV_OFFSET = (0.04, 0.0, 0.17)     # camera position in the body frame (m): on the cover, above the dribbler
+FPV_PITCH = 15.0                   # deg below the horizon (mouse drag turns the head)
+FPV_LOOK = 3.0                     # m: distance of the orbit centre ahead of the camera (sets the clip planes only)
+FPV_FOV = 70.0                     # deg, wider than the orbit presets
+LINE_Z = 0.003                     # field markings above the floor (avoids z-fighting at grazing angles)
+PLATE_Z_OVER_TOP = 0.0015          # id plate thickness above the cover (m)
+PLATE_RADIUS = 0.025
+DOT_RADIUS = 0.02
+CHASSIS_RGBA = (0.26, 0.26, 0.29, 1.0)      # fallback colour of a CAD mesh without materials
+WHEEL_RGBA = (0.62, 0.62, 0.66, 1.0)
+MECHANISM_KEYS = ("kicker", "dribbler")      # meshes.json entries drawn with the chassis transform
+PRIMITIVE_RGBA = (0.24, 0.24, 0.27, 1.0)
+FLOOR_RGBA = (0.13, 0.47, 0.20, 1.0)
+BOUNDARY_RGBA = (0.10, 0.36, 0.16, 1.0)
+APRON_RGBA = (0.22, 0.22, 0.24, 1.0)          # floor outside the walls (parked substitutes)
+APRON_WIDTH = 0.6                             # m beyond the walls
+LINE_RGBA = (0.96, 0.96, 0.96, 1.0)
+BALL_RGBA = (1.0, 0.55, 0.0, 1.0)
+SELECT_RGBA = (1.0, 1.0, 1.0, 0.9)
+
+
+# --------------------------------------------------------------------------------------
+# Meshes
+# --------------------------------------------------------------------------------------
+@dataclass
+class Mesh:
+    vertices: np.ndarray            # (n, 3) float
+    faces: np.ndarray               # (m, 3) int
+    colors: np.ndarray | None = None    # (m, 4) per-face RGBA or None
+    normals: np.ndarray | None = None   # (n, 3) per-vertex normals, set by smooth_mesh (None: flat shading)
+    vertex_colors: np.ndarray | None = None     # (n, 4) RGBA per vertex, set by smooth_mesh from `colors`
+
+    @property
+    def n_faces(self) -> int:
+        return int(len(self.faces))
+
+    @property
+    def smooth(self) -> bool:
+        return self.normals is not None
+
+    def bbox(self) -> tuple[np.ndarray, np.ndarray]:
+        return self.vertices.min(0), self.vertices.max(0)
+
+
+SMOOTH_ANGLE_DEG = 35.0     # edges with a larger dihedral angle stay sharp when a mesh is smoothed
+
+
+def split_smoothing_groups(vertices: np.ndarray, faces: np.ndarray,
+                           angle_deg: float = SMOOTH_ANGLE_DEG) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Duplicate vertices so that faces share a vertex only across edges whose dihedral angle is below
+    ``angle_deg``: a vertex normal averaged over the faces of the new mesh then smooths a cylinder or a
+    curved cover and keeps the edges of a box sharp. Returns ``(vertices, faces, corner)`` where ``corner[i]``
+    is a face corner ``3 * face + k`` that the new vertex ``i`` came from (to carry per-face data over)."""
+    from scipy.sparse import coo_matrix
+    from scipy.sparse.csgraph import connected_components
+
+    v = np.asarray(vertices, dtype=float)
+    f = np.asarray(faces, dtype=np.int64)
+    m = len(f)
+    fn = np.cross(v[f[:, 1]] - v[f[:, 0]], v[f[:, 2]] - v[f[:, 0]])
+    fn /= np.maximum(np.linalg.norm(fn, axis=1, keepdims=True), 1e-20)
+    a, b = f, np.roll(f, -1, axis=1)                                # edge of corner (i, k): f[i, k] -> f[i, k+1]
+    key = np.stack([np.minimum(a, b), np.maximum(a, b)], axis=-1).reshape(-1, 2)
+    swapped = (a > b).ravel()
+    order = np.lexsort((key[:, 1], key[:, 0]))
+    ks = key[order]
+    same = np.nonzero(np.all(ks[1:] == ks[:-1], axis=1))[0]
+    ca, cb = order[same], order[same + 1]                            # corners whose edges coincide
+    fa, fb = ca // 3, cb // 3
+    ok = np.einsum("ij,ij->i", fn[fa], fn[fb]) >= math.cos(math.radians(angle_deg))
+    ca, cb, fa, fb = ca[ok], cb[ok], fa[ok], fb[ok]
+    nxt_a, nxt_b = 3 * fa + (ca % 3 + 1) % 3, 3 * fb + (cb % 3 + 1) % 3     # the other corner of each edge
+    sa, sb = swapped[ca], swapped[cb]
+    lo_a, hi_a = np.where(sa, nxt_a, ca), np.where(sa, ca, nxt_a)        # corners of the lower / upper vertex
+    lo_b, hi_b = np.where(sb, nxt_b, cb), np.where(sb, cb, nxt_b)
+    rows, cols = np.concatenate([lo_a, hi_a]), np.concatenate([lo_b, hi_b])
+    n = 3 * m
+    graph = coo_matrix((np.ones(len(rows)), (rows, cols)), shape=(n, n))
+    _, labels = connected_components(graph, directed=False)
+    _, first, inv = np.unique(labels, return_index=True, return_inverse=True)
+    corner = first.astype(np.int64)
+    return v[f.ravel()[corner]], inv.reshape(m, 3).astype(np.int64), corner
+
+
+def vertex_normals(vertices: np.ndarray, faces: np.ndarray) -> np.ndarray:
+    """Area-weighted average of the face normals around each vertex (unit vectors, (n, 3))."""
+    v = np.asarray(vertices, dtype=float)
+    f = np.asarray(faces, dtype=np.int64)
+    fn = np.cross(v[f[:, 1]] - v[f[:, 0]], v[f[:, 2]] - v[f[:, 0]])      # |fn| = 2 x the face area
+    n = np.zeros_like(v)
+    for k in range(3):
+        np.add.at(n, f[:, k], fn)
+    return n / np.maximum(np.linalg.norm(n, axis=1, keepdims=True), 1e-20)
+
+
+def smooth_mesh(mesh: Mesh, angle_deg: float = SMOOTH_ANGLE_DEG) -> Mesh:
+    """The mesh ready for smooth shading: vertices split at the edges sharper than ``angle_deg``
+    (:func:`split_smoothing_groups`), per-vertex ``normals`` and, when the mesh has per-face colours, the
+    same colours per vertex (``vertex_colors``). Faces keep their order, so ``colors`` stays valid."""
+    if mesh.smooth:
+        return mesh
+    v, f, corner = split_smoothing_groups(mesh.vertices, mesh.faces, angle_deg)
+    vc = None if mesh.colors is None else np.asarray(mesh.colors, dtype=float)[corner // 3]
+    return Mesh(v, f, mesh.colors, vertex_normals(v, f), vc)
+
+
+def parse_obj(data: bytes | str, materials: dict[str, tuple[float, float, float]] | None = None,
+              default_rgba=CHASSIS_RGBA) -> Mesh:
+    """Wavefront OBJ reader (``dtssl.physics.mjcf.read_obj``): with ``materials`` (``{usemtl name: (r, g, b)}``,
+    from :func:`dtssl.physics.mjcf.read_mtl`) the ``usemtl`` groups become per-face RGBA colours; a mesh without
+    any material gets ``colors = None`` (drawn with a single colour by the widgets)."""
+    obj = read_obj(data, materials)
+    mesh = Mesh(obj.vertices, obj.faces)
+    if obj.materials and any(mtl for _, mtl, _, _ in obj.groups):
+        cols = np.tile(default_rgba, (len(obj.faces), 1))
+        for _, mtl, a, b in obj.groups:
+            rgb = obj.materials.get(mtl)
+            if rgb is not None:
+                cols[a:b] = (rgb[0], rgb[1], rgb[2], 1.0)
+        mesh.colors = cols
+    return mesh
+
+
+def _asset_mesh(key: str, lod: bool) -> Mesh:
+    meta = cad_meta()
+    assets = mesh_assets()
+    k = f"{key}_lod" if lod and f"{key}_lod" in meta else key
+    entry = meta[k]
+    mtl = read_mtl(assets[entry["mtl"]]) if entry.get("mtl") in assets else None
+    return parse_obj(assets[entry["file"]], mtl)
+
+
+def cad_meshes(lod: bool = False) -> tuple[Mesh, Mesh, dict]:
+    """``(chassis, wheel, meta)`` from ``dtssl.physics.assets`` (chassis z origin on the wheel-axle plane,
+    wheel centred on its axle with the axle along +x), with per-face colours. ``lod=True`` picks the light pair
+    exported for the GUI (``ssl_*_lod.obj``, ~4x fewer triangles) when the assets have it."""
+    return _asset_mesh("chassis", lod), _asset_mesh("wheel", lod), cad_meta()
+
+
+def mechanism_meshes(lod: bool = False) -> dict[str, Mesh]:
+    """``{"kicker": Mesh, "dribbler": Mesh}`` from ``dtssl.physics.assets`` (same frame as the chassis OBJ: z
+    origin on the wheel-axle plane, so they are drawn with the chassis transform), with per-face colours.
+    ``lod=True`` picks the decimated ``ssl_*_lod.obj`` when present. Mechanisms missing from ``meshes.json``
+    are left out."""
+    meta = cad_meta()
+    return {key: _asset_mesh(key, lod) for key in MECHANISM_KEYS if key in meta}
+
+
+def d_prism_mesh(radius: float, front: float, z0: float, z1: float, n_arc: int = 40) -> Mesh:
+    """Primitive chassis: D-shaped prism (cylinder cut flat at x = ``front``), closed top and bottom."""
+    alpha = math.acos(min(front / radius, 1.0))
+    angs = np.linspace(alpha, 2 * math.pi - alpha, n_arc)
+    ring = np.c_[radius * np.cos(angs), radius * np.sin(angs)]
+    n = len(ring)
+    bottom = np.c_[ring, np.full(n, z0)]
+    top = np.c_[ring, np.full(n, z1)]
+    verts = np.vstack([bottom, top, [[0.0, 0.0, z0]], [[0.0, 0.0, z1]]])
+    cb, ct = 2 * n, 2 * n + 1
+    faces = []
+    for i in range(n):                                   # side quads (closing edge = the flat face)
+        j = (i + 1) % n
+        faces += [(i, j, n + j), (i, n + j, n + i)]
+        faces += [(cb, j, i), (ct, n + i, n + j)]        # caps
+    return Mesh(verts, np.asarray(faces, dtype=np.int32))
+
+
+def cylinder_mesh(radius: float, half_width: float, n: int = 24) -> Mesh:
+    """Primitive wheel: cylinder with its axis along +x, centred at the origin."""
+    angs = np.linspace(0, 2 * math.pi, n, endpoint=False)
+    ring = np.c_[radius * np.cos(angs), radius * np.sin(angs)]
+    left = np.c_[np.full(n, -half_width), ring]
+    right = np.c_[np.full(n, half_width), ring]
+    verts = np.vstack([left, right, [[-half_width, 0, 0]], [[half_width, 0, 0]]])
+    cl, cr = 2 * n, 2 * n + 1
+    faces = []
+    for i in range(n):
+        j = (i + 1) % n
+        faces += [(i, n + i, n + j), (i, n + j, j), (cl, j, i), (cr, n + i, n + j)]
+    return Mesh(verts, np.asarray(faces, dtype=np.int32))
+
+
+def disc_mesh(radius: float, z: float, cx: float = 0.0, cy: float = 0.0, n: int = 24, thickness: float = 0.0015):
+    """Flat cylinder (a plate or a dot) with its top face at ``z + thickness``."""
+    return _translate(cylinder_mesh_z(radius, thickness / 2.0, n), (cx, cy, z + thickness / 2.0))
+
+
+def cylinder_mesh_z(radius: float, half_height: float, n: int = 24) -> Mesh:
+    m = cylinder_mesh(radius, half_height, n)
+    # rotate the x-axis cylinder onto z: (x, y, z) -> (y, z, x)
+    v = m.vertices[:, [1, 2, 0]]
+    return Mesh(v, m.faces)
+
+
+def _translate(m: Mesh, d) -> Mesh:
+    return Mesh(m.vertices + np.asarray(d, dtype=float), m.faces, m.colors, m.normals, m.vertex_colors)
+
+
+def merge_meshes(parts: list[Mesh], default_rgba=(0.5, 0.5, 0.5, 1.0)) -> Mesh:
+    """One mesh out of several (faces in the given order). Per-face colours survive when any part has them
+    (``default_rgba`` for the others); normals and per-vertex colours survive only when every part is smooth."""
+    verts, faces, cols, norms, vcols, off = [], [], [], [], [], 0
+    has_col = any(p.colors is not None for p in parts)
+    smooth = all(p.smooth for p in parts)
+    for p in parts:
+        verts.append(p.vertices)
+        faces.append(p.faces + off)
+        if has_col:
+            cols.append(p.colors if p.colors is not None else np.tile(default_rgba, (p.n_faces, 1)))
+        if smooth:
+            norms.append(p.normals)
+            if has_col:
+                vcols.append(p.vertex_colors if p.vertex_colors is not None
+                             else np.tile(default_rgba, (len(p.vertices), 1)))
+        off += len(p.vertices)
+    return Mesh(np.vstack(verts), np.vstack(faces), np.vstack(cols) if has_col else None,
+                np.vstack(norms) if smooth else None, np.vstack(vcols) if smooth and has_col else None)
+
+
+def id_plate_mesh(team: str, rid: int, z_top: float) -> Mesh:
+    """SSL id plate on top of the robot: central team-colour disc + 4 pink/green dots (rulebook pattern
+    ``ID_PATTERN``), as one mesh with per-face colours."""
+    plate = disc_mesh(PLATE_RADIUS, z_top)
+    plate.colors = np.tile(TEAM_RGBA.get(team, (0.6, 0.6, 0.6, 1.0)), (plate.n_faces, 1))
+    parts = [plate]
+    for (x, y), c in zip(ID_DOT_POS, ID_PATTERN[int(rid) % 16], strict=True):
+        dot = disc_mesh(DOT_RADIUS, z_top, x, y)
+        dot.colors = np.tile(PINK_RGBA if c == "p" else GREEN_RGBA, (dot.n_faces, 1))
+        parts.append(dot)
+    return merge_meshes(parts)
+
+
+@dataclass
+class RobotMeshes:
+    """The meshes a robot is drawn with (shared by every robot of the scene)."""
+
+    chassis: Mesh
+    wheel: Mesh
+    z_top: float                    # top of the cover above the floor (plate goes here)
+    z_chassis: float                # z offset of the chassis mesh (0 for primitives, wheel.r for the CAD)
+    cad: bool
+    lod: bool = False
+    mechanisms: dict[str, Mesh] = field(default_factory=dict)   # kicker/dribbler, drawn with the chassis transform
+
+    @classmethod
+    def build(cls, wheel: WheelGeometry, spec: RobotSpec, cad: bool = True, lod: bool = True,
+              smooth: bool = True) -> RobotMeshes:
+        """``smooth`` (default) prepares every mesh for smooth shading (:func:`smooth_mesh`: cylinders and
+        the curved cover shade as round surfaces, box edges stay sharp); ``False`` keeps the raw meshes
+        (flat shading)."""
+        prep = smooth_mesh if smooth else (lambda m: m)
+        if cad:
+            chassis, wh, meta = cad_meshes(lod=lod)
+            # the id plate sits where the CAD has its pattern decals (cover top), not on the bbox top
+            return cls(prep(chassis), prep(wh), wheel.r + cad_plate_z(meta), wheel.r, True,
+                       lod and "chassis_lod" in meta, {k: prep(m) for k, m in mechanism_meshes(lod=lod).items()})
+        chassis = d_prism_mesh(spec.radius, spec.dribbler_offset, 0.008, spec.height)
+        wh = cylinder_mesh(wheel.r * 0.92, wheel.hub_half_width)
+        return cls(prep(chassis), prep(wh), spec.height, 0.0, False)
+
+
+def body_mesh(meshes: RobotMeshes, team: str, rid: int) -> Mesh:
+    """Everything of a robot that moves with the chassis as one mesh in the chassis frame: chassis, kicker
+    and dribbler (CAD) and the id plate (its body-frame height minus ``z_chassis``), so the 3D field view
+    draws a robot with two GL items (body + wheels) instead of eight: with 22 robots the Python cost per
+    item in ``pyqtgraph`` is what caps the frame rate, not the triangles."""
+    plate = id_plate_mesh(team, rid, meshes.z_top + PLATE_Z_OVER_TOP - meshes.z_chassis)
+    if meshes.chassis.smooth:
+        plate = smooth_mesh(plate)
+    return merge_meshes([meshes.chassis, *meshes.mechanisms.values(), plate], default_rgba=CHASSIS_RGBA)
+
+
+# --------------------------------------------------------------------------------------
+# Transforms
+# --------------------------------------------------------------------------------------
+def rot_z(theta: float) -> np.ndarray:
+    c, s = math.cos(theta), math.sin(theta)
+    return np.array([[c, -s, 0.0, 0.0], [s, c, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]])
+
+
+def rot_x(a: float) -> np.ndarray:
+    c, s = math.cos(a), math.sin(a)
+    return np.array([[1.0, 0.0, 0.0, 0.0], [0.0, c, -s, 0.0], [0.0, s, c, 0.0], [0.0, 0.0, 0.0, 1.0]])
+
+
+def translate(x: float, y: float, z: float) -> np.ndarray:
+    t = np.eye(4)
+    t[:3, 3] = (x, y, z)
+    return t
+
+
+def robot_transform(x: float, y: float, theta: float, z: float = 0.0) -> np.ndarray:
+    """World-from-body 4x4 for a pose (the chassis mesh is offset by ``z`` = ``RobotMeshes.z_chassis``)."""
+    return translate(x, y, 0.0) @ rot_z(theta) @ translate(0.0, 0.0, z)
+
+
+def wheel_transform(x: float, y: float, theta: float, wheel: WheelGeometry, i: int, spin: float = 0.0) -> np.ndarray:
+    """World 4x4 of wheel ``i``: at ``R (cos phi, sin phi)`` and height ``r`` in the body frame, mesh axle
+    (+x) turned onto the outward radial direction ``u_r`` by ``rot_z(phi)``, then spun by ``spin`` about
+    ``-u_r`` (the hinge axis of the MJCF, positive = CCW-tangent motion of the rim)."""
+    phi = float(wheel.angles[i])
+    p = translate(wheel.R * math.cos(phi), wheel.R * math.sin(phi), wheel.r)
+    return translate(x, y, 0.0) @ rot_z(theta) @ p @ rot_z(phi) @ rot_x(-spin)
+
+
+class WheelSpin:
+    """Integrates the wheel spin angles of every robot from the body velocity (inverse kinematics)."""
+
+    def __init__(self, wheel: WheelGeometry):
+        self.wheel = wheel
+        self._ik = self._ik_matrix(wheel)
+        self.angles: dict[tuple[str, int], np.ndarray] = {}
+
+    @staticmethod
+    def _ik_matrix(wheel: WheelGeometry) -> np.ndarray:
+        rows = [(-math.sin(p), math.cos(p), wheel.R) for p in wheel.angles]
+        return np.asarray(rows, dtype=float) / wheel.r
+
+    def wheel_speeds(self, vx: float, vy: float, w: float) -> np.ndarray:
+        return self._ik @ np.array([vx, vy, w], dtype=float)
+
+    def advance(self, key: tuple[str, int], vx: float, vy: float, w: float, dt: float) -> np.ndarray:
+        a = self.angles.get(key)
+        if a is None:
+            a = np.zeros(len(self.wheel.angles))
+        if dt > 0.0:
+            a = (a + self.wheel_speeds(vx, vy, w) * dt) % (2.0 * math.pi)
+        self.angles[key] = a
+        return a
+
+    def reset(self) -> None:
+        self.angles.clear()
+
+
+# --------------------------------------------------------------------------------------
+# Field
+# --------------------------------------------------------------------------------------
+def apron_quads(f: FieldGeometry, apron: float) -> np.ndarray:
+    """Frame of 4 quads ``(16, 3)`` at z = 0, ``apron`` wide around the arena (walls): the strip where the parked
+    substitutes stand (:func:`dtssl.sim.entities.park_spot`)."""
+    Lb, Wb = f.half_length + f.boundary_width, f.half_width + f.boundary_width
+    La, Wa = Lb + apron, Wb + apron
+    return np.array([
+        [-La, -Wa, 0.0], [La, -Wa, 0.0], [La, -Wb, 0.0], [-La, -Wb, 0.0],
+        [-La, Wb, 0.0], [La, Wb, 0.0], [La, Wa, 0.0], [-La, Wa, 0.0],
+        [-La, -Wb, 0.0], [-Lb, -Wb, 0.0], [-Lb, Wb, 0.0], [-La, Wb, 0.0],
+        [Lb, -Wb, 0.0], [La, -Wb, 0.0], [La, Wb, 0.0], [Lb, Wb, 0.0],
+    ])
+
+
+def floor_quads(f: FieldGeometry) -> tuple[np.ndarray, np.ndarray]:
+    """Floor as non-overlapping rectangles at z = 0 (no coplanar overlap -> no z-fighting): the boundary
+    area as a frame of 4 quads ``(16, 3)`` and the playing field ``(4, 3)``."""
+    L, W, b = f.half_length, f.half_width, f.boundary_width
+    Lb, Wb = L + b, W + b
+    frame = np.array([
+        [-Lb, -Wb, 0.0], [Lb, -Wb, 0.0], [Lb, -W, 0.0], [-Lb, -W, 0.0],       # bottom strip
+        [-Lb, W, 0.0], [Lb, W, 0.0], [Lb, Wb, 0.0], [-Lb, Wb, 0.0],           # top strip
+        [-Lb, -W, 0.0], [-L, -W, 0.0], [-L, W, 0.0], [-Lb, W, 0.0],           # left strip
+        [L, -W, 0.0], [Lb, -W, 0.0], [Lb, W, 0.0], [L, W, 0.0],               # right strip
+    ])
+    inner = np.array([[-L, -W, 0.0], [L, -W, 0.0], [L, W, 0.0], [-L, W, 0.0]])
+    return frame, inner
+
+
+def quad_mesh(corners: np.ndarray, rgba) -> Mesh:
+    """Mesh of one or more quads given as consecutive groups of 4 corners (CCW seen from above)."""
+    c = np.asarray(corners, dtype=float).reshape(-1, 4, 3)
+    faces = []
+    for q in range(len(c)):
+        o = 4 * q
+        faces += [(o, o + 1, o + 2), (o, o + 2, o + 3)]
+    m = Mesh(c.reshape(-1, 3), np.asarray(faces, dtype=np.int32))
+    m.colors = np.tile(rgba, (len(faces), 1))
+    return m
+
+
+def circle_points(cx: float, cy: float, r: float, n: int = 48, z: float = 0.0) -> np.ndarray:
+    a = np.linspace(0, 2 * math.pi, n + 1)
+    return np.c_[cx + r * np.cos(a), cy + r * np.sin(a), np.full(n + 1, z)]
+
+
+def field_segments(f: FieldGeometry, z: float = LINE_Z) -> np.ndarray:
+    """Field markings as an ``(2k, 3)`` array of segment end points (``mode='lines'``): touch/goal lines,
+    halfway line, centre circle, penalty areas, goals (as boxes behind the goal lines)."""
+    L, W = f.half_length, f.half_width
+    pd, pw = f.penalty_area_depth, f.penalty_area_width / 2.0
+    gd, gw = f.goal_depth, f.goal_width / 2.0
+    polys: list[np.ndarray] = [
+        np.array([[-L, -W], [L, -W], [L, W], [-L, W], [-L, -W]]),
+        np.array([[0.0, -W], [0.0, W]]),
+        np.array([[-L, -pw], [-L + pd, -pw], [-L + pd, pw], [-L, pw]]),
+        np.array([[L, -pw], [L - pd, -pw], [L - pd, pw], [L, pw]]),
+        np.array([[-L, -gw], [-L - gd, -gw], [-L - gd, gw], [-L, gw]]),
+        np.array([[L, -gw], [L + gd, -gw], [L + gd, gw], [L, gw]]),
+        circle_points(0.0, 0.0, f.center_circle_radius)[:, :2],
+    ]
+    segs = []
+    for poly in polys:
+        p = np.c_[poly, np.full(len(poly), z)] if poly.shape[1] == 2 else poly
+        for a, b in zip(p[:-1], p[1:], strict=True):
+            segs += [a, b]
+    return np.asarray(segs, dtype=float)
+
+
+def goal_frames(f: FieldGeometry, height: float = 0.16) -> np.ndarray:
+    """Goal posts and crossbars as vertical/horizontal segments (``mode='lines'``)."""
+    L, gd, gw = f.half_length, f.goal_depth, f.goal_width / 2.0
+    segs = []
+    for sx in (-1.0, 1.0):
+        x0, x1 = sx * L, sx * (L + gd)
+        for y in (-gw, gw):
+            segs += [[x0, y, 0.0], [x0, y, height], [x1, y, 0.0], [x1, y, height], [x0, y, height], [x1, y, height]]
+        segs += [[x0, -gw, height], [x0, gw, height], [x1, -gw, height], [x1, gw, height]]
+    return np.asarray(segs, dtype=float)
+
+
+# --------------------------------------------------------------------------------------
+# Single-robot view (Robot tab): arcball rotation of the part, wheel angles from wheel speeds
+# --------------------------------------------------------------------------------------
+ROBOT_VIEW_PRESETS: dict[str, tuple[float, float]] = {   # (elevation, azimuth) of the camera, degrees
+    "iso": (24.0, -50.0),
+    "frente": (8.0, 0.0),
+    "lado": (8.0, 90.0),
+    "topo": (89.0, -90.0),
+    "baixo": (-89.0, -90.0),
+}
+ROBOT_VIEW_DISTANCE = 0.46          # camera distance (m) for a 0.18 m robot
+AXIS_RGBA = {"x": (0.95, 0.30, 0.30, 1.0), "y": (0.35, 0.85, 0.35, 1.0), "z": (0.35, 0.55, 1.0, 1.0)}
+
+
+def arcball_point(x: float, y: float, w: float, h: float) -> np.ndarray:
+    """Widget pixel ``(x, y)`` (y down) -> unit vector on Shoemake's arcball sphere, in screen axes
+    ``(right, up, toward the viewer)``; points outside the sphere are projected onto its rim."""
+    s = min(w, h) / 2.0
+    px = (x - w / 2.0) / s
+    py = (h / 2.0 - y) / s
+    r2 = px * px + py * py
+    if r2 > 1.0:
+        n = math.sqrt(r2)
+        return np.array([px / n, py / n, 0.0])
+    return np.array([px, py, math.sqrt(1.0 - r2)])
+
+
+def axis_angle(axis, angle: float) -> np.ndarray:
+    """4x4 rotation of ``angle`` rad about ``axis`` (Rodrigues); identity for a null axis."""
+    a = np.asarray(axis, dtype=float)
+    n = float(np.linalg.norm(a))
+    T = np.eye(4)
+    if n < 1e-12 or abs(angle) < 1e-12:
+        return T
+    a = a / n
+    K = np.array([[0.0, -a[2], a[1]], [a[2], 0.0, -a[0]], [-a[1], a[0], 0.0]])
+    T[:3, :3] = np.eye(3) + math.sin(angle) * K + (1.0 - math.cos(angle)) * (K @ K)
+    return T
+
+
+def rotation_between(v0, v1) -> np.ndarray:
+    """4x4 rotation taking unit vector ``v0`` onto ``v1`` (the arcball step)."""
+    v0 = np.asarray(v0, dtype=float)
+    v1 = np.asarray(v1, dtype=float)
+    axis = np.cross(v0, v1)
+    dot = float(np.clip(np.dot(v0, v1), -1.0, 1.0))
+    return axis_angle(axis, math.acos(dot))
+
+
+class Arcball:
+    """Free rotation of the part (CAD style): ``R`` is the world-from-part 4x4 the drawn items are
+    premultiplied by, about ``centre``. :meth:`begin` on mouse press, :meth:`drag` on every move; the drag
+    is mapped from screen axes to world axes with the camera's ``right/up/toward`` unit vectors so the part
+    turns about the axis the mouse describes on the screen, whatever the camera orientation."""
+
+    def __init__(self, centre=(0.0, 0.0, 0.0)):
+        self.centre = np.asarray(centre, dtype=float)
+        self.R = np.eye(4)
+        self._p0: np.ndarray | None = None
+
+    def reset(self) -> None:
+        self.R = np.eye(4)
+        self._p0 = None
+
+    def begin(self, x: float, y: float, w: float, h: float) -> None:
+        self._p0 = arcball_point(x, y, w, h)
+
+    def end(self) -> None:
+        self._p0 = None
+
+    @property
+    def dragging(self) -> bool:
+        return self._p0 is not None
+
+    def drag(self, x: float, y: float, w: float, h: float, right, up, toward) -> bool:
+        """Apply the rotation between the pressed point and ``(x, y)``; returns False when not dragging."""
+        if self._p0 is None:
+            return False
+        p1 = arcball_point(x, y, w, h)
+        B = np.column_stack([np.asarray(right, float), np.asarray(up, float), np.asarray(toward, float)])
+        v0, v1 = B @ self._p0, B @ p1
+        self.R = rotation_between(v0, v1) @ self.R
+        self._p0 = p1
+        return True
+
+    def spin(self, axis, angle: float) -> None:
+        """Turn the part by ``angle`` about a world ``axis`` (auto-rotate / keyboard)."""
+        self.R = axis_angle(axis, angle) @ self.R
+
+    def transform(self) -> np.ndarray:
+        """World-from-part 4x4 including the rotation centre."""
+        c = self.centre
+        return translate(*c) @ self.R @ translate(*(-c))
+
+
+class WheelAngles:
+    """Integrates the four wheel angles from the wheel speeds of the telemetry record (rad/s)."""
+
+    def __init__(self, n: int = 4):
+        self.angles = np.zeros(n)
+        self._t: float | None = None
+
+    def reset(self) -> None:
+        self.angles[:] = 0.0
+        self._t = None
+
+    def advance(self, t: float, speeds) -> np.ndarray:
+        if self._t is not None and speeds is not None and t > self._t:
+            dt = min(t - self._t, 0.5)
+            self.angles = (self.angles + np.asarray(speeds, dtype=float)[: len(self.angles)] * dt) % (2.0 * math.pi)
+        if self._t is None or t >= self._t:
+            self._t = t
+        return self.angles
+
+
+def robot_part_transforms(model_T: np.ndarray, meshes: RobotMeshes, wheel: WheelGeometry,
+                          angles) -> tuple[np.ndarray, list[np.ndarray], np.ndarray]:
+    """``(chassis_T, wheel_Ts, body_T)`` of one robot drawn at the origin of its body frame and turned by
+    ``model_T`` (the :class:`Arcball` transform)."""
+    body_T = model_T @ robot_transform(0.0, 0.0, 0.0)
+    chassis_T = model_T @ robot_transform(0.0, 0.0, 0.0, meshes.z_chassis)
+    wheel_Ts = [model_T @ wheel_transform(0.0, 0.0, 0.0, wheel, i, float(angles[i])) for i in range(len(wheel.angles))]
+    return chassis_T, wheel_Ts, body_T
+
+
+def arrow_segments(vx: float, vy: float, z: float, scale: float, head: float = 0.02) -> np.ndarray:
+    """A planar arrow from the origin along ``(vx, vy) * scale`` at height ``z`` as ``mode='lines'``
+    segments (shaft + two head strokes); empty array for a null vector."""
+    ex, ey = vx * scale, vy * scale
+    n = math.hypot(ex, ey)
+    if n < 1e-4:
+        return np.zeros((0, 3))
+    a = math.atan2(ey, ex)
+    segs = [[0.0, 0.0, z], [ex, ey, z]]
+    for da in (math.pi * 0.8, -math.pi * 0.8):
+        segs += [[ex, ey, z], [ex + head * math.cos(a + da), ey + head * math.sin(a + da), z]]
+    return np.asarray(segs, dtype=float)
+
+
+# --------------------------------------------------------------------------------------
+# Scene bookkeeping (what the widget updates each frame)
+# --------------------------------------------------------------------------------------
+@dataclass
+class RobotPose:
+    x: float
+    y: float
+    theta: float
+    vx: float = 0.0
+    vy: float = 0.0
+    w: float = 0.0
+    present: bool = True
+
+
+@dataclass
+class SceneFrame:
+    """Per-frame transforms of every drawn robot (computed by :func:`compute_frame`, applied by the widget)."""
+
+    chassis: dict[tuple[str, int], np.ndarray] = field(default_factory=dict)
+    wheels: dict[tuple[str, int], list[np.ndarray]] = field(default_factory=dict)
+    hidden: set[tuple[str, int]] = field(default_factory=set)
+    ball: tuple[float, float, float] = (0.0, 0.0, 0.0)
+
+
+def compute_frame(poses: dict[tuple[str, int], RobotPose], ball_xyz: tuple[float, float, float],
+                  meshes: RobotMeshes, wheel: WheelGeometry, spin: WheelSpin | None, dt: float,
+                  show_absent: bool = True) -> SceneFrame:
+    """Transforms of every robot. Robots that are not present are drawn where the world parks them (outside
+    the arena, wheels still) unless ``show_absent`` is False, in which case they go to ``hidden``."""
+    fr = SceneFrame(ball=ball_xyz)
+    for key, p in poses.items():
+        if not p.present and not show_absent:
+            fr.hidden.add(key)
+            continue
+        fr.chassis[key] = robot_transform(p.x, p.y, p.theta, meshes.z_chassis)
+        if p.present and spin is not None:
+            angles = spin.advance(key, p.vx, p.vy, p.w, dt)
+        else:
+            angles = np.zeros(len(wheel.angles))
+        fr.wheels[key] = [wheel_transform(p.x, p.y, p.theta, wheel, i, float(angles[i]))
+                          for i in range(len(wheel.angles))]
+    return fr
+
+
+# --------------------------------------------------------------------------------------
+# Cameras riding on a robot
+# --------------------------------------------------------------------------------------
+@dataclass
+class CameraPose:
+    """Orbit parameters of pyqtgraph's ``GLViewWidget``: the camera sits ``distance`` from ``center`` in the
+    direction (``elevation``, ``azimuth``) and looks at ``center``."""
+
+    center: tuple[float, float, float]
+    azimuth: float          # deg
+    elevation: float        # deg
+    distance: float         # m
+
+    def position(self) -> np.ndarray:
+        el, az = math.radians(self.elevation), math.radians(self.azimuth)
+        u = np.array([math.cos(el) * math.cos(az), math.cos(el) * math.sin(az), math.sin(el)])
+        return np.asarray(self.center, dtype=float) + self.distance * u
+
+
+class RobotCamera:
+    """Camera riding on a robot, as the orbit parameters the ``GLViewWidget`` takes (:class:`CameraPose`).
+
+    * ``"chase"`` (third person, as in a video game): behind and above the robot, turning with its heading
+      through a first-order lag (``CHASE_YAW_TAU``) so the picture does not whip when the robot spins; the
+      look-at point is a little ahead of the robot so it sits low in the frame. The mouse orbits around the
+      robot (:meth:`nudge` offsets) and the wheel changes the distance.
+    * ``"fpv"`` (first person): on the cover above the dribbler (``FPV_OFFSET`` in the body frame), looking
+      ahead and ``FPV_PITCH`` down, rigidly attached (no lag); the mouse turns the head.
+
+    Pure numpy: the widget feeds poses and mouse deltas and copies the result into ``opts``."""
+
+    def __init__(self, mode: str = "chase"):
+        if mode not in ("chase", "fpv"):
+            raise ValueError(f"unknown robot camera mode {mode!r}")
+        self.mode = mode
+        self.yaw: float | None = None
+        self.az_offset = 0.0
+        self.el_offset = 0.0
+        self.distance = CHASE_DISTANCE
+
+    def reset(self, keep_user: bool = False) -> None:
+        """Forget the smoothed heading (the next pose is taken at once) and, unless ``keep_user``, the mouse
+        offsets and the zoom."""
+        self.yaw = None
+        if not keep_user:
+            self.az_offset = self.el_offset = 0.0
+            self.distance = CHASE_DISTANCE
+
+    def nudge(self, d_azimuth: float, d_elevation: float, distance: float | None = None) -> None:
+        """Mouse input since the last frame: orbit (chase) or turn the head (fpv) by the given degrees, and
+        the zoomed distance (chase only)."""
+        self.az_offset = (self.az_offset + float(d_azimuth) + 180.0) % 360.0 - 180.0
+        lo, hi = (-25.0, 65.0) if self.mode == "chase" else (-70.0, 70.0)
+        self.el_offset = float(np.clip(self.el_offset + float(d_elevation), lo, hi))
+        if distance is not None and self.mode == "chase":
+            self.distance = float(np.clip(distance, 0.3, 10.0))
+
+    def update(self, x: float, y: float, theta: float, dt: float) -> CameraPose:
+        """Camera for the robot at ``(x, y, theta)``; ``dt`` (s) advances the heading lag of the chase mode."""
+        if self.yaw is None or self.mode == "fpv":
+            self.yaw = float(theta)
+        elif dt > 0.0:
+            self.yaw = wrap_to_pi(self.yaw + wrap_to_pi(float(theta) - self.yaw) * (1.0 - math.exp(-dt / CHASE_YAW_TAU)))
+        yaw = self.yaw
+        if self.mode == "fpv":
+            # the orbit camera sits at centre + distance * u: put it on the cover and the centre ahead of it
+            ox, oy, oz = FPV_OFFSET
+            cam = np.array([x + ox * math.cos(yaw) - oy * math.sin(yaw), y + ox * math.sin(yaw) + oy * math.cos(yaw), oz])
+            az, el = math.degrees(yaw) + 180.0 + self.az_offset, FPV_PITCH + self.el_offset
+            pose = CameraPose((0.0, 0.0, 0.0), az, el, FPV_LOOK)
+            centre = cam - pose.position()          # = cam - distance * u
+            return CameraPose((float(centre[0]), float(centre[1]), float(centre[2])), az, el, FPV_LOOK)
+        centre = (x + CHASE_AHEAD * math.cos(yaw), y + CHASE_AHEAD * math.sin(yaw), CHASE_HEIGHT)
+        return CameraPose(centre, math.degrees(yaw) + 180.0 + self.az_offset, CHASE_ELEVATION + self.el_offset,
+                          self.distance)
+
+
+__all__ = [
+    "Mesh", "parse_obj", "cad_meshes", "mechanism_meshes", "MECHANISM_KEYS", "d_prism_mesh", "cylinder_mesh",
+    "disc_mesh", "merge_meshes", "split_smoothing_groups", "vertex_normals", "smooth_mesh", "SMOOTH_ANGLE_DEG",
+    "body_mesh",
+    "id_plate_mesh", "RobotMeshes", "rot_z", "rot_x", "translate", "robot_transform", "wheel_transform",
+    "WheelSpin", "floor_quads", "apron_quads", "quad_mesh", "circle_points", "field_segments", "goal_frames",
+    "RobotPose",
+    "SceneFrame", "compute_frame", "CAMERA_PRESETS", "CameraPose", "RobotCamera",
+    "CHASE_DISTANCE", "CHASE_ELEVATION", "CHASE_AHEAD", "CHASE_HEIGHT", "CHASE_YAW_TAU",
+    "FPV_OFFSET", "FPV_PITCH", "FPV_LOOK", "FPV_FOV", "CHASSIS_RGBA", "WHEEL_RGBA", "PRIMITIVE_RGBA",
+    "FLOOR_RGBA", "BOUNDARY_RGBA", "APRON_RGBA", "APRON_WIDTH", "LINE_RGBA", "BALL_RGBA", "SELECT_RGBA",
+    "PLATE_Z_OVER_TOP", "LINE_Z",
+    "ROBOT_VIEW_PRESETS", "ROBOT_VIEW_DISTANCE", "AXIS_RGBA", "arcball_point", "axis_angle", "rotation_between",
+    "Arcball", "WheelAngles", "robot_part_transforms", "arrow_segments",
+]

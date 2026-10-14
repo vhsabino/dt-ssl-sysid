@@ -5,11 +5,11 @@ import math
 import numpy as np
 import pytest
 
-from phase0_replay import (AnalyticFOPDTPlant, IdealKinematicPlant, rollout_segment,
+from dtssl import (DofParam, AnalyticFOPDTPlant, IdealKinematicPlant, rollout_segment,
                            free_run, build_error_table, evaluate, load_metrics_config,
                            load_twin_params, body_velocity_series)
-from phase0_replay.schema import Segment
-from phase0_replay.rollout import Window, WindowRollout
+from dtssl.data.schema import Segment
+from dtssl.sim.rollout import Window, WindowRollout
 
 TS = 1.0 / 60.0
 
@@ -106,8 +106,11 @@ def test_effective_N_is_nonoverlapping():
 
 # ---- 4) gate de placeholder: misto/rot => INDETERMINADO ----
 def test_placeholder_gate_marks_rot_and_misto():
-    params = load_twin_params()
-    assert params["w"].placeholder is True
+    """A placeholder omega must force INDETERMINADO on rot/misto bins regardless of the data.
+    Uses a synthetic placeholder theta (config/twin_params.json has no placeholder since 2026-07-24)."""
+    base = load_twin_params()
+    params = dict(base)
+    params["w"] = DofParam(K=1.0, tau=0.1, Td=0.0, placeholder=True)
     twin = AnalyticFOPDTPlant(params)
     seg = _synth_segment(twin)
     res = evaluate([rollout_segment(seg, twin)],

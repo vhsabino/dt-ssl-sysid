@@ -1,0 +1,24 @@
+{
+  "_doc": "External simulators reachable over the ssl-simulation-protocol (dtssl.sim.protocol_plant.ProtocolPlant, C2b). One entry per simulator: host and league ports (10300 sim control, 10301 blue, 10302 yellow), vision multicast group/port and the interface used to join it (multicast_if: 127.0.0.1 for dtssl serve, which sends on loopback; 0.0.0.0 = the default-route interface, where grSim and ER-Force send), the team/id of the replayed robot, vision_rate (frames per simulated second; null = measured from t_capture, which grSim and ER-Force stamp in simulated time; set 60 for dtssl serve when it runs at speed != 1), clear_others (remove the other robots and park the ball at connection; n_robots_per_team = ids swept, 11 in grSim and ER-Force by default), teleport_omega (send the yaw-rate initial condition in TeleportRobot.v_angular). Use `python -m dtssl.sim.protocol_plant --sim <name>` to probe an entry; `dtssl analysis run protocol_holdout --kw sims=<name>` for the hold-out. Run the analysis on the same host/network namespace as the simulator (multicast); in WSL2 that means inside WSL (tools/external_sims/README.md).",
+  "dtssl": {
+    "host": "127.0.0.1",
+    "port_blue": 10301, "port_yellow": 10302, "port_simcontrol": 10300,
+    "vision_ip": "224.5.23.2", "vision_port": 10006, "multicast_if": "127.0.0.1",
+    "team": "blue", "robot_id": 0, "vision_rate": 60.0,
+    "notes": "dtssl serve --backend fopdt (self-test: the twin through its own protocol server; vision port of config/bridge.json). TeleportRobot sets pose and body velocity."
+  },
+  "grsim": {
+    "host": "127.0.0.1",
+    "port_blue": 10301, "port_yellow": 10302, "port_simcontrol": 10300,
+    "vision_ip": "224.5.23.2", "vision_port": 10020, "multicast_if": "0.0.0.0",
+    "team": "blue", "robot_id": 0, "vision_rate": null, "n_robots_per_team": 11,
+    "notes": "grSim >= 2021 (ssl-simulation-protocol), `grSim --headless -platform offscreen`; ODE at 60 Hz, vision 60 Hz, noise/vanishing off (defaults); robot profile = config/Parsian.ini (default: R 0.09 m, wheel r 0.027 m, a_max 4 m/s^2, v_max 5 m/s). TeleportRobot (sslworld.cpp processTeleportRobot) resets the robot and turns v_x/v_y/v_angular into wheel-motor setpoints under its acceleration limits: every window starts from rest (the initial velocity of the harness is not honoured)."
+  },
+  "erforce": {
+    "host": "127.0.0.1",
+    "port_blue": 10301, "port_yellow": 10302, "port_simcontrol": 10300,
+    "vision_ip": "224.5.23.2", "vision_port": 10020, "multicast_if": "0.0.0.0",
+    "team": "blue", "robot_id": 0, "vision_rate": null, "teleport_omega": false, "n_robots_per_team": 11,
+    "notes": "ER-Force simulator-cli -g 2020B --realism None (Bullet; vision 66.67 Hz with 35 ms delay + 5 ms processing in every realism file, command_delay 0 in None; robots stop 0.1 s after the last command). TeleportRobot sets pose and linear body velocity; v_angular is applied about the x axis in simrobot.cpp (bug), so teleport_omega=false sends 0: the yaw-rate initial condition is not honoured."
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "_doc": "ssl-simulation-protocol server (dtssl serve). Ports follow the RoboCup convention: 10300 simulation control, 10301 blue robot control, 10302 yellow robot control; vision multicast 224.5.23.2 (ssl-unification 'develop' config listens on 10006; the code default is 10020). Everything is overridable by CLI flags.",
+  "vision": {
+    "ip": "224.5.23.2",
+    "port": 10006,
+    "multicast_if": "127.0.0.1",
+    "ttl": 1,
+    "loop": true,
+    "unicast_targets": [],
+    "rate_hz": 60.0,
+    "camera_id": 0,
+    "geometry_every": 60,
+    "position_noise_std_mm": 0.0,
+    "orientation_noise_std_rad": 0.0,
+    "latency_frames": 0
+  },
+  "control": {
+    "bind_ip": "0.0.0.0",
+    "port_blue": 10301,
+    "port_yellow": 10302,
+    "port_simcontrol": 10300,
+    "watchdog_s": 0.3
+  },
+  "sim": {
+    "backend": "fopdt",
+    "n_blue": 6,
+    "n_yellow": 6,
+    "realtime": true,
+    "speed": 1.0
+  }
+}

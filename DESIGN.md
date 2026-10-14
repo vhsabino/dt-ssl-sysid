@@ -1,5 +1,12 @@
 # DESIGN — Harness de replay para validação do gêmeo digital (FOPDT por DOF)
 
+> **HISTÓRICO — superseded by `docs/SPEC_DTSSL.md` em 02/09/2026; mantido por rastreabilidade.**
+> Documento de exploração de 15/06/2026 que originou o harness `phase0_replay` (hoje `src/dtssl/`:
+> `models/fopdt.py`, `sim/rollout.py`, `eval/`). Os caminhos citados abaixo (`automation/*.m`,
+> `matlab/sysid/*`, `scripts/run_one.m`) foram movidos para `matlab/dtssl/` (vivos) e `matlab/legacy/`
+> (arquivados) — ver `matlab/legacy/README.md`. O contrato de dados da §2 continua válido
+> (`dtssl.data.schema`); θ oficial inclui ω promovido (24/07/2026), não mais o placeholder da §1.2.
+
 *Documento de exploração e contrato de dados. NÃO contém implementação. Para revisão antes de codar. Autor: sessão 2026-06-15.*
 
 Robô SSL omnidirecional 4 rodas (RobôCIn v2025). Gêmeo = FOPDT por grau de liberdade:

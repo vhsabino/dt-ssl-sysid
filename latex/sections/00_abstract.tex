@@ -1,0 +1,68 @@
+%==============================================================================
+% ABSTRACT — reposicionado 2026-08-10 apos a revisao independente.
+% Mudancas:
+%  - comparador PRIMARIO passa a ser a cinematica ideal (mesmo harness, mesma
+%    inicializacao). rSim vira contexto, com a ressalva fitted-vs-untuned (B2/B3).
+%  - estatistica reportada por EVENTO (n=10), nao por janela (item 9 / C11).
+%  - acrescentadas as tres omissoes que o revisor cobrou (6.3): heading pior em
+%    horizonte longo, 99.6% da validacao e translacional, rSim nao sintonizado.
+%  - declarado o tamanho da evidencia em segundos (C11).
+% IEEE: sem simbolos matematicos, sem citacoes. ~215 palavras.
+% Numeros: 87% (CHANGELOG 2026-06-14); 71.1% (identificacao_omega_20260724.md);
+% 1% (omega_excitation_analysis_20260807_133917.json); 0.038/0.101 e
+% decomposicao (gap_decomposition_20260809_2308.md); p e efeito por evento
+% (clustered_stats_20260809_2309.md); 73.5 s idem.
+%
+% REVISAO 2026-08-10 (pedido do autor), tres mudancas:
+%  1. ABLACAO reescrita em linguagem plana: "switch each ingredient off in every
+%     combination" em vez de "order-independent ablation". Mesmo conteudo
+%     (Shapley sobre o fatorial 2^3, tau 55% / Td 43% / K 2%), sem o jargao.
+%     Acrescentado o 0.114 m do braco "from rest", que torna o achado de
+%     interacao verificavel em vez de assertivo.
+%  2. rSim EXPLICITO e com resultado: 0.129 m em h_ref, nomeado, na mesma frase
+%     do modelo e da cinematica ideal. Ressalva fitted-vs-untuned MANTIDA (B5) e
+%     a ablacao de atraso casado entra como evidencia. O elo "roda do repouso,
+%     como o rSim" liga a ablacao ao resultado do rSim -- explica o numero em vez
+%     de so reporta-lo.
+%  3. REMOVIDA a frase dos 99.6% translacional. ATENCAO: era uma das tres
+%     omissoes que o revisor independente cobrou (item 6.3). A limitacao
+%     PERMANECE enunciada em 06_limitations.tex, paragrafo "Evaluation and
+%     scope", primeira frase. Se o revisor reabrir o ponto, a resposta e essa.
+%
+% Custo: ~240 -> ~270 palavras. Fonte dos numeros novos: 0.129 e 0.114 de
+% results/epos_eang_three_models_20260810_1022.md (execucao canonica, mesma da
+% Tabela III e da Fig. 2); atraso casado de
+% results/eval_rsim_delay_ablation_20260809_2154.md.
+%
+% PENDENTE (nao aprovado pelo autor): o par 0.039/0.101 e mediana POR JANELA
+% (gap_decomposition), enquanto "ten hold-out events" e por EVENTO
+% (clustered_stats: 0.0421 vs 0.1177, gap +0.0689). A frase mistura as duas
+% unidades. Mantido como estava ate decisao.
+%==============================================================================
+\begin{abstract}
+Teams in the RoboCup Small Size League validate control software largely in
+simulation, whose simplified physics leaves a reality gap to the field. This
+paper asks what a behavioral model of an omnidirectional soccer robot can be
+identified from the competition logs teams already record, and what those logs
+cannot supply. Modeling each degree of freedom as one first-order channel with
+dead time, the translational channels identify directly from in-game logs and
+reach roughly 87 percent hold-out fit. The yaw channel does not: in play the yaw
+command is a median of one percent of what the four wheels are asked to do, and
+explains only 56 percent of the variance of the measured rotation, against 94 to
+96 percent for translation. A short dedicated open-loop campaign restores the
+excitation and identifies the channel at 71 percent hold-out fit. Fidelity is
+then evaluated in free run over horizons from 0.1 to 1.5 seconds, every plant
+under an identical harness. Over 73.5 seconds of scored motion the model reaches
+0.039 metre of median position error at the 0.4-second horizon, against 0.101
+for ideal kinematics and 0.129 for rSim, the ODE simulator used across the
+league; all ten hold-out events favor the model. Switching each ingredient off
+in every combination, so the attribution does not depend on removal order, the
+lag in reaching commanded speed and the dead time before the robot responds
+contribute in comparable parts, and the fitted gain almost nothing. The
+improvement also requires starting each window from the measured velocity: from
+rest the model gives 0.114 metre and no longer beats ideal kinematics, which is
+how rSim runs for want of a velocity setter. Since rSim also runs at default
+parameters against a plant fitted to this robot, and giving it the model's dead
+time widens the difference rather than closing it, we report that comparison as
+context, not as a general dynamical advantage.
+\end{abstract}

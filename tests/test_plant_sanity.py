@@ -4,7 +4,7 @@ import math
 import numpy as np
 import pytest
 
-from phase0_replay import (AnalyticFOPDTPlant, IdealKinematicPlant,
+from dtssl import (AnalyticFOPDTPlant, IdealKinematicPlant,
                            load_twin_params, wrap_to_pi)
 
 TS = 1.0 / 60.0
@@ -20,15 +20,18 @@ def _const_drive(plant, cmd, nsteps, pose0=(0.0, 0.0, 0.0), velb0=(0.0, 0.0, 0.0
 
 # ----- AnalyticFOPDT: resposta ao degrau do lag (DOF w, Td=0) -----
 def test_step_response_reaches_63pct_at_tau():
+    """After the dead time (ceil(Td/Ts) samples) the ZOH-exact lag reaches
+    K*u*(1-exp(-k*Ts/tau)) at step k of the response; checked at k = round(tau/Ts)."""
     p = load_twin_params()
     plant = AnalyticFOPDTPlant(p)
     plant.reset(pose0=(0, 0, 0), velb0=(0, 0, 0))
     u = 1.0
-    k_tau = round(p["w"].tau / TS)          # tau_w=0.1 -> 6 passos = 0.1 s
-    for k in range(1, k_tau + 1):
+    m = 0 if p["w"].Td <= 0 else math.ceil(p["w"].Td / TS - 1e-9)   # dead-time samples
+    k_tau = round(p["w"].tau / TS)
+    for _ in range(m + k_tau):
         plant.step((0.0, 0.0, u), TS)
     vw = plant.body_velocity[2]
-    expected = p["w"].K * u * (1.0 - math.exp(-1.0))   # 63.21%
+    expected = p["w"].K * u * (1.0 - math.exp(-k_tau * TS / p["w"].tau))
     assert abs(vw - expected) < 1e-6, (vw, expected)
 
 
