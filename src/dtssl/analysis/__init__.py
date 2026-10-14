@@ -33,6 +33,7 @@ claim" table, results/CHANGELOG.md, docs/PLANO_V2_EXECUTADO.md, docs/PLANO_V3_EX
 | closed_loop_stats | C4: closed-loop session of the real strategy on the twin vs competition logs, P1-P5 (2026-09) | new |
 | protocol_holdout | C2b: league simulators (grSim, ER-Force) replayed through the ssl-simulation-protocol on the hold-out (2026-09) | new |
 | coupled_mimo_check | WP2: coupled (MIMO) first-order check vs per-DOF on the hold-out, pre-registered (2026-09) | new |
+| tuned_physics_baseline | C3 / WP3: MuJoCo route b tuned on the training events (Bayesian optimisation) vs the twin on the hold-out, pre-registered (2026-10, not run) | new |
 | regenerate_bin_distribution | bin distribution with the CAD radius (D9) | scripts/regenerate_bin_distribution.py |
 | holdout_report | honest hold-out report, twin vs rSim (needs robosim) | phase0_replay/holdout_report.py |
 | loader_report | loader sanity + duration distribution (H_max) | phase0_replay/report.py |
@@ -89,6 +90,7 @@ _ALL: dict[str, str] = {
     "closed_loop_stats": "dtssl.analysis.closed_loop_stats",
     "protocol_holdout": "dtssl.analysis.protocol_holdout",
     "coupled_mimo_check": "dtssl.analysis.coupled_mimo_check",
+    "tuned_physics_baseline": "dtssl.analysis.tuned_physics_baseline",
     # reports
     "metrics_report": "dtssl.analysis.metrics_report",
     "holdout_report": "dtssl.analysis.holdout_report",

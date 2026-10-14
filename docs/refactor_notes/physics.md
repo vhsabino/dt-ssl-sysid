@@ -342,3 +342,15 @@ Leitura: (i) o gêmeo embutido no MuJoCo é o gêmeo — contatos passam a exist
 física "como sai da caixa" fica entre a ideal e o gêmeo (melhor que o rSim de 0,129 m do artigo, pior que o
 gêmeo por 1,9×); (iii) só o atraso identificado fecha a maior parte desse gap (0,073 → 0,048 m), coerente com a
 ablação do artigo (Td 43 % do ganho). Artefato: `results/backends_holdout_20260907_1515.md/.csv`.
+
+## Atrito do piso como opção (14/10/2026, preparação do C3)
+
+- `mjcf.world_root` / `build_world_xml` ganharam `floor_friction` (default 0,9, inalterado) e `MuJoCoWorld`
+  o parâmetro de mesmo nome, guardado em `self.floor_friction` e passado em `build_xml`. Geoms de mesma
+  prioridade combinam atrito pelo máximo: o contato roleta-piso da rota b vê
+  `max(floor_friction, RouteBOptions.roller_friction)`; a bola (prioridade 1) mantém o seu. Com os defaults
+  nada muda (teste `test_world_floor_friction_option_defaults_to_0_9`; o ponto untuned do
+  `tuned_physics_baseline` reproduz `mujoco-rollers-delay` a 1e-9 m em
+  `test_default_point_reproduces_the_untuned_route_b_with_delay`).
+- Uso: a sintonia da rota b (C3) põe piso e roletes no mesmo `mu`, de modo que o atrito efetivo seja
+  exatamente o parâmetro otimizado, sem mexer em prioridades (que alterariam a mistura de `solref`/`solimp`).

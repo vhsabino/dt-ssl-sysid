@@ -252,3 +252,22 @@ marcador `_BROKEN_` que o `results/` do repositório tem.
   `latex_journal/sections/07_results_coupling.tex` (texto em inglês a partir dos artefatos; a pasta
   `latex_journal/` continua não versionada, como o chat do artigo a deixou). Compilação verificada na nuvem
   com um invólucro `article` (sem `elsarticle` no sandbox): 0 erros, 0 referências indefinidas.
+
+## `tuned_physics_baseline` (C3 / WP3), pré-registrado e não executado (14/10/2026)
+
+- Módulo novo `src/dtssl/analysis/tuned_physics_baseline.py` (registrado em `dtssl.analysis`): rota b do
+  MuJoCo + atraso identificado (`WorldPlant("mujoco-rollers", delay="theta")`) com cinco parâmetros de contato e
+  acionamento (`mu`, `impratio`, `kv_wheel`, `wheel_torque_max`, `gear_ratio`, escala log) calibrados nos 36
+  eventos de treino pelo objetivo do harness (mediana por janela de e_pos em h_ref, bin translacional) com
+  otimização bayesiana própria (GP Matern 5/2 do scikit-learn + melhoria esperada sobre candidatos Sobol com
+  refino L-BFGS-B; 16 + 44 avaliações; determinística por semente), pontuada no hold-out contra o gêmeo e a
+  rota b untuned; vereditos T1 (gate do C2b nas duas direções), T2, T3, V e a faixa quase-ótima de cada
+  parâmetro; controle in silico `control=rollers` (gerador da própria classe em parâmetros conhecidos).
+  Pré-registro `docs/PREREGISTRO_C3_BASELINE_SINTONIZADA_20261014.md`.
+- O núcleo (`compute_from_segments`) recebe `factory`, `space` e `defaults`: os testes
+  (`tests/test_tuned_physics_baseline.py`, 11 testes) exercitam o tuner com uma família analítica (o θ do gêmeo
+  com K escalado) em segmentos sintéticos, sem dataset nem MuJoCo; dois testes `requires_mujoco` fixam que o
+  ponto untuned reproduz `mujoco-rollers-delay` e que os parâmetros chegam ao MJCF.
+- Ensaio de software com MuJoCo de verdade (PRBS sintético, 7 avaliações, `_to_delete\c3_smoke`): cadeia
+  inteira funcionando, ~1,7 s por avaliação em 600 amostras, o que dá ~56 s por avaliação nos 36 eventos
+  reais (~1 h para as 60 avaliações). Nenhum número do robô foi produzido.
