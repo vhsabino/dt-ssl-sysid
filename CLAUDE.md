@@ -53,7 +53,7 @@ Removidos na refatoração: `automation/` (→ `matlab/dtssl` e `matlab/legacy`)
   versionado → `git restore config/ssl_robot.sldd` depois.
 - Resultados: arquivo novo com carimbo de tempo + cabeçalho (commit, θ, dataset, seed); **nunca sobrescrever**
   `results/` nem `models/`. Cada número do artigo = `dtssl analysis run <nome>` reproduzível.
-- Git: branch `refactor/dtssl`, commits atômicos por etapa, sem push automático.
+- Git: branch `main` (a `refactor/dtssl` foi mesclada com `--no-ff` na tag `v1.0.0` em 14/10/2026), commits atômicos por etapa, sem push automático.
 
 ## 4. Guardrails (NUNCA)
 
