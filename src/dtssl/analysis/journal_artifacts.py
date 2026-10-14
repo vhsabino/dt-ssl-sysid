@@ -40,6 +40,10 @@ ARTEFACTS: dict[str, str] = {
     "c2b": "protocol_holdout_20260910_0211.json",
     "c2b2_s1": "protocol_holdout_20260918_1326.json",
     "c2b2_s2": "protocol_holdout_20260920_1143.json",
+    # October 2026 (WP2: pre-registered MIMO check on the competition logs and its two in-silico controls)
+    "mimo": "coupled_mimo_check_20261014_1211.json",
+    "mimo_cminus": "coupled_mimo_check_control-fopdt_20261014_1211.json",
+    "mimo_cplus": "coupled_mimo_check_control-mujoco-rollers-delay_20261014_1216.json",
 }
 #: sessions of the league-simulator replays (C2b on 10/09; C2b2 run twice, 18/09 and 20/09)
 SESSIONS = {"c2b": "2026-09-10", "c2b2_s1": "2026-09-18", "c2b2_s2": "2026-09-20"}
@@ -299,6 +303,38 @@ def closed_loop(root: Path | None = None) -> dict:
 
 def session_report(root: Path | None = None) -> dict:
     return load_json("b3", root)
+
+
+MIMO_CONTROLS = {"mimo_cminus": "fopdt", "mimo_cplus": "mujoco-rollers-delay"}
+
+
+def coupling(root: Path | None = None) -> dict:
+    """WP2: the pre-registered coupled (MIMO) check on the competition logs and its in-silico controls.
+
+    ``fit_pooled`` / ``fit_mean``: hold-out fit (%) per arm (promoted, diagonal, coupled) and DOF; ``G`` and
+    ``tau_s``: static gain matrices (row = output, column = command) and time constants per arm; ``ratios``:
+    cross-term contribution (RMS cross / RMS direct) per output, total and per input; ``m1``, ``m2``,
+    ``m2_game`` (training restricted to the game label) and ``harness`` (with ``m3``): the pre-registered
+    verdicts; ``pair_delays`` and ``bootstrap``: the secondary analyses; ``controls``: the same quantities
+    for C- (``fopdt``) and C+ (``mujoco-rollers-delay``) when their artefacts are present.
+    """
+    d = load_json("mimo", root)
+    arms = ("promoted", "diagonal", "coupled")
+    pdl = d["pair_delays"]
+    out = dict(n_train=d["n_train"], n_test=d["n_test"], K_ref=d["K_ref_w"], delays=d["delays_primary"],
+               fit_pooled=d["score"]["pooled"], fit_mean=d["score"]["mean"],
+               G={k: d["models"][k]["G"] for k in arms}, tau_s={k: d["models"][k]["tau_s"] for k in arms},
+               ratios=d["ratios"], m1=d["m1"], m2=d["m2"], m2_game=d["m2_stg_only"],
+               pair_delays=dict(fit_pooled=pdl["score"]["pooled"], m1=pdl["m1"], m2=pdl["m2"],
+                                G_coupled=pdl["models"]["coupled"]["G"], M_coupled=pdl["models"]["coupled"]["M"]),
+               bootstrap=d["bootstrap"], harness=d["harness"], controls={})
+    for key, name in MIMO_CONTROLS.items():
+        if available(key, root):
+            c = load_json(key, root)
+            out["controls"][name] = dict(K_ref=c["K_ref_w"], m1=c["m1"], m2=c["m2"], ratios=c["ratios"],
+                                         G_coupled=c["models"]["coupled"]["G"],
+                                         negative_control=c.get("negative_control"))
+    return out
 
 
 # =========================================================================

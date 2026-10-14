@@ -84,6 +84,45 @@ def test_second_c2b2_session():
     assert all(s1["validity"].values())
 
 
+def test_mimo_numbers():
+    """WP2 (CHANGELOG 2026-10-14 12:11): M1 does not matter, M2 falsified, M3 no improvement, C- OK, C+ premise
+    not reproduced."""
+    need("mimo", "mimo_cminus", "mimo_cplus")
+    m = J.coupling()
+    assert (m["n_train"], m["n_test"], m["delays"]) == (36, 10, [5, 4, 6]) and round(m["K_ref"], 4) == 1.0016
+    fp = m["fit_pooled"]
+    assert [round(fp["promoted"][d], 1) for d in ("vx", "vy", "w")] == [75.3, 79.7, 40.1]
+    assert [round(fp["diagonal"][d], 1) for d in ("vx", "vy", "w")] == [75.5, 79.9, 48.8]
+    assert [round(fp["coupled"][d], 1) for d in ("vx", "vy", "w")] == [76.5, 80.1, 48.9]
+    m1 = m["m1"]
+    assert [round(m1["per_dof"][d]["fit_gain_pp"], 2) for d in ("vx", "vy", "w")] == [0.95, 0.23, 0.13]
+    assert [round(m1["per_dof"][d]["contrib_ratio"], 3) for d in ("vx", "vy", "w")] == [0.058, 0.039, 0.048]
+    assert not m1["coupling_matters"] and not m["pair_delays"]["m1"]["coupling_matters"]
+    m2 = m["m2"]
+    assert (round(m2["G_diag"], 4), round(m2["G_coupled"], 4), m2["premise"], m2["status"]) == (
+        1.419, 1.4138, True, "FALSIFICADA")
+    assert round(m2["inflation_diag"], 3) == 0.417 and round(m2["fraction_removed"], 2) == 0.01
+    assert (round(m["m2_game"]["G_diag"], 4), m["m2_game"]["n_train"]) == (1.3719, 13)
+    assert round(m["pair_delays"]["m2"]["G_coupled"], 4) == 1.4127
+    ci = m["bootstrap"]["ci95"]
+    assert m["bootstrap"]["n_boot"] == 200 and [round(v, 3) for v in ci["G_diag_w"]] == [1.36, 1.517]
+    assert [round(v, 3) for v in ci["gain_vx"]] == [0.616, 1.07]
+    assert [round(v, 3) for v in ci["ratio_w"]] == [0.026, 0.074]
+    h = m["harness"]
+    assert (h["n_windows"], h["n_trans"], round(h["sanity_promoted_event_median"], 4)) == (265, 264, 0.0421)
+    ref = next(r for r in h["rows"] if abs(r["h_s"] - 0.4) < 1e-9)
+    assert [round(ref["epos"][k], 4) for k in ("promoted", "diagonal", "coupled")] == [0.0388, 0.039, 0.0381]
+    m3 = h["m3"]
+    assert (m3["wins"], round(m3["p"], 3), round(m3["rb"], 2), m3["improves"]) == (6, 0.461, 0.05, False)
+    c = m["controls"]
+    nc = c["fopdt"]["negative_control"]
+    assert nc["ok"] and round(nc["G"]["diagonal"], 4) == 0.9997 and round(nc["truth"], 4) == 1.0017
+    cp = c["mujoco-rollers-delay"]
+    assert not cp["m2"]["premise"] and round(cp["m2"]["inflation_diag"], 3) == 0.072
+    assert round(cp["K_ref"], 4) == 0.9964
+    assert round(cp["ratios"]["w"]["per_input"]["vy"], 3) == 0.216 and not cp["m1"]["coupling_matters"]
+
+
 @pytest.mark.parametrize("mod", [fig_journal_identifiability, fig_journal_league_sims, fig_journal_closed_loop])
 def test_journal_figures_render(mod, tmp_path):
     need("c1", "c1b_delay", "c1b_nodelay", "r3", "c2b", "c2b2_s1", "c2b2_s2", "c4")
@@ -101,6 +140,9 @@ def test_journal_tables_write_latex(tmp_path):
     assert "0.0809" in base and "0.1106" in base and "0.2389" in base and "\\label{tab:baselines}" in base
     ident = (tmp_path / "tab_journal_identified.tex").read_text(encoding="utf-8")
     assert "86.7" in ident and "1.378" in ident and "$84.3\\pm2.0$" in ident
+    coup = (tmp_path / "tab_journal_coupling.tex").read_text(encoding="utf-8")
+    assert "1.419 $\\rightarrow$ 1.414" in coup and "6/10, $p = 0.46$" in coup and "\\label{tab:coupling}" in coup
+    assert "+0.95 [+0.62, +1.07]" in coup and "0.058 [0.046, 0.076]" in coup and "falsified" in coup
     for p in r["paths"]:
         text = p.read_text(encoding="utf-8")
         assert text.count("\\begin{table") == text.count("\\end{table") == 1

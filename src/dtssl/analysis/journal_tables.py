@@ -2,7 +2,8 @@
 
 Writes ``latex_journal/tables/tab_journal_<name>.tex``: identified model (``identified``), in-silico yaw
 gains by regime (``insilico_yaw``), every baseline at h_ref (``baselines``), robustness checks
-(``robustness``) and closed-loop plausibility (``closed_loop``). Every number comes from
+(``robustness``), closed-loop plausibility (``closed_loop``) and the pre-registered cross-coupling check
+(``coupling``, WP2). Every number comes from
 ``journal_artifacts`` (files in ``results/``) or, for the three hold-out fits and the post hoc C4 reading,
 from the ``results/CHANGELOG.md`` entries quoted in the constants below; each table carries its sources in
 a header comment. The tables are build outputs of the manuscript: re-running overwrites them.
@@ -16,9 +17,10 @@ from dtssl.analysis import journal_artifacts as J
 
 NAME = "journal_tables"
 KIND = "report"
-CLAIM = "Journal tables (identified model, in-silico yaw, baselines, robustness, closed loop) from the artefacts"
+CLAIM = ("Journal tables (identified model, in-silico yaw, baselines, robustness, closed loop, coupling) "
+         "from the artefacts")
 REQUIRES: tuple[str, ...] = ()
-TABLES = ("identified", "insilico_yaw", "baselines", "robustness", "closed_loop")
+TABLES = ("identified", "insilico_yaw", "baselines", "robustness", "closed_loop", "coupling")
 # Numbers stated only in results/CHANGELOG.md (quoted entry in each comment):
 HOLDOUT_FIT = {"vx": 86.7, "vy": 87.1}   # 2026-06-14 10:24: "fit hold-out 86.7%" / "fit hold-out 87.1%"
 HOLDOUT_FIT_W = 71.1                     # 2026-07-24 17:35: "fit hold-out media 71.1%"
@@ -257,8 +259,90 @@ def table_closed_loop(root: Path | None = None) -> str:
                  note=note, star=True)
 
 
+def table_coupling(root: Path | None = None) -> str:
+    """WP2: per-DOF (diagonal) against coupled first-order structure on the frozen hold-out, with the
+    pre-registered verdicts M1 to M3 and the two in-silico controls (``coupled_mimo_check``)."""
+    m = J.coupling(root)
+    dofs = ("vx", "vy", "w")
+    idx = {d: i for i, d in enumerate(dofs)}
+    sym = {"vx": "$v_x$", "vy": "$v_y$", "w": "$\\omega$"}
+    fp, m1, m2, ci = m["fit_pooled"], m["m1"]["per_dof"], m["m2"], m["bootstrap"]["ci95"]
+    Gd, Gc = m["G"]["diagonal"], m["G"]["coupled"]
+
+    def fits(arm):
+        return " & ".join(f"{fp[arm][d]:.1f}" for d in dofs)
+
+    def gain(d):
+        lo, hi = ci[f"gain_{d}"]
+        return f"{m1[d]['fit_gain_pp']:+.2f} [{lo:+.2f}, {hi:+.2f}]"
+
+    def ratio(d):
+        lo, hi = ci[f"ratio_{d}"]
+        return f"{m1[d]['contrib_ratio']:.3f} [{lo:.3f}, {hi:.3f}]"
+
+    def cross(d):
+        i = idx[d]
+        j = max((j for j in range(3) if j != i), key=lambda j: abs(Gc[i][j]))
+        return f"{Gc[i][j]:+.3f} (from {sym[dofs[j]]})"
+
+    h = m["harness"]
+    at_ref = next(r for r in h["rows"] if abs(r["h_s"] - h["h_ref_s"]) < 1e-9)
+    m3 = h["m3"]
+    c = m["controls"]
+
+    def wide(text):
+        return f"\\multicolumn{{4}}{{l}}{{{text}}} \\\\"
+
+    m2_verdict = "corroborated" if m2["status"] == "CORROBORADA" else "falsified" if m2["premise"] else "not testable"
+    body = [
+        f"pooled hold-out fit (\\%): promoted plant & {fits('promoted')} \\\\",
+        f"\\quad diagonal re-fit & {fits('diagonal')} \\\\",
+        f"\\quad coupled & {fits('coupled')} \\\\",
+        "fit gain, coupled vs. diagonal (p.p.) [95\\% CI] & " + " & ".join(gain(d) for d in dofs) + " \\\\",
+        "cross / direct RMS ratio [95\\% CI] & " + " & ".join(ratio(d) for d in dofs) + " \\\\",
+        "direct gain, diagonal / coupled & " + " & ".join(f"{Gd[i][i]:.3f} / {Gc[i][i]:.3f}" for i in range(3))
+        + " \\\\",
+        "largest cross gain (source) & " + " & ".join(cross(d) for d in dofs) + " \\\\",
+        "M1 ($\\geq 3$ p.p. and ratio $\\geq 0.10$): coupling matters & "
+        + " & ".join("yes" if m1[d]["matters"] else "no" for d in dofs) + " \\\\",
+        "\\midrule",
+        wide(f"free-run $\\epos$ at $\\hRef$, per-window median (m): promoted {at_ref['epos']['promoted']:.4f}, "
+             f"diagonal {at_ref['epos']['diagonal']:.4f}, coupled {at_ref['epos']['coupled']:.4f}"),
+        wide(f"M3 (gate 8/10, $p<0.05$, $r_b \\geq 0.5$): coupled beats diagonal {m3['wins']}/{m3['n']}, "
+             f"$p = {_p(m3['p'])}$, $r_b = {m3['rb']:+.2f}$: {'yes' if m3['improves'] else 'no'}"),
+        wide(f"M2 (half of the excess over {m2['K_ref']:.4f} open loop): direct yaw gain {m2['G_diag']:.3f} "
+             f"$\\rightarrow$ {m2['G_coupled']:.3f} with the translational inputs, "
+             f"{m2['fraction_removed'] * 100:.0f}\\% removed: {m2_verdict}"),
+    ]
+    if "fopdt" in c:
+        nc = c["fopdt"]["negative_control"]
+        body.append(wide(f"C$-$ (promoted twin as generator): $G_{{\\omega\\omega}}$ {nc['G']['diagonal']:.4f} / "
+                         f"{nc['G']['coupled']:.4f} against {nc['truth']:.4f}; no spurious coupling: "
+                         f"{'passed' if nc['ok'] else 'failed'}"))
+    if "mujoco-rollers-delay" in c:
+        cp = c["mujoco-rollers-delay"]
+        premise = "premise met" if cp["m2"]["premise"] else "below the 10\\% premise: not testable"
+        body.append(wide(f"C$+$ (MuJoCo route b with delay as generator): inflation "
+                         f"{cp['m2']['inflation_diag'] * 100:+.1f}\\%, {premise}"))
+        body.append(wide(f"C$+$, post hoc: $\\omega$ from $v_y$ {cp['ratios']['w']['per_input']['vy']:.3f} of the direct term; "
+                         f"$G_{{\\omega\\omega}}$ {cp['m2']['G_diag']:.3f} $\\rightarrow$ {cp['m2']['G_coupled']:.3f}"))
+    head = ["& " + " & ".join(sym[d] for d in dofs) + " \\\\"]
+    note = (f"Same estimator (separable least squares on the simulation error), same {m['n_train']} training events and "
+            f"the same {m['n_test']} frozen hold-out events for both arms; delays fixed at the promoted plant's "
+            f"{'/'.join(str(k) for k in m['delays'])} samples. Bootstrap over training events "
+            f"({m['bootstrap']['n_boot']} replicates, percentile intervals). The free-run rows use the paper's harness "
+            "(re-anchored windows, translational bin). The in-silico controls run the same pipeline on noise-free logs "
+            "generated from the recorded commands.")
+    return _wrap("tab_journal_coupling", "Cross-coupling check on the competition logs: per-DOF against coupled "
+                 "first-order structure, scored on the frozen hold-out, with the pre-registered verdicts.",
+                 "tab:coupling", "lccc", head, body,
+                 [f"results/{J.ARTEFACTS[k]}" for k in ("mimo", "mimo_cminus", "mimo_cplus")]
+                 + ["results/CHANGELOG.md 2026-10-14 12:11", "docs/PREREGISTRO_MIMO_CHECK_20260923.md"],
+                 note=note, star=True)
+
+
 BUILDERS = dict(identified=table_identified, insilico_yaw=table_insilico_yaw, baselines=table_baselines,
-                robustness=table_robustness, closed_loop=table_closed_loop)
+                robustness=table_robustness, closed_loop=table_closed_loop, coupling=table_coupling)
 
 
 def run(root: Path | None = None, out: Path | None = None, *, tables: str | None = None,
