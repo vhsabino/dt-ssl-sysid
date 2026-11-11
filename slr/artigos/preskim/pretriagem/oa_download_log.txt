@@ -1,0 +1,75 @@
+pid	url	status	bytes
+SLR-2026-Cristian-881	https://www.mdpi.com/2076-3417/16/2/650/pdf?version=1767866460	erro:The server returned the status 403 with message "Forbidden" in response to the r	0
+SLR-2026-Jiarong-057	https://arxiv.org/pdf/2605.17681	ok	19362083
+SLR-2026-Llus-916	https://doi.org/10.3390/electronics15142993	erro:The server returned the status 403 with message "Forbidden" in response to the r	0
+SLR-2026-Philipp-3415	https://link.springer.com/content/pdf/10.1007/s10270-026-01368-8.pdf	ok	1992217
+SLR-2026-Ruopeng-455	https://arxiv.org/pdf/2601.09920	ok	3244106
+SLR-2026-Shinta-855	https://doi.org/10.1080/21642583.2026.2634459	erro:The server returned the status 403 with message "Forbidden" in response to the r	0
+SLR-2026-Zacheous-490	https://link.springer.com/content/pdf/10.1007/s44291-026-00241-8.pdf	ok	3276943
+SLR-2025-Abdelrahim-2241	https://doi.org/10.1109/access.2025.3597797	erro:Invalid file identifier. Use fopen to generate a valid file identifier.	0
+SLR-2025-Afrooz-443	http://www.scs-europe.net/dlib/2025/ecms2025acceptedpapers/0361_simai_ecms2025_0019.pdf	ok	1671968
+SLR-2025-Carlo-4067	https://link.springer.com/content/pdf/10.1007/s10846-025-02258-9.pdf	ok	2287476
+SLR-2025-Daniel-818	https://www.mdpi.com/1424-8220/25/15/4666/pdf?version=1753712771	erro:The server returned the status 403 with message "Forbidden" in response to the r	0
+SLR-2025-Dominika-831	https://doi.org/10.3390/s25185715	erro:The server returned the status 403 with message "Forbidden" in response to the r	0
+SLR-2025-Franciszek-063	https://doi.org/10.64972/jaat.2025v3.182p10e:117-130	erro:Invalid file identifier. Use fopen to generate a valid file identifier.	0
+SLR-2025-Jalil-918	https://doi.org/10.5220/0013772600003982	erro:Invalid file identifier. Use fopen to generate a valid file identifier.	0
+SLR-2025-Maksim-1096	https://doi.org/10.21685/2307-5538-2025-3-7	erro:The server returned the status 502 with message "Bad Gateway" in response to the	0
+SLR-2025-Miriana-5327	https://link.springer.com/content/pdf/10.1007/s42979-025-04525-w.pdf	ok	2275211
+SLR-2025-O-1796	https://doi.org/10.1109/access.2025.3570947	erro:Invalid file identifier. Use fopen to generate a valid file identifier.	0
+SLR-2025-R-2043	https://doi.org/10.1109/access.2025.3619776	erro:Invalid file identifier. Use fopen to generate a valid file identifier.	0
+SLR-2025-Shou-948	https://doi.org/10.20965/jrm.2025.p1314	erro:Invalid file identifier. Use fopen to generate a valid file identifier.	0
+SLR-2025-T-338	https://dt.bsuir.by/jour/article/download/955/364	ok	1630545
+SLR-2025-V-1914	https://arxiv.org/pdf/2510.10273	ok	2094857
+SLR-2024-D-1768	https://ieeexplore.ieee.org/ielx7/7083369/7339444/10478139.pdf	ok	900449
+SLR-2024-Gustavo-995	https://periodicos.univali.br/index.php/acotb/article/download/20323/11735	ok	3046468
+SLR-2024-Jiri-548	https://ebooks.iospress.nl/pdf/doi/10.3233/ATDE241206	erro:Invalid file identifier. Use fopen to generate a valid file identifier.	0
+SLR-2024-Marcel-289	https://arxiv.org/pdf/2403.03949	ok	14181785
+SLR-2024-Ruwen-765	https://iopscience.iop.org/article/10.1088/1742-6596/2803/1/012060/pdf	erro:The server returned the status 302 with message "Moved Temporarily" in response 	0
+SLR-2024-X-1879	https://arxiv.org/pdf/2305.01263	ok	5682303
+SLR-2023-Pere-3366	https://arxiv.org/pdf/2311.10834	ok	4966901
+SLR-2023-Taeyoon-122	https://doi.org/10.1146/annurev-control-061523-102310	erro:The server returned the status 403 with message "Forbidden" in response to the r	0
+SLR-2022-A-1784	https://elib.dlr.de/197476/1/AIM22_0133_FI_copyright.pdf	ok	4398000
+SLR-2022-Mahmoud-752	https://www.sciencedirect.com/science/article/pii/S2212827122004231/pdf	erro:The server returned the status 403 with message "Forbidden" in response to the r	0
+SLR-2021-Eric-3363	https://www.mdpi.com/2079-9292/11/15/2453/pdf?version=1660016960	erro:The server returned the status 403 with message "Forbidden" in response to the r	0
+SLR-2021-M-2427	https://www.mdpi.com/2076-3417/11/10/4490/pdf?version=1620990898	erro:The server returned the status 403 with message "Forbidden" in response to the r	0
+SLR-2021-Xuda-797	https://arxiv.org/pdf/2103.04391	ok	3338347
+SLR-2020-Ra-745	https://doi.org/10.1016/j.ifacol.2020.11.033	erro:Invalid file identifier. Use fopen to generate a valid file identifier.	0
+SLR-2026-Albatati-1285	https://doi.org/10.1145/3815113	erro:The server returned the status 403 with message "Forbidden" in response to the r	0
+SLR-2026-M-857	https://izvestswsu.elpub.ru/jour/article/download/1590/782	erro:The connection to URL 'https://izvestswsu.elpub.ru/jour/article/download/1590/78	0
+SLR-2026-Seung-562	https://doi.org/10.1002/aisy.70465	erro:The server returned the status 403 with message "Forbidden" in response to the r	0
+SLR-2026-Song-2371	https://www.mdpi.com/2075-5309/16/3/646/pdf	erro:The server returned the status 403 with message "Forbidden" in response to the r	0
+SLR-2026-Tianwei-597	https://arxiv.org/pdf/2604.26509	ok	13162008
+SLR-2026-Vladyslav-865	https://tm.khpi.edu.ua/article/download/360300/346028	ok	768588
+SLR-2026-Zhaohan-4309	https://arxiv.org/pdf/2505.05108	ok	13478207
+SLR-2026-Ziyang-467	https://arxiv.org/pdf/2601.03200	ok	4244901
+SLR-2025-Chiara-4068	https://link.springer.com/content/pdf/10.1007/s10846-025-02328-y.pdf	ok	3357771
+SLR-2025-Ghandali-915	https://espace2.etsmtl.ca/id/eprint/32289/1/134%20-%20Sensor%20integration%20to%20create%20a%20dig.pdf	ok	145347
+SLR-2025-J-223	https://doi.org/10.20517/ir.2025.11	erro:Invalid file identifier. Use fopen to generate a valid file identifier.	0
+SLR-2025-M-1836	https://doi.org/10.1109/ojits.2025.3562504	erro:Invalid file identifier. Use fopen to generate a valid file identifier.	0
+SLR-2025-Maurice-654	https://arxiv.org/pdf/2506.09629	ok	11713754
+SLR-2025-N-5339	https://link.springer.com/content/pdf/10.1134/S1064562425700450.pdf	ok	714133
+SLR-2025-Santiago-303	https://doi.org/10.1016/j.robot.2025.105240	erro:Invalid file identifier. Use fopen to generate a valid file identifier.	0
+SLR-2025-Shabi-544	https://scientia-tss.com/index.php/journal/article/download/189/167	ok	862141
+SLR-2025-Wang-1664	https://dl.acm.org/doi/pdf/10.1145/3766887	erro:The server returned the status 403 with message "Forbidden" in response to the r	0
+SLR-2024-Bonak-2283	https://doi.org/10.46354/i3m.2024.emss.017	erro:Invalid file identifier. Use fopen to generate a valid file identifier.	0
+SLR-2024-Robert-002	https://www.tandfonline.com/doi/pdf/10.1080/0951192X.2024.2386980?needAccess=true	erro:The server returned the status 403 with message "Forbidden" in response to the r	0
+SLR-2024-Yuantian-2428	https://www.mdpi.com/2075-1702/12/9/595/pdf?version=1724753297	erro:The server returned the status 403 with message "Forbidden" in response to the r	0
+SLR-2023-Jaqueline-3731	https://lume.ufrgs.br/bitstream/10183/255587/1/001163946.pdf	ok	2150033
+SLR-2022-G-2167	https://eprints.whiterose.ac.uk/196549/1/ROSIE_2___ieeeconf__RO_MAN__-5.pdf	ok	2646068
+SLR-2021-Huang-2262	https://www.mdpi.com/1424-8220/21/19/6340/pdf?version=1632809060	erro:The server returned the status 403 with message "Forbidden" in response to the r	0
+SLR-2020-John-743	https://www.sciencedirect.com/science/article/pii/S0007850620301086/pdf	erro:The server returned the status 403 with message "Forbidden" in response to the r	0
+SLR-2018-Lionel-065	https://eprints.lib.hokudai.ac.jp/repo/huscap/all/69988/Lionel_Matias_Sobehart.pdf	ok	6943407
+SLR-2026-Pranjal-355	https://doi.org/10.1016/j.iswa.2026.200649	erro:Invalid file identifier. Use fopen to generate a valid file identifier.	0
+SLR-2026-Boris-3537	https://link.springer.com/content/pdf/10.1007/s00158-026-04310-0.pdf	ok	1048299
+SLR-2026-Yixiong-652	https://arxiv.org/pdf/2605.07687	ok	42369139
+SLR-2025-Feng-1317	https://dl.acm.org/doi/pdf/10.1145/3721251.3734066?download=true	erro:The server returned the status 403 with message "Forbidden" in response to the r	0
+SLR-2025-Xiaoran-4273	https://arxiv.org/pdf/2506.06580	ok	1532396
+SLR-2025-Zhe-649	https://arxiv.org/pdf/2511.00940	ok	6914149
+SLR-2024-Eiben-1443	https://doi.org/10.1145/3638530.3648427	erro:The server returned the status 403 with message "Forbidden" in response to the r	0
+SLR-2022-Gianmarco-3829	https://inria.hal.science/hal-03921606	erro:Invalid file identifier. Use fopen to generate a valid file identifier.	0
+SLR-2022-Xin-742	https://www.frontiersin.org/articles/10.3389/fbioe.2021.793782/pdf	ok	2609381
+SLR-2026-Pranjal-461	https://doi.org/10.20944/preprints202507.2177.v1	erro:The server returned the status 403 with message "Forbidden" in response to the r	0
+SLR-2025-Maya-938	https://doi.org/10.1016/j.ifacol.2025.10.220	erro:Invalid file identifier. Use fopen to generate a valid file identifier.	0
+SLR-2023-Haixia-862	https://www.researchsquare.com/article/rs-2941373/latest.pdf	erro:Secure connection to "https://assets-eu.researchsquare.com/files/rs-2941373/v1_c	0
+SLR-2025-Stefan-4287	https://research.tue.nl/en/publications/b038b8b6-5e70-4a89-87ae-b68f82d6a73e	erro:Invalid file identifier. Use fopen to generate a valid file identifier.	0
+FIM		33 ok	

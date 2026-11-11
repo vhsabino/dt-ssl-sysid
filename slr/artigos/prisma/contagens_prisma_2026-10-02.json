@@ -1,0 +1,128 @@
+{
+ "banco_total": 5565,
+ "outros_metodos": 2,
+ "banco_bases": 5563,
+ "log_por_base": {
+  "IEEE Xplore": 722,
+  "Scopus": 1034,
+  "ACM DL": 2171,
+  "SpringerLink": 2560,
+  "OpenAlex": 1232,
+  "Semantic Scholar": 729,
+  "arXiv": 187
+ },
+ "log_total": 8635,
+ "log_por_string": {
+  "S1": 1521,
+  "S2": 303,
+  "S3": 977,
+  "S4": 4123,
+  "S5": 1711
+ },
+ "registro_vazio": 1,
+ "banco_pos_ingestao": 5564,
+ "removidos_ingestao": 3071,
+ "ec5_titulo": 40,
+ "banco_ocorrencias_por_fonte": {
+  "ACM DL": 1434,
+  "IEEE Xplore": 683,
+  "OpenAlex/Claude Science": 1273,
+  "Scopus": 936,
+  "Manual": 1,
+  "SpringerLink": 2217,
+  "Snowballing": 1
+ },
+ "banco_por_string": {
+  "S1": 1399,
+  "S2": 164,
+  "S3": 597,
+  "S4": 2610,
+  "S5": 793,
+  "Snowball-B": 2
+ },
+ "triados_r1": 5523,
+ "excl_r1_por_ec": {
+  "sem": 1,
+  "EC1": 5068,
+  "EC2": 2,
+  "EC4": 4
+ },
+ "excl_r1": 5075,
+ "aprov_r1": 448,
+ "p1_total": 271,
+ "p1_pendentes": 141,
+ "p1_aprovados": 58,
+ "p1_excluidos_por_ec": {
+  "EC1": 71,
+  "EC4": 1
+ },
+ "p1_excluidos": 72,
+ "p1_excl_marcados_FT": 70,
+ "p1_excl_marcados_TA": 2,
+ "p1_pendentes_por_rq_grupo": {
+  "RQ1 C": 55,
+  "RQ1 D": 48,
+  "RQ1 E": 10,
+  "RQ4 A": 8,
+  "RQ4 B": 4,
+  "RQ4 C": 4,
+  "RQ4 D": 6,
+  "RQ4 E": 6
+ },
+ "tc_direto": 177,
+ "buscados": 235,
+ "nao_recuperados_ec6": 2,
+ "rq3_pendentes_com_pdf": 4,
+ "rq3_grupo_F_sem_pdf": 18,
+ "p1_aprov_com_pdf": 11,
+ "p1_aprov_sem_pdf": 47,
+ "aguardando_pdf": 65,
+ "recuperados": 168,
+ "pendentes_decisao_com_pdf": 15,
+ "avaliados": 153,
+ "excl_tc_por_ec": {
+  "EC1": 54,
+  "EC2": 4,
+  "EC3": 5,
+  "EC4": 1,
+  "EC5": 2
+ },
+ "excl_tc": 66,
+ "excl_tc_registro_com_etapa_errada": 1,
+ "incluidos_tc": 89,
+ "incluidos_bases": 87,
+ "incluidos_tc_por_tipo": {
+  "(vazio)": 79,
+  "Journal": 1,
+  "Preprint": 1,
+  "Survey": 8
+ },
+ "incluidos_p1_survey": 3,
+ "incluidos_tc_ocorrencias_rq": {
+  "RQ1": 6,
+  "RQ2": 23,
+  "RQ3": 67
+ },
+ "estudos_primarios_tc": 81,
+ "extracao": {
+  "Data Extracted": 0,
+  "Quality Score preenchido": 0,
+  "Cite": 0
+ },
+ "p1_x_pretriagem": {
+  "CANDIDATO -> aprovado": 50,
+  "CANDIDATO -> excluido": 30,
+  "EC1_CLARO -> aprovado": 7,
+  "EC1_CLARO -> excluido": 41,
+  "EC2 -> aprovado": 1,
+  "EC4 -> excluido": 1
+ },
+ "p1_por_grupo": {
+  "grupo A -> aprovado": 8,
+  "grupo A -> excluido": 42,
+  "grupo B -> aprovado": 47,
+  "grupo B -> excluido": 28,
+  "grupo C -> aprovado": 3,
+  "grupo C -> excluido": 2
+ }
+}

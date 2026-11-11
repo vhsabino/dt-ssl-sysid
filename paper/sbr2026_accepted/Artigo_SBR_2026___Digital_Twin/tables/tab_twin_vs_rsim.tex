@@ -1,0 +1,36 @@
+%==============================================================================
+% TABLE: twin (FOPDT) vs rSim (ODE) — translation-dominated windows, Mode A.
+% Source: results/eval_twin_vs_rsim_modeA_20260617_0030.md (trans-dominado table).
+% e_pos medians (m), gap = rSim - twin, paired non-overlapping Wilcoxon p,
+% rank-biserial effect size. N_indep = 49.
+%
+% 2026-08-07: the "rSim + matched Td" ablation row was REMOVED rather than
+% shipped as a visible \TODO. The ablation is blocked upstream (the rSim
+% trajectories of run 20260617_0030 were never persisted and robosim is
+% unavailable), and a red TODO in a submitted PDF costs more than the missing
+% row. The gap it was meant to bound is stated as a threat to validity in
+% Sec.~\ref{sec:limitations} and registered in docs/TASKS_CLAUDE_CODE.md (R2).
+% Column widths tightened (tabcolsep) after the 2026-08-07 build overflowed the
+% column and clipped the p and effect columns.
+%==============================================================================
+\begin{table}[t]
+  \caption{Twin (FOPDT) vs.\ rSim (ODE) on translation-dominated hold-out windows,
+  Mode A (warm-up $+$ rigid $\SEtwo$ re-anchor). $\epos$ medians in meters;
+  $\mathrm{gap}=\epos^{\mathrm{rSim}}-\epos^{\mathrm{twin}}$; paired
+  non-overlapping Wilcoxon $p$; rank-biserial effect. $N_{\mathrm{indep}}=49$.}
+  \label{tab:twinvsrsim}
+  \centering
+  \setlength{\tabcolsep}{4pt}
+  \begin{tabular}{cccccc}
+    \toprule
+    $h$ (s) & twin $\epos$ & rSim $\epos$ & gap (m) & $p$ & effect \\
+    \midrule
+    0.10 & 0.0077 & 0.0572 & $+0.0495$ & $1.6e{-}13$ & $+0.979$ \\
+    0.20 & 0.0177 & 0.0935 & $+0.0758$ & $1.2e{-}13$ & $+0.980$ \\
+    0.40 & 0.0382 & 0.1312 & $+0.0930$ & $4.4e{-}11$ & $+0.922$ \\
+    0.70 & 0.0644 & 0.1731 & $+0.1087$ & $8.2e{-}9$  & $+0.838$ \\
+    1.00 & 0.0919 & 0.2144 & $+0.1225$ & $1.3e{-}9$  & $+0.871$ \\
+    1.50 & 0.1229 & 0.2927 & $+0.1699$ & $1.0e{-}6$  & $+0.731$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}

@@ -57,44 +57,39 @@
 \draw[ar] (cmd) -- (plant.west);
 \draw[ar] (plant.east) -- (att);
 
-\node[lbl, anchor=north, text width=5.9cm, align=center] at (2.55,-1.72)
-  {\textbf{this paper} --- the layer that decides whether\\
-   the other two reproduce the robot at all};
-
+\node[lbl, anchor=north, text width=5.9cm, align=center] at (2.55,-1.72) {};
 % ======================= PANEL (b): PIPELINE ===============================
 % Layout deliberadamente reto: uma unica linha, e os dois ramos auxiliares
 % entram por BAIXO, na vertical. Nenhuma aresta cruza caixa (a versao anterior
 % roteava o ramo tracejado por dentro de "Per-DOF window labeling").
-\node[blk, text width=1.75cm] (p1) at ( 7.40,0.30) {League protocol\\ stream};
-\node[blk, text width=1.75cm] (p2) at ( 9.75,0.30) {Event\\ extraction};
-\node[blk, text width=1.75cm] (p3) at (12.10,0.30) {Per-DOF window\\ labeling};
-\node[blk, text width=1.75cm] (p4) at (14.50,0.30) {Grey-box FOPDT\\ fit per channel};
-\node[blk, text width=1.85cm] (p5) at (16.95,0.30) {Free-run replay\\ vs.\ ground truth};
+\node[blk, text width=1.75cm] (p1) at ( 8.40,0.30) {Vision protocol\\ and event extraction};
 
-\draw[ar] (p1) -- (p2);
-\draw[ar] (p2) -- (p3);
+%\node[blk, text width=1.75cm] (p2) at ( 9.75,0.30) {Event\\ extraction};
+\node[blk, text width=1.75cm] (p3) at (11.10,0.30) {Per-DOF window};
+\node[blk, text width=1.75cm] (p4) at (13.50,0.30) {Grey-box FOPDT fit};
+\node[blk, text width=1.85cm] (p5) at (15.95,0.30) {Free-run replay\\ vs.\ ground truth};
+
+\draw[ar] (p1) -- (p3);
 \draw[ar] (p3) -- (p4);
 \draw[ar] (p4) -- (p5) node[lbl, midway, above=0pt] {$\theta$};
 
 % dedicated open-loop branch -- the finding, drawn as the one asymmetry
-\node[blk, dashed, thick, fill=black!4, text width=1.95cm] (rot) at (14.50,-1.55)
-  {dedicated \textbf{open-loop}\\ yaw excitation};
+\node[blk, dashed, thick, fill=black!4, text width=1.95cm] (rot) at (13.50,-1.55)
+  {dedicated \\ \textbf{yaw excitation}};
 \draw[arD] (rot) -- (p4) node[lbl, midway, right=1pt] {$\omega$ only};
 
 % baselines on the same gate
-\node[blk, text width=1.85cm] (base) at (16.95,-1.55)
-  {Ideal kinematics\\ rSim (ODE)};
+\node[blk, text width=1.85cm] (base) at (15.95,-1.55)
+  {rSim (ODE)};
 \draw[ar] (base) -- (p5) node[lbl, midway, right=1pt] {same gate};
 
 % ======================= panel captions ====================================
-\node[font=\footnotesize\bfseries] at ( 2.55,-3.00) {(a) Scope};
-\node[font=\footnotesize\bfseries] at (12.20,-3.00) {(b) Identification and evaluation pipeline};
+\node[font=\footnotesize\bfseries] at ( 2.55,-3.00) {(a) Scope of the paper};
+\node[font=\footnotesize\bfseries] at (12.60,-3.00) {(b) Identification and evaluation pipeline};
 
 \end{tikzpicture}
-\caption{(a) The paper delivers the plant layer of a larger digital twin: the
-map from commanded to attained body motion. (b) Solid path: closed-loop
+\caption{(a) The paper delivers the plant layer of a larger digital twin: the map from commanded to attained body motion. (b) Solid path: closed-loop
 competition logs. Dashed branch: the dedicated open-loop collection, which
-feeds the $\omega$ channel alone. Every comparison plant is scored on the same
-windows, horizons and gates as the model.}
+feeds the $\omega$ channel alone. Every comparison plant is scored on the same windows, horizons and gates as the model.}
 \label{fig:arch2}
 \end{figure*}

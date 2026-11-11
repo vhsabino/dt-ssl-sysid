@@ -78,11 +78,16 @@
 \node[lbl, anchor=east] at (16.15,-3.85) {same windows, horizons and gate};
 
 \end{tikzpicture}
-% CORTE 2026-08-10: legenda reduzida de 11 para 3 linhas por pedido do autor.
-% O conteudo explicativo (por que o ramo tracejado existe, e que os
-% comparadores correm no mesmo gate) passou para o texto de III.
-\caption{Identification and evaluation pipeline. Solid path: closed-loop
-competition logs. Dashed branch: the dedicated open-loop collection, which
-feeds the $\omega$ channel alone.}
+\caption{Identification and evaluation pipeline of the behavioral twin.
+The solid path is driven entirely by closed-loop competition logs, which the
+league already records. The dashed branch is the dedicated \emph{open-loop}
+rotation-only collection; it feeds the $\omega$ channel alone, because
+$94.3\%$ of commanded yaw-rate samples in the competition logs fall below the
+robot's per-wheel actuation threshold (Sec.~\ref{sec:results:omega}). That
+asymmetry is a finding, not an implementation detail: which data a channel
+requires is set by the excitation the data contain. All three comparison
+plants are scored on the same windows, horizons and statistical gate as the
+twin, including the matched-delay ablation
+(Sec.~\ref{sec:results:rsim}).}
 \label{fig:arch}
 \end{figure*}

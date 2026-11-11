@@ -1,0 +1,27 @@
+%==============================================================================
+% INTRODUCTION — corte 9->6 paginas (2026-08-10, pedido do autor).
+%  - 4o paragrafo ("This paper models...") REMOVIDO: repetia o abstract e as
+%    contribuicoes. O essencial (o que e medido, contra o que) migrou para uma
+%    frase de fecho do 3o paragrafo.
+%  - Contribuicoes: maximo 2 frases cada.
+% Todas as citacoes preservadas. Nenhuma referencia removida.
+%==============================================================================
+\section{Introduction}
+\label{sec:intro}
+
+The RoboCup Small Size League (SSL) fields teams of fast, omnidirectional, four-wheeled robots whose coordination software is written, tuned, and regression-tested almost entirely on simulators. The league's reference simulation tools implement a simplified omnidirectional wheel model on top of a rigid-body ODE engine \cite{monajjemi2012grsim}; reinforcement-learning frameworks inherit that engine \cite{martins2021rsoccer}; and recent motion-planning policies for the SSL are trained in these environments \cite{machado2025planning}. Because the simulated dynamic response departs from that of the physical robot, behavior that passes validation in simulation often degrades once deployed. This discrepancy is what the literature calls the reality gap.
+
+Recent efforts to narrow it converge on \emph{digital twins}: simulation models bound to one specific physical asset and kept faithful to it by data measured from that asset, rather than generic models of a class of robots. Twins of mobile platforms have been built for commercial AGVs \cite{barioni2024development}, and for the navigation and control of omnidirectional robots \cite{yang2025digital}, and grey-box identification has been evaluated as the module that produces the model within such a twin \cite{brennan2025greybox}. Building one is not free: it normally presumes either a detailed physical description of the mechanism, whose mechanical parameters teams rarely have, or
+a dedicated excitation campaign, which demands the robot, the field, and time outside of competition.
+
+Competition logs are an attractive alternative because teams already record them: body-frame velocity commands and vision poses at roughly \SI{60}{Hz} during closed-loop play. Existing work, however, reflects the difficulty of using them by avoiding it. Simulation models of omnidirectional platforms are
+tuned on dedicated real trajectories \cite{wiedemann2024simulation,wiedemann2025automated}, identification pipelines design excitation sequences per parameter group \cite{giro2023otbot}, real-time
+estimation for twins assumes informative operating data \cite{kosmaga2026digital}, and offline sim-to-real calibration presumes the pre-collected data excite the parameters of interest \cite{tiboni2023dropo}. Whether a behavioral model can be identified from closed-loop \emph{operational} logs, and which degrees of freedom (DOF) such logs support, remains underexplored. This paper answers that question for an SSL robot modeled as three decoupled first-order-plus-dead-time (FOPDT) channels, one per DOF, evaluated in free run against a zero-parameter baseline under an identical harness.
+
+\noindent\textbf{Contributions.}
+\textbf{(C1)} A per-DOF grey-box FOPDT identification methodology for an omnidirectional robot from \emph{closed-loop} competition logs, validated on held-out events, for the degrees of freedom those logs excite. 
+\textbf{(C2)} A fidelity protocol that scores the model the way it is used: driven only by the recorded commands from a known pose, with no correction from measured data inside the window. Verdicts are issued per motion regime and only when a paired test, an effect size, and a bootstrap interval agree.
+% source: src/dtssl/sim/rollout.py ; src/dtssl/eval/metrics.py ; config/metrics.json
+\textbf{(C3)} A translational fidelity result with the improvement attributed to its source: the model lowers the median position error of the baseline in all ten hold-out events, and an order-independent ablation splits the effect between the time constant and the dead time, conditional on the measured initial state.
+\textbf{(C4)} A pre-fit screening procedure that predicts, from an operational log alone, which degrees of freedom that log can identify. It combines two quantities computable before any model is estimated: the share of the actuation each command carries and the variance of the attained velocity it explains. On this robot it separates the identifiable channels from the unidentifiable one before a single parameter is fitted.
+% source: results/omega_excitation_analysis_20260807_133917.json

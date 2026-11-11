@@ -1,0 +1,86 @@
+%==============================================================================
+% Journal extension of the SBR/LARS 2026 paper (#34344).
+% Target: Digital Engineering (Elsevier), Special Issue VSI:DTE_DigiTwin2026.
+% Class: elsarticle, numeric references (elsarticle-num).
+%
+% Skeleton of 23/09/2026 (lote 1 do chat do artigo). Mapa secao -> artefato ->
+% numero -> figura em docs/journal/MAPEAMENTO_ARTIGO.md. Tabelas em tables/ e
+% figuras em figures/ sao geradas pelos modulos do dtssl a partir dos artefatos
+% de results/ (nao editar a mao):
+%   dtssl analysis run journal_tables
+%   dtssl fig fig_journal_identifiability | fig_journal_league_sims | fig_journal_closed_loop
+% Regras: nenhum numero fora de results/CHANGELOG.md ou de um artefato citado;
+% nenhuma referencia fora de refs/references.bib (copia de latex/refs) ou da
+% lista de incluidos da SLR; nenhum paragrafo copiado do artigo do SBR; sem
+% travessao. \pending{} e REPLACE-ME tem de sumir antes da submissao.
+%
+% Build: latexmk -pdf main.tex   (ou pdflatex, bibtex, pdflatex, pdflatex)
+%==============================================================================
+\documentclass[preprint,12pt]{elsarticle}
+% Submission: \documentclass[review,12pt]{elsarticle} (double spacing) + line numbers.
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{adjustbox}
+\usepackage{siunitx}
+\usepackage{xcolor}
+\usepackage[hidelinks]{hyperref}
+\usepackage{lineno}
+\graphicspath{{figures/}}
+
+% --- notation (same symbols as the SBR paper) --------------------------------
+\newcommand{\epos}{e_{\mathrm{pos}}}
+\newcommand{\eang}{e_{\mathrm{ang}}}
+\newcommand{\SEtwo}{\mathrm{SE}(2)}
+\newcommand{\Td}{T_{d}}
+\newcommand{\hRef}{h_{\mathrm{ref}}}
+
+% --- drafting marker: must be absent at submission ------------------------------
+\newcommand{\pending}[1]{\textcolor{gray}{\emph{[Pending: #1]}}}
+
+\journal{Digital Engineering}
+
+\begin{document}
+
+\begin{frontmatter}
+
+% Working title (plan, option 1). Option 2: "What operational logs can identify:
+% excitation regime, cross-coupling and fair baselines in a behavioral digital twin
+% of an omnidirectional robot". Decide with the advisor.
+\title{Identifiability-aware behavioral digital twins from operational data: a validated grey-box plant for an omnidirectional robot with physics-based and league-simulator baselines}
+
+% Authors and affiliations: REPLACE-ME (decide authorship with the advisor).
+\author[cin]{REPLACE-ME}
+\affiliation[cin]{organization={Centro de Informática, Universidade Federal de Pernambuco},
+            city={Recife},
+            country={Brazil}}
+
+\begin{abstract}
+\pending{abstract, 200 to 250 words, written last (WP4).}
+\end{abstract}
+
+\begin{keyword}
+digital twin \sep system identification \sep identifiability \sep grey-box modeling \sep validation \sep omnidirectional robot
+\end{keyword}
+
+\end{frontmatter}
+
+\linenumbers
+
+\input{sections/01_introduction}
+\input{sections/02_related_work}
+\input{sections/03_robot_data}
+\input{sections/04_models}
+\input{sections/05_protocol}
+\input{sections/06_results_identifiability}
+\input{sections/07_results_coupling}
+\input{sections/08_results_fidelity}
+\input{sections/09_results_closed_loop}
+\input{sections/10_discussion}
+\input{sections/11_limitations}
+\input{sections/12_conclusion}
+
+\bibliographystyle{elsarticle-num}
+\bibliography{refs/references,refs/own}
+
+\end{document}

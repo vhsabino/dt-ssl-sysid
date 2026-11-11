@@ -1,0 +1,130 @@
+%==============================================================================
+% SBR/LARS 2026 (Robotica 2026, Joao Pessoa) — Conference paper (6 pages, IEEE)
+% DOUBLE-BLIND submission. Template: IEEEtran (conference).
+%
+% STATUS: SKELETON + SAFE SECTIONS. Method and Results are written from validated
+% repository artifacts; Introduction / Related Work / Discussion / Limitations /
+% Abstract are structured STUBS with explicit TODOs (see each file).
+%
+% BASELINE NAMING: the comparison baseline is rSim (the ODE physics engine of the
+% rSoccer environment) — NOT grSim. Use "rSim" everywhere. The first mention in
+% the text spells out what it is.
+%
+% Build: pdflatex main && bibtex main && pdflatex main && pdflatex main
+% (References render once refs/references.bib is populated by the focused review.)
+%==============================================================================
+\documentclass[conference,a4paper]{IEEEtran}
+\IEEEoverridecommandlockouts
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{siunitx}
+\usepackage{url}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,backgrounds,calc}
+\usepackage{stfloats}   % permite figure*/table* no rodapé; evita floats empurrados
+                        % para depois das referências (falha observada em 2026-08-07)
+\graphicspath{{figures/}}
+
+% --- Float placement -----------------------------------------------------
+% O build de 2026-08-07 empurrou Fig.2 e Fig.3 para DUAS páginas órfãs depois
+% das referências (8 floats: 3 figuras + 5 tabelas). Os defaults do LaTeX
+% (topnumber=2, totalnumber=3, textfraction=0.2) são restritivos demais aqui.
+\setcounter{topnumber}{3}
+\setcounter{bottomnumber}{2}
+\setcounter{totalnumber}{4}
+\renewcommand{\topfraction}{0.92}
+\renewcommand{\bottomfraction}{0.85}
+\renewcommand{\textfraction}{0.07}
+\renewcommand{\floatpagefraction}{0.70}
+
+% --- Pending-number marker (REGRA DE OURO) ---------------------------------
+% Every number that enters the paper must come from a repository artifact.
+% Where a number is required but does not yet exist, \TODO{origin} marks it and
+% the exact command that produces it is registered in docs/TASKS_CLAUDE_CODE.md.
+% MUST be empty (zero occurrences) before submission.
+\newcommand{\TODO}[1]{\textcolor{red}{\textbf{[TODO: #1]}}}
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+% --- Notation shortcuts -------------------------------------------------------
+\newcommand{\epos}{e_{\mathrm{pos}}}
+\newcommand{\eang}{e_{\mathrm{ang}}}
+\newcommand{\SEtwo}{\mathrm{SE}(2)}
+\newcommand{\Td}{T_{d}}
+
+\begin{document}
+
+%------------------------------------------------------------------------------
+% DOUBLE-BLIND TITLE/AUTHOR BLOCK (anonymization checklist A1,A2,A9,A10).
+% No names, no affiliation, no funding, no ORCID until camera-ready.
+%------------------------------------------------------------------------------
+% --- Title decision (2026-07-31, redação): the previous title ("... from
+% Closed-Loop Competition Logs ...") stated the inverse of the central finding
+% (yaw is identified from a DEDICATED OPEN-LOOP collection precisely because
+% closed-loop logs fail). Three regime-aware alternatives were considered;
+% the first is applied below. The other two, kept for the record:
+% Alt 2: When Competition Logs Are Not Enough: Excitation-Dependent
+%        Identifiability in a Per-DOF Digital Twin of an Omnidirectional
+%        Soccer Robot
+% Alt 3: Per-DOF Grey-Box Digital Twinning of an Omnidirectional Soccer
+%        Robot: Multi-Horizon Fidelity and Identifiability Across Excitation
+%        Regimes
+% --- Title revision (2026-08-07, revisão maior) -------------------------------
+% Hybrid form approved by the author: keeps the reality-gap framing requested in
+% the revision brief (T1) AND the central finding that the 2026-07-31 decision
+% was built on. The literal T1 title ("A Behavioral Model for Reality-Gap
+% Mitigation in Digital Twins of Omnidirectional Soccer Robots") was NOT applied
+% verbatim: it drops the identifiability result and promises a gap-mitigation
+% claim that is validated only on translation-dominated windows against an
+% untuned rSim (reviewer B5). Deviation registered in docs/REGISTRO_DESVIOS.md.
+% 2026-08-10: título trocado por decisão do autor após a revisão independente.
+% O anterior ("A Behavioral Model for Reality-Gap Mitigation in Digital Twins of
+% Omnidirectional Soccer Robots") prometia MITIGAÇÃO do reality gap, que é uma
+% alegação sobre transferência: nenhuma política é treinada nem transferida aqui
+% (bloqueador B5). O novo título nomeia o que o artigo de fato mede.
+% AÇÃO DO AUTOR: atualizar o registro preliminar no JEMS.
+% 2026-08-10 (3a volta, decisao do autor): removido "for Reality-Gap Mitigation",
+% que prometia transferencia (treinar e transferir politica) -- algo que o artigo
+% NAO mede, apontado por tres revisoes independentes. O reality gap permanece
+% como MOTIVACAO na Introducao, onde e legitimo. O subtitulo nomeia a
+% contribuicao de fato entregue. AÇÃO: atualizar o registro no JEMS.
+\title{A Behavioral Model for Reality-Gap Mitigation in Digital Twins of Omnidirectional Soccer Robots
+%Diagnosing Identifiability from Competition Logs
+}
+
+\author{\IEEEauthorblockN{Anonymous Author(s)}
+\IEEEauthorblockA{\textit{Affiliation withheld for double-blind review}}}
+
+\maketitle
+
+\input{sections/00_abstract}
+
+\begin{IEEEkeywords}
+digital twin, system identification, robot modeling, omnidirectional robot, robot soccer
+% FIX 2026-08-10: "sim-to-real" removido das keywords -- nenhuma transferencia
+% e feita no artigo (opcional (i) da revisao V2). Trocado por "excitation design".
+\end{IEEEkeywords}
+
+\input{sections/01_introduction}
+\input{sections/02_related_work}
+\input{sections/03_method}
+\input{sections/04_results}
+% 2026-08-10: 06_limitations.tex saiu do build -- as Limitacoes viraram uma
+% subsecao da Discussao (pedido do autor, corte 9->6 pag.). Arquivo mantido em
+% sections/ para a extensao JINT.
+\input{sections/05_discussion}
+\input{sections/07_conclusion}
+
+%------------------------------------------------------------------------------
+% References. IEEEtran BibTeX style + external .bib (refs/references.bib).
+% NOTE: the bibliography is EMPTY until the focused related-work review yields
+% real entries. Do NOT add references from memory (project guardrail).
+%------------------------------------------------------------------------------
+\bibliographystyle{IEEEtran}
+\bibliography{refs/references}
+
+\end{document}

@@ -1,0 +1,866 @@
+{
+  "models": {
+    "erforce": {
+      "rows": [
+        {
+          "h": 6,
+          "h_s": 0.1,
+          "epos_twin_trans": 0.007917288293312017,
+          "epos_model_trans": 0.018461192007373332,
+          "epos_twin_all": 0.007863776521337405,
+          "epos_model_all": 0.018531224956302928,
+          "eang_twin_trans": 0.012766017113583692,
+          "eang_model_trans": 0.024718706342194054,
+          "p_wilcoxon": 0.0009765625,
+          "rank_biserial": 1.0,
+          "wins": 10,
+          "n_events": 10
+        },
+        {
+          "h": 12,
+          "h_s": 0.2,
+          "epos_twin_trans": 0.01779496567328239,
+          "epos_model_trans": 0.03841019573146094,
+          "epos_twin_all": 0.017830268991895593,
+          "epos_model_all": 0.03851608564908064,
+          "eang_twin_trans": 0.031106256625596112,
+          "eang_model_trans": 0.046528446533576184,
+          "p_wilcoxon": 0.0009765625,
+          "rank_biserial": 1.0,
+          "wins": 10,
+          "n_events": 10
+        },
+        {
+          "h": 24,
+          "h_s": 0.4,
+          "epos_twin_trans": 0.0388378965569626,
+          "epos_model_trans": 0.08560323520510835,
+          "epos_twin_all": 0.038794867992855406,
+          "epos_model_all": 0.0861772839966108,
+          "eang_twin_trans": 0.04399195962896664,
+          "eang_model_trans": 0.0644609599172982,
+          "p_wilcoxon": 0.0009765625,
+          "rank_biserial": 1.0,
+          "wins": 10,
+          "n_events": 10
+        },
+        {
+          "h": 42,
+          "h_s": 0.7,
+          "epos_twin_trans": 0.06173039646697673,
+          "epos_model_trans": 0.13477497600513744,
+          "epos_twin_all": 0.06095622883864312,
+          "epos_model_all": 0.13476093681012458,
+          "eang_twin_trans": 0.06273238853343031,
+          "eang_model_trans": 0.07720313384791469,
+          "p_wilcoxon": 0.0009765625,
+          "rank_biserial": 1.0,
+          "wins": 10,
+          "n_events": 10
+        },
+        {
+          "h": 60,
+          "h_s": 1.0,
+          "epos_twin_trans": 0.09196620255100446,
+          "epos_model_trans": 0.18565598883466483,
+          "epos_twin_all": 0.09184475287370122,
+          "epos_model_all": 0.1854497248601614,
+          "eang_twin_trans": 0.07332839288622366,
+          "eang_model_trans": 0.09335666184387072,
+          "p_wilcoxon": 0.0009765625,
+          "rank_biserial": 1.0,
+          "wins": 10,
+          "n_events": 10
+        },
+        {
+          "h": 90,
+          "h_s": 1.5,
+          "epos_twin_trans": 0.11928369797237338,
+          "epos_model_trans": 0.25569509473523155,
+          "epos_twin_all": 0.11922637878307533,
+          "epos_model_all": 0.25460657161828143,
+          "eang_twin_trans": 0.08954989448400069,
+          "eang_model_trans": 0.08764619661914586,
+          "p_wilcoxon": 0.0009765625,
+          "rank_biserial": 1.0,
+          "wins": 10,
+          "n_events": 10
+        }
+      ],
+      "per_event": [
+        [
+          0,
+          0.017236096177965624,
+          0.05544227060813245
+        ],
+        [
+          1,
+          0.058098940908348246,
+          0.13739778832657282
+        ],
+        [
+          2,
+          0.044860365620600605,
+          0.09888740807461997
+        ],
+        [
+          3,
+          0.022351551379293524,
+          0.053705625697615764
+        ],
+        [
+          4,
+          0.021260926058479266,
+          0.0546017412725312
+        ],
+        [
+          5,
+          0.05517959253686725,
+          0.11400274820107069
+        ],
+        [
+          6,
+          0.03934351743214175,
+          0.07676012479574588
+        ],
+        [
+          7,
+          0.04360428968466158,
+          0.10576206399204874
+        ],
+        [
+          8,
+          0.054003197293052044,
+          0.14233454464089915
+        ],
+        [
+          9,
+          0.040649982156637746,
+          0.10706440421136526
+        ]
+      ],
+      "gap_vs_twin_med": 0.04757363206414068,
+      "gap_vs_twin_max": 0.4430816063441372,
+      "n_windows": 265,
+      "n_trans": 264,
+      "n_failed": 0,
+      "diagnostics": {
+        "windows": 265,
+        "anchor_failures": 0,
+        "anchor_late": 1,
+        "short_windows": 0,
+        "tau0_estimated": 248,
+        "send_jitter_max": 0.0013867259999642556,
+        "send_jitter_mean": 3.1738306937439036e-06,
+        "send_late": 0,
+        "vision_period_wall": 0.015184931000021606,
+        "vision_rate_sim": 66.42069312803544,
+        "capture_scale": 0.9999999999999999,
+        "wall_per_sim": 1.0,
+        "teleport_latency_wall": 0.04251875599993582,
+        "teleport_latency_spread": 0.0018653110000741435,
+        "vision_gaps": 0,
+        "decode_errors": 0,
+        "controls_sent": 28090,
+        "teleports": 268,
+        "preroll_windows": 0,
+        "preroll_short": 0,
+        "reanchor_failures": 0,
+        "tau0_median": 0.0013380541557887285,
+        "frames_used_median": 115.0,
+        "send_phase_median": 0.5000635169039933,
+        "preroll_samples_median": 0.0
+      },
+      "pre_roll_s": 0.0,
+      "endpoint": {
+        "name": "erforce",
+        "host": "127.0.0.1",
+        "vision": "224.5.23.2:10020",
+        "control_port": 10301,
+        "team": "blue",
+        "robot_id": 0,
+        "teleport_omega": false
+      }
+    },
+    "erforce+preroll": {
+      "rows": [
+        {
+          "h": 6,
+          "h_s": 0.1,
+          "epos_twin_trans": 0.007917288293312017,
+          "epos_model_trans": 0.026740279907537683,
+          "epos_twin_all": 0.007863776521337405,
+          "epos_model_all": 0.026830561546425165,
+          "eang_twin_trans": 0.012766017113583692,
+          "eang_model_trans": 0.024554732443998833,
+          "p_wilcoxon": 0.0009765625,
+          "rank_biserial": 1.0,
+          "wins": 10,
+          "n_events": 10
+        },
+        {
+          "h": 12,
+          "h_s": 0.2,
+          "epos_twin_trans": 0.01779496567328239,
+          "epos_model_trans": 0.047292788856146926,
+          "epos_twin_all": 0.017830268991895593,
+          "epos_model_all": 0.047648121422949365,
+          "eang_twin_trans": 0.031106256625596112,
+          "eang_model_trans": 0.046847709067634635,
+          "p_wilcoxon": 0.0009765625,
+          "rank_biserial": 1.0,
+          "wins": 10,
+          "n_events": 10
+        },
+        {
+          "h": 24,
+          "h_s": 0.4,
+          "epos_twin_trans": 0.0388378965569626,
+          "epos_model_trans": 0.09335835084690977,
+          "epos_twin_all": 0.038794867992855406,
+          "epos_model_all": 0.09340062112444981,
+          "eang_twin_trans": 0.04399195962896664,
+          "eang_model_trans": 0.06454226046024635,
+          "p_wilcoxon": 0.0009765625,
+          "rank_biserial": 1.0,
+          "wins": 10,
+          "n_events": 10
+        },
+        {
+          "h": 42,
+          "h_s": 0.7,
+          "epos_twin_trans": 0.06173039646697673,
+          "epos_model_trans": 0.1403326153706157,
+          "epos_twin_all": 0.06095622883864312,
+          "epos_model_all": 0.13944034545156878,
+          "eang_twin_trans": 0.06273238853343031,
+          "eang_model_trans": 0.07743546261717119,
+          "p_wilcoxon": 0.0009765625,
+          "rank_biserial": 1.0,
+          "wins": 10,
+          "n_events": 10
+        },
+        {
+          "h": 60,
+          "h_s": 1.0,
+          "epos_twin_trans": 0.09196620255100446,
+          "epos_model_trans": 0.19024598993319208,
+          "epos_twin_all": 0.09184475287370122,
+          "epos_model_all": 0.18927074866384627,
+          "eang_twin_trans": 0.07332839288622366,
+          "eang_model_trans": 0.09092357919803952,
+          "p_wilcoxon": 0.0009765625,
+          "rank_biserial": 1.0,
+          "wins": 10,
+          "n_events": 10
+        },
+        {
+          "h": 90,
+          "h_s": 1.5,
+          "epos_twin_trans": 0.11928369797237338,
+          "epos_model_trans": 0.25889996633744106,
+          "epos_twin_all": 0.11922637878307533,
+          "epos_model_all": 0.2587147501716463,
+          "eang_twin_trans": 0.08954989448400069,
+          "eang_model_trans": 0.08851518041145483,
+          "p_wilcoxon": 0.0009765625,
+          "rank_biserial": 1.0,
+          "wins": 10,
+          "n_events": 10
+        }
+      ],
+      "per_event": [
+        [
+          0,
+          0.017236096177965624,
+          0.055055999375363186
+        ],
+        [
+          1,
+          0.058098940908348246,
+          0.15507627933646678
+        ],
+        [
+          2,
+          0.044860365620600605,
+          0.11130647502815832
+        ],
+        [
+          3,
+          0.022351551379293524,
+          0.054725971656024504
+        ],
+        [
+          4,
+          0.021260926058479266,
+          0.05580341764822172
+        ],
+        [
+          5,
+          0.05517959253686725,
+          0.12831660171532044
+        ],
+        [
+          6,
+          0.03934351743214175,
+          0.05997921227519607
+        ],
+        [
+          7,
+          0.04360428968466158,
+          0.11144664257971135
+        ],
+        [
+          8,
+          0.054003197293052044,
+          0.17368485943441817
+        ],
+        [
+          9,
+          0.040649982156637746,
+          0.11329211878393397
+        ]
+      ],
+      "gap_vs_twin_med": 0.05150687337068756,
+      "gap_vs_twin_max": 0.4139496147963473,
+      "n_windows": 265,
+      "n_trans": 264,
+      "n_failed": 0,
+      "diagnostics": {
+        "windows": 265,
+        "anchor_failures": 0,
+        "anchor_late": 0,
+        "short_windows": 0,
+        "tau0_estimated": 236,
+        "send_jitter_max": 0.0013679196665634663,
+        "send_jitter_mean": 3.159810567857442e-06,
+        "send_late": 0,
+        "vision_period_wall": 0.014922726999884617,
+        "vision_rate_sim": 67.05120532968192,
+        "capture_scale": 0.9999999999999999,
+        "wall_per_sim": 1.0,
+        "teleport_latency_wall": 0.042946643000050244,
+        "teleport_latency_spread": 0.002227580000180751,
+        "vision_gaps": 0,
+        "decode_errors": 0,
+        "controls_sent": 35730,
+        "teleports": 268,
+        "preroll_windows": 265,
+        "preroll_short": 20,
+        "reanchor_failures": 0,
+        "tau0_median": 0.0011376263696084457,
+        "frames_used_median": 148.0,
+        "send_phase_median": 0.5000517667093094,
+        "preroll_samples_median": 30.0
+      },
+      "pre_roll_s": 0.5,
+      "endpoint": {
+        "name": "erforce",
+        "host": "127.0.0.1",
+        "vision": "224.5.23.2:10020",
+        "control_port": 10301,
+        "team": "blue",
+        "robot_id": 0,
+        "teleport_omega": false
+      }
+    },
+    "grsim": {
+      "rows": [
+        {
+          "h": 6,
+          "h_s": 0.1,
+          "epos_twin_trans": 0.007917288293312017,
+          "epos_model_trans": 0.10400751849178545,
+          "epos_twin_all": 0.007863776521337405,
+          "epos_model_all": 0.10424968439417774,
+          "eang_twin_trans": 0.012766017113583692,
+          "eang_model_trans": 0.029347650524343044,
+          "p_wilcoxon": 0.0009765625,
+          "rank_biserial": 1.0,
+          "wins": 10,
+          "n_events": 10
+        },
+        {
+          "h": 12,
+          "h_s": 0.2,
+          "epos_twin_trans": 0.01779496567328239,
+          "epos_model_trans": 0.17790414720665626,
+          "epos_twin_all": 0.017830268991895593,
+          "epos_model_all": 0.1780341491810365,
+          "eang_twin_trans": 0.031106256625596112,
+          "eang_model_trans": 0.04566658360388107,
+          "p_wilcoxon": 0.0009765625,
+          "rank_biserial": 1.0,
+          "wins": 10,
+          "n_events": 10
+        },
+        {
+          "h": 24,
+          "h_s": 0.4,
+          "epos_twin_trans": 0.0388378965569626,
+          "epos_model_trans": 0.2420583751757621,
+          "epos_twin_all": 0.038794867992855406,
+          "epos_model_all": 0.24158423136716106,
+          "eang_twin_trans": 0.04399195962896664,
+          "eang_model_trans": 0.07303870748441789,
+          "p_wilcoxon": 0.0009765625,
+          "rank_biserial": 1.0,
+          "wins": 10,
+          "n_events": 10
+        },
+        {
+          "h": 42,
+          "h_s": 0.7,
+          "epos_twin_trans": 0.06173039646697673,
+          "epos_model_trans": 0.2817729373523241,
+          "epos_twin_all": 0.06095622883864312,
+          "epos_model_all": 0.2811419728493123,
+          "eang_twin_trans": 0.06273238853343031,
+          "eang_model_trans": 0.0967484771242813,
+          "p_wilcoxon": 0.0009765625,
+          "rank_biserial": 1.0,
+          "wins": 10,
+          "n_events": 10
+        },
+        {
+          "h": 60,
+          "h_s": 1.0,
+          "epos_twin_trans": 0.09196620255100446,
+          "epos_model_trans": 0.32883878836403874,
+          "epos_twin_all": 0.09184475287370122,
+          "epos_model_all": 0.32873681232112184,
+          "eang_twin_trans": 0.07332839288622366,
+          "eang_model_trans": 0.10522562704421007,
+          "p_wilcoxon": 0.0009765625,
+          "rank_biserial": 1.0,
+          "wins": 10,
+          "n_events": 10
+        },
+        {
+          "h": 90,
+          "h_s": 1.5,
+          "epos_twin_trans": 0.11928369797237338,
+          "epos_model_trans": 0.4074657167444451,
+          "epos_twin_all": 0.11922637878307533,
+          "epos_model_all": 0.4071477839013246,
+          "eang_twin_trans": 0.08954989448400069,
+          "eang_model_trans": 0.11306532722756027,
+          "p_wilcoxon": 0.0009765625,
+          "rank_biserial": 1.0,
+          "wins": 10,
+          "n_events": 10
+        }
+      ],
+      "per_event": [
+        [
+          0,
+          0.017236096177965624,
+          0.22815084536516425
+        ],
+        [
+          1,
+          0.058098940908348246,
+          0.3837849528411823
+        ],
+        [
+          2,
+          0.044860365620600605,
+          0.23829532666536724
+        ],
+        [
+          3,
+          0.022351551379293524,
+          0.24133332293382917
+        ],
+        [
+          4,
+          0.021260926058479266,
+          0.23578538949605052
+        ],
+        [
+          5,
+          0.05517959253686725,
+          0.4382532563944771
+        ],
+        [
+          6,
+          0.03934351743214175,
+          0.20521922700609202
+        ],
+        [
+          7,
+          0.04360428968466158,
+          0.17398543529819746
+        ],
+        [
+          8,
+          0.054003197293052044,
+          0.36082482894026446
+        ],
+        [
+          9,
+          0.040649982156637746,
+          0.250192564528483
+        ]
+      ],
+      "gap_vs_twin_med": 0.22094728176654707,
+      "gap_vs_twin_max": 0.8368231266311236,
+      "n_windows": 265,
+      "n_trans": 264,
+      "n_failed": 0,
+      "diagnostics": {
+        "windows": 265,
+        "anchor_failures": 0,
+        "anchor_late": 0,
+        "short_windows": 0,
+        "tau0_estimated": 248,
+        "send_jitter_max": 0.001817341000162287,
+        "send_jitter_mean": 3.376499510152357e-06,
+        "send_late": 0,
+        "vision_period_wall": 0.01723266949999669,
+        "vision_rate_sim": 60.00000000000021,
+        "capture_scale": 1.0,
+        "wall_per_sim": 1.0339601699998051,
+        "teleport_latency_wall": 0.016518062000002942,
+        "teleport_latency_spread": 0.009086489999994285,
+        "vision_gaps": 0,
+        "decode_errors": 0,
+        "controls_sent": 28090,
+        "teleports": 268,
+        "preroll_windows": 0,
+        "preroll_short": 0,
+        "reanchor_failures": 0,
+        "tau0_median": 0.0,
+        "frames_used_median": 107.0,
+        "send_phase_median": 0.5000388071042128,
+        "preroll_samples_median": 0.0
+      },
+      "pre_roll_s": 0.0,
+      "endpoint": {
+        "name": "grsim",
+        "host": "127.0.0.1",
+        "vision": "224.5.23.2:10020",
+        "control_port": 10301,
+        "team": "blue",
+        "robot_id": 0,
+        "teleport_omega": true
+      }
+    },
+    "grsim+preroll": {
+      "rows": [
+        {
+          "h": 6,
+          "h_s": 0.1,
+          "epos_twin_trans": 0.007917288293312017,
+          "epos_model_trans": 0.02667542465978113,
+          "epos_twin_all": 0.007863776521337405,
+          "epos_model_all": 0.02677102582352186,
+          "eang_twin_trans": 0.012766017113583692,
+          "eang_model_trans": 0.026016032714091978,
+          "p_wilcoxon": 0.0009765625,
+          "rank_biserial": 1.0,
+          "wins": 10,
+          "n_events": 10
+        },
+        {
+          "h": 12,
+          "h_s": 0.2,
+          "epos_twin_trans": 0.01779496567328239,
+          "epos_model_trans": 0.04885131495672779,
+          "epos_twin_all": 0.017830268991895593,
+          "epos_model_all": 0.049296263411709555,
+          "eang_twin_trans": 0.031106256625596112,
+          "eang_model_trans": 0.048946250399823255,
+          "p_wilcoxon": 0.0009765625,
+          "rank_biserial": 1.0,
+          "wins": 10,
+          "n_events": 10
+        },
+        {
+          "h": 24,
+          "h_s": 0.4,
+          "epos_twin_trans": 0.0388378965569626,
+          "epos_model_trans": 0.09956785976059139,
+          "epos_twin_all": 0.038794867992855406,
+          "epos_model_all": 0.09959784517639175,
+          "eang_twin_trans": 0.04399195962896664,
+          "eang_model_trans": 0.06911911447681049,
+          "p_wilcoxon": 0.0009765625,
+          "rank_biserial": 1.0,
+          "wins": 10,
+          "n_events": 10
+        },
+        {
+          "h": 42,
+          "h_s": 0.7,
+          "epos_twin_trans": 0.06173039646697673,
+          "epos_model_trans": 0.14926205905040335,
+          "epos_twin_all": 0.06095622883864312,
+          "epos_model_all": 0.14799763693401813,
+          "eang_twin_trans": 0.06273238853343031,
+          "eang_model_trans": 0.09871125416780041,
+          "p_wilcoxon": 0.0009765625,
+          "rank_biserial": 1.0,
+          "wins": 10,
+          "n_events": 10
+        },
+        {
+          "h": 60,
+          "h_s": 1.0,
+          "epos_twin_trans": 0.09196620255100446,
+          "epos_model_trans": 0.19771027306747863,
+          "epos_twin_all": 0.09184475287370122,
+          "epos_model_all": 0.1965897534366098,
+          "eang_twin_trans": 0.07332839288622366,
+          "eang_model_trans": 0.09795020643261626,
+          "p_wilcoxon": 0.0009765625,
+          "rank_biserial": 1.0,
+          "wins": 10,
+          "n_events": 10
+        },
+        {
+          "h": 90,
+          "h_s": 1.5,
+          "epos_twin_trans": 0.11928369797237338,
+          "epos_model_trans": 0.2778328319063287,
+          "epos_twin_all": 0.11922637878307533,
+          "epos_model_all": 0.27564264036093605,
+          "eang_twin_trans": 0.08954989448400069,
+          "eang_model_trans": 0.12344130310971856,
+          "p_wilcoxon": 0.0009765625,
+          "rank_biserial": 1.0,
+          "wins": 10,
+          "n_events": 10
+        }
+      ],
+      "per_event": [
+        [
+          0,
+          0.017236096177965624,
+          0.05670045263413924
+        ],
+        [
+          1,
+          0.058098940908348246,
+          0.14028924208532204
+        ],
+        [
+          2,
+          0.044860365620600605,
+          0.12356482230373934
+        ],
+        [
+          3,
+          0.022351551379293524,
+          0.05599154587418085
+        ],
+        [
+          4,
+          0.021260926058479266,
+          0.055700243211319646
+        ],
+        [
+          5,
+          0.05517959253686725,
+          0.15580908729653933
+        ],
+        [
+          6,
+          0.03934351743214175,
+          0.06353609231709023
+        ],
+        [
+          7,
+          0.04360428968466158,
+          0.09761430011723614
+        ],
+        [
+          8,
+          0.054003197293052044,
+          0.17730252418259354
+        ],
+        [
+          9,
+          0.040649982156637746,
+          0.13277644231152663
+        ]
+      ],
+      "gap_vs_twin_med": 0.053850822568624,
+      "gap_vs_twin_max": 0.5031199247097444,
+      "n_windows": 265,
+      "n_trans": 264,
+      "n_failed": 0,
+      "diagnostics": {
+        "windows": 265,
+        "anchor_failures": 0,
+        "anchor_late": 1,
+        "short_windows": 0,
+        "tau0_estimated": 236,
+        "send_jitter_max": 0.0015293923332819759,
+        "send_jitter_mean": 4.028564032288516e-06,
+        "send_late": 0,
+        "vision_period_wall": 0.017047355999977754,
+        "vision_rate_sim": 60.00000000005457,
+        "capture_scale": 1.0,
+        "wall_per_sim": 1.0,
+        "teleport_latency_wall": 0.01665930500007562,
+        "teleport_latency_spread": 0.005351765999989766,
+        "vision_gaps": 0,
+        "decode_errors": 0,
+        "controls_sent": 35730,
+        "teleports": 268,
+        "preroll_windows": 265,
+        "preroll_short": 20,
+        "reanchor_failures": 0,
+        "tau0_median": 2.762151231126998e-09,
+        "frames_used_median": 132.0,
+        "send_phase_median": 0.5000395955927703,
+        "preroll_samples_median": 30.0
+      },
+      "pre_roll_s": 0.5,
+      "endpoint": {
+        "name": "grsim",
+        "host": "127.0.0.1",
+        "vision": "224.5.23.2:10020",
+        "control_port": 10301,
+        "team": "blue",
+        "robot_id": 0,
+        "teleport_omega": true
+      }
+    }
+  },
+  "order": [
+    "erforce",
+    "erforce+preroll",
+    "grsim",
+    "grsim+preroll"
+  ],
+  "horizons": [
+    6,
+    12,
+    24,
+    42,
+    60,
+    90
+  ],
+  "h_ref": 24,
+  "h_ref_s": 0.4,
+  "n_events": 10,
+  "n_windows": 265,
+  "events": [
+    "front_to_back_01_01",
+    "side_to_side_01_05",
+    "side_to_side_01_06",
+    "side_to_side_01_07",
+    "side_to_side_02_03",
+    "shoot_to_goal_05_02",
+    "shoot_to_goal_08_01",
+    "shoot_to_goal_09_01",
+    "shoot_to_goal_12_01",
+    "shoot_to_goal_14_02"
+  ],
+  "dropped": [],
+  "cost_s": {
+    "fopdt": 0.354083071000332,
+    "erforce": 480.9790434050001,
+    "erforce+preroll": 606.9991765850002,
+    "grsim": 495.65179199700003,
+    "grsim+preroll": 607.47645336
+  },
+  "caches": {
+    "erforce": "results/_cache_protocol_erforce_20260918_1308.npz",
+    "erforce+preroll": "results/_cache_protocol_erforce_preroll_20260918_1308.npz",
+    "grsim": "results/_cache_protocol_grsim_20260918_1249.npz",
+    "grsim+preroll": "results/_cache_protocol_grsim_preroll_20260918_1249.npz"
+  },
+  "delay": "none",
+  "repeat": 1,
+  "twin_v0zero": {
+    "rows": [
+      {
+        "h": 6,
+        "h_s": 0.1,
+        "epos_model_trans": 0.06829381212740901,
+        "eang_model_trans": 0.02699934535913545
+      },
+      {
+        "h": 12,
+        "h_s": 0.2,
+        "epos_model_trans": 0.096375581568588,
+        "eang_model_trans": 0.03659055748644938
+      },
+      {
+        "h": 24,
+        "h_s": 0.4,
+        "epos_model_trans": 0.11372715030555389,
+        "eang_model_trans": 0.04547600765853795
+      },
+      {
+        "h": 42,
+        "h_s": 0.7,
+        "epos_model_trans": 0.12197649452127132,
+        "eang_model_trans": 0.06625476662306315
+      },
+      {
+        "h": 60,
+        "h_s": 1.0,
+        "epos_model_trans": 0.14187514577787946,
+        "eang_model_trans": 0.07565348449986223
+      },
+      {
+        "h": 90,
+        "h_s": 1.5,
+        "epos_model_trans": 0.17831646700770454,
+        "eang_model_trans": 0.07755186787276443
+      }
+    ]
+  },
+  "preroll_s": 0.5,
+  "twin_preroll": {
+    "rows": [
+      {
+        "h": 6,
+        "h_s": 0.1,
+        "epos_model_trans": 0.013695209470517836,
+        "eang_model_trans": 0.021464716642940206
+      },
+      {
+        "h": 12,
+        "h_s": 0.2,
+        "epos_model_trans": 0.02458476841532025,
+        "eang_model_trans": 0.033530818051101086
+      },
+      {
+        "h": 24,
+        "h_s": 0.4,
+        "epos_model_trans": 0.04057232961699826,
+        "eang_model_trans": 0.045493592907169096
+      },
+      {
+        "h": 42,
+        "h_s": 0.7,
+        "epos_model_trans": 0.0642077282841613,
+        "eang_model_trans": 0.06371449927289863
+      },
+      {
+        "h": 60,
+        "h_s": 1.0,
+        "epos_model_trans": 0.08827381624130033,
+        "eang_model_trans": 0.07417925813619518
+      },
+      {
+        "h": 90,
+        "h_s": 1.5,
+        "epos_model_trans": 0.12193546135476577,
+        "eang_model_trans": 0.08734610740467202
+      }
+    ],
+    "samples_median": 30.0
+  },
+  "validity": {
+    "erforce": true,
+    "erforce+preroll": true,
+    "grsim": true,
+    "grsim+preroll": true
+  }
+}

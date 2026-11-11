@@ -1,0 +1,214 @@
+i	pid	oa_pdf	unpaywall	s2
+1	SLR-2026-A-2169			
+2	SLR-2026-Cristian-881	https://www.mdpi.com/2076-3417/16/2/650/pdf?version=1767866460		
+3	SLR-2026-Jay-450			
+4	SLR-2026-Jiarong-057			
+5	SLR-2026-Khadr-2516			
+6	SLR-2026-Llus-916			https://doi.org/10.3390/electronics15142993
+7	SLR-2026-Mostafa-4396			
+8	SLR-2026-Philipp-3415	https://link.springer.com/content/pdf/10.1007/s10270-026-01368-8.pdf		
+9	SLR-2026-Ruopeng-455	https://arxiv.org/pdf/2601.09920		
+10	SLR-2026-Shinta-855			https://doi.org/10.1080/21642583.2026.2634459
+11	SLR-2026-Zacheous-490	https://link.springer.com/content/pdf/10.1007/s44291-026-00241-8.pdf		
+12	SLR-2026-Zaiwu-3395			
+13	SLR-2025-Abdelrahim-2241			https://doi.org/10.1109/access.2025.3597797
+14	SLR-2025-Afrooz-443	http://www.scs-europe.net/dlib/2025/ecms2025acceptedpapers/0361_simai_ecms2025_0019.pdf		
+15	SLR-2025-Binhao-025			
+16	SLR-2025-Carlo-4067	https://link.springer.com/content/pdf/10.1007/s10846-025-02258-9.pdf		
+17	SLR-2025-Charles-404			
+18	SLR-2025-Daniel-818	https://www.mdpi.com/1424-8220/25/15/4666/pdf?version=1753712771		
+19	SLR-2025-Dominika-831			https://doi.org/10.3390/s25185715
+20	SLR-2025-Franciszek-063			https://doi.org/10.64972/jaat.2025v3.182p10e:117-130
+21	SLR-2025-J-828			
+22	SLR-2025-Jalil-918			https://doi.org/10.5220/0013772600003982
+23	SLR-2025-Lianzhao-3590			
+24	SLR-2025-M-451			
+25	SLR-2025-Maksim-1096	https://doi.org/10.21685/2307-5538-2025-3-7		
+26	SLR-2025-Marvin-1071			
+27	SLR-2025-Maurice-680			
+28	SLR-2025-Miriana-5327	https://link.springer.com/content/pdf/10.1007/s42979-025-04525-w.pdf		
+29	SLR-2025-Muhammad-3393			
+30	SLR-2025-O-1796			https://doi.org/10.1109/access.2025.3570947
+31	SLR-2025-R-2043			https://doi.org/10.1109/access.2025.3619776
+32	SLR-2025-S-2045			
+33	SLR-2025-Shaoting-265			
+34	SLR-2025-Shou-948			https://doi.org/10.20965/jrm.2025.p1314
+35	SLR-2025-T-338	https://dt.bsuir.by/jour/article/download/955/364		
+36	SLR-2025-Taemin-896			
+37	SLR-2025-V-1914	https://arxiv.org/pdf/2510.10273		
+38	SLR-2025-Xuexin-5348			
+39	SLR-2025-Yongkui-033			
+40	SLR-2025-Yuanqing-870			
+41	SLR-2024-D-1768	https://ieeexplore.ieee.org/ielx7/7083369/7339444/10478139.pdf		
+42	SLR-2024-F-1766			
+43	SLR-2024-Gustavo-995	https://periodicos.univali.br/index.php/acotb/article/download/20323/11735		
+44	SLR-2024-Jiri-548	https://ebooks.iospress.nl/pdf/doi/10.3233/ATDE241206		
+45	SLR-2024-Lin-2372			
+46	SLR-2024-Marcel-289	https://arxiv.org/pdf/2403.03949		
+47	SLR-2024-Marvin-250			
+48	SLR-2024-Ruwen-765	https://iopscience.iop.org/article/10.1088/1742-6596/2803/1/012060/pdf		
+49	SLR-2024-Wilson-782			
+50	SLR-2024-X-1879			https://arxiv.org/pdf/2305.01263
+51	SLR-2023-Chengye-441			
+52	SLR-2023-Harinarayanan-3508			
+53	SLR-2023-Hongjiu-749			
+54	SLR-2023-Junru-760			
+55	SLR-2023-Laura-2396			
+56	SLR-2023-Luo-2237			
+57	SLR-2023-Nazish-795			
+58	SLR-2023-Pere-3366	https://arxiv.org/pdf/2311.10834		
+59	SLR-2023-Sijie-850			
+60	SLR-2023-Taeyoon-122			https://doi.org/10.1146/annurev-control-061523-102310
+61	SLR-2022-A-1784			https://elib.dlr.de/197476/1/AIM22_0133_FI_copyright.pdf
+62	SLR-2022-Cijyun-5223			
+63	SLR-2022-Dohyung-3963			
+64	SLR-2022-J-2055			
+65	SLR-2022-Mahmoud-752	https://www.sciencedirect.com/science/article/pii/S2212827122004231/pdf		
+66	SLR-2022-Noah-2410			
+67	SLR-2022-Qiu-1107			
+68	SLR-2022-Shang-2393			
+69	SLR-2022-Z-1951			
+70	SLR-2021-Eric-3363	https://www.mdpi.com/2079-9292/11/15/2453/pdf?version=1660016960		
+71	SLR-2021-M-2427	https://www.mdpi.com/2076-3417/11/10/4490/pdf?version=1620990898		
+72	SLR-2021-Tan-3749			
+73	SLR-2021-Xuda-797	https://arxiv.org/pdf/2103.04391		
+74	SLR-2020-Ra-745			https://doi.org/10.1016/j.ifacol.2020.11.033
+75	SLR-2019-Dohyung-4039			
+76	SLR-2026-Albatati-1285			https://doi.org/10.1145/3815113
+77	SLR-2026-Gia-3397			
+78	SLR-2026-Hamidreza-031			
+79	SLR-2026-Jhonattan-584			
+80	SLR-2026-M-702			
+81	SLR-2026-M-857	https://izvestswsu.elpub.ru/jour/article/download/1590/782		
+82	SLR-2026-Nazarenko-501			
+83	SLR-2026-Seung-562			https://doi.org/10.1002/aisy.70465
+84	SLR-2026-Soham-567			
+85	SLR-2026-Song-2371	https://www.mdpi.com/2075-5309/16/3/646/pdf		
+86	SLR-2026-Sung-4334			
+87	SLR-2026-Tianwei-597	https://arxiv.org/pdf/2604.26509		
+88	SLR-2026-Vladyslav-865	https://tm.khpi.edu.ua/article/download/360300/346028		
+89	SLR-2026-Zhaohan-4309	https://arxiv.org/pdf/2505.05108		
+90	SLR-2026-Ziyang-467			
+91	SLR-2025-Alishba-4278			
+92	SLR-2025-Allamaa-2507			
+93	SLR-2025-Artr-321			
+94	SLR-2025-Chiara-4068	https://link.springer.com/content/pdf/10.1007/s10846-025-02328-y.pdf		
+95	SLR-2025-Ghandali-915	https://espace2.etsmtl.ca/id/eprint/32289/1/134%20-%20Sensor%20integration%20to%20create%20a%20dig.pdf		
+96	SLR-2025-Haiwen-851			
+97	SLR-2025-J-223			https://doi.org/10.20517/ir.2025.11
+98	SLR-2025-M-1836			https://doi.org/10.1109/ojits.2025.3562504
+99	SLR-2025-Mateo-856			
+100	SLR-2025-Maurice-654	https://arxiv.org/pdf/2506.09629		
+101	SLR-2025-N-5339	https://link.springer.com/content/pdf/10.1134/S1064562425700450.pdf		
+102	SLR-2025-P-1764			
+103	SLR-2025-Protin-2360			
+104	SLR-2025-Q-2160			
+105	SLR-2025-Santiago-303			https://doi.org/10.1016/j.robot.2025.105240
+106	SLR-2025-Satyam-886			
+107	SLR-2025-Schrage-2388			
+108	SLR-2025-Shabi-544	https://scientia-tss.com/index.php/journal/article/download/189/167		
+109	SLR-2025-Wang-1664	https://dl.acm.org/doi/pdf/10.1145/3766887		
+110	SLR-2025-Zong-3367			
+111	SLR-2024-Bonak-2283			https://doi.org/10.46354/i3m.2024.emss.017
+112	SLR-2024-Jaeho-458			
+113	SLR-2024-Liu-1421			
+114	SLR-2024-Robert-002	https://www.tandfonline.com/doi/pdf/10.1080/0951192X.2024.2386980?needAccess=true		
+115	SLR-2024-Yuantian-2428	https://www.mdpi.com/2075-1702/12/9/595/pdf?version=1724753297		
+116	SLR-2023-Ali-770			
+117	SLR-2023-Carsten-763			
+118	SLR-2023-Flavien-822			
+119	SLR-2023-Hussein-4690			
+120	SLR-2023-Jaqueline-3731	https://lume.ufrgs.br/bitstream/10183/255587/1/001163946.pdf		
+121	SLR-2023-Joo-2435			
+122	SLR-2023-M-1762			
+123	SLR-2023-Pavol-903			
+124	SLR-2022-Edison-783			
+125	SLR-2022-G-2167			https://eprints.whiterose.ac.uk/196549/1/ROSIE_2___ieeeconf__RO_MAN__-5.pdf
+126	SLR-2022-Kholood-4740			
+127	SLR-2022-Qiuying-333			
+128	SLR-2022-Ryota-771			
+129	SLR-2021-Carlos-750			
+130	SLR-2021-Christoph-2394			
+131	SLR-2021-Huang-2262	https://www.mdpi.com/1424-8220/21/19/6340/pdf?version=1632809060		
+132	SLR-2020-John-743	https://www.sciencedirect.com/science/article/pii/S0007850620301086/pdf		
+133	SLR-2018-Lionel-065	https://eprints.lib.hokudai.ac.jp/repo/huscap/all/69988/Lionel_Matias_Sobehart.pdf		
+134	SLR-2026-Pranjal-355			https://doi.org/10.1016/j.iswa.2026.200649
+135	SLR-2026-Xingdong-911			
+136	SLR-2026-Boris-3537	https://link.springer.com/content/pdf/10.1007/s00158-026-04310-0.pdf		
+137	SLR-2026-Jesus-3475			
+138	SLR-2026-Amanda-3593			
+139	SLR-2026-Atul-650			
+140	SLR-2026-Biedenkapp-1235			
+141	SLR-2026-Hadria-3402			
+142	SLR-2026-Hongbo-3582			
+143	SLR-2026-Krisztin-4743			
+144	SLR-2026-Kunal-4729			
+145	SLR-2026-Minghao-4433			
+146	SLR-2026-Nazwa-5307			
+147	SLR-2026-R-3689			
+148	SLR-2026-Robel-4076			
+149	SLR-2026-Sathvika-5132			
+150	SLR-2026-Siyuan-5042			
+151	SLR-2026-Yixiong-652	https://arxiv.org/pdf/2605.07687		
+152	SLR-2025-Cristian-900			
+153	SLR-2025-Fangyu-3857			
+154	SLR-2025-Fangyu-5066			
+155	SLR-2025-Feng-1317	https://dl.acm.org/doi/pdf/10.1145/3721251.3734066?download=true		
+156	SLR-2025-Hannes-919			
+157	SLR-2025-Hussein-5345			
+158	SLR-2025-Nino-846			
+159	SLR-2025-Shubham-4820			
+160	SLR-2025-Xiaoran-4273	https://arxiv.org/pdf/2506.06580		
+161	SLR-2025-Yao-4934			
+162	SLR-2025-Zhe-649			
+163	SLR-2024-Ali-779			
+164	SLR-2024-Bentley-3518			
+165	SLR-2024-Christian-3430			
+166	SLR-2024-Cludio-3751			
+167	SLR-2024-Eiben-1443			https://doi.org/10.1145/3638530.3648427
+168	SLR-2024-Giuseppe-3583			
+169	SLR-2024-Juan-300			
+170	SLR-2024-Lingyun-4708			
+171	SLR-2024-Lukas-5462			
+172	SLR-2024-Michele-4935			
+173	SLR-2024-Zhang-4532			
+174	SLR-2023-Ayan-4763			
+175	SLR-2023-Bo-3503			
+176	SLR-2023-C-2135			
+177	SLR-2023-Jonathan-007			
+178	SLR-2023-K-2119			
+179	SLR-2023-Matas-5425			
+180	SLR-2023-Xiang-4799			
+181	SLR-2022-Carolina-4725			
+182	SLR-2022-Gianmarco-3829			https://inria.hal.science/hal-03921606
+183	SLR-2020-Poommitol-010			
+184	SLR-2026-Canada-859			
+185	SLR-2026-Li-2282			
+186	SLR-2026-Luigi-869			
+187	SLR-2025-Nicol-2518			
+188	SLR-2025-Onggo-2956			
+189	SLR-2025-Stepani-2511			
+190	SLR-2025-Yuchen-1093			
+191	SLR-2023-M-070			
+192	SLR-2022-Dehghanimohammadabadi-2959			
+193	SLR-2020-Barat-2970			
+194	SLR-2025-Batool-655			
+195	SLR-2024-Ahmad-2438			
+196	SLR-2024-Sanaa-789			
+197	SLR-2022-Xin-742	https://www.frontiersin.org/articles/10.3389/fbioe.2021.793782/pdf		
+198	SLR-2026-Gershom-2485			
+199	SLR-2026-Pranjal-461	https://doi.org/10.20944/preprints202507.2177.v1		
+200	SLR-2025-Maya-938			https://doi.org/10.1016/j.ifacol.2025.10.220
+201	SLR-2023-Haixia-862	https://www.researchsquare.com/article/rs-2941373/latest.pdf		
+202	SLR-2026-Rudy-4996			
+203	SLR-2025-Riei-2446			
+204	SLR-2025-Rohman-2466			
+205	SLR-2025-Stefan-4287			https://research.tue.nl/en/publications/b038b8b6-5e70-4a89-87ae-b68f82d6a73e
+206	SLR-2025-Tim-4861			
+207	SLR-2023-M-5410			
+208	SLR-2026-Hunain-2514			
+209	SLR-2026-Supradip-864			
+210	SLR-2025-Jaoua-2957			
+211	SLR-2025-Mateo-2513			
+212	SLR-2023-Anon-907			
+213	SLR-2021-Rens-2541			

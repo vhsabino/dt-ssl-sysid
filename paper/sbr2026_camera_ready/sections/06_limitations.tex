@@ -1,0 +1,60 @@
+%==============================================================================
+% LIMITATIONS — condensado a 2 parágrafos por decisão do autor (2026-08-08, "L").
+% GUARDRAIL: nenhuma limitação foi REMOVIDA; todas as sete da versão anterior
+% continuam mencionadas (amostra pequena / fidelidade rotacional não verificada /
+% contraste não single-factor / estimadores closed-loop não tentados / constantes
+% cinemáticas / Ljung-Box / rSim não sintonizado + baseline ideal + CI residual /
+% escopo de um único dataset). O detalhamento longo está em
+% docs/BACKLOG_EXTENSAO_JINT.md item A.
+%==============================================================================
+\section{Limitations and Threats to Validity}
+\label{sec:limitations}
+
+\paragraph{Data and identification}
+% CORTE 2026-08-09 (9->8 pag.): SO prosa apertada. NENHUMA limitacao removida --
+% amostra pequena, sessao unica, ausencia de varredura fina, robo unico,
+% campanhas nao single-factor e a impossibilidade de separar feedback de
+% diluicao continuam todas enunciadas.
+The open-loop yaw fit rests on six linear-regime events (four training, two
+held out) from a single session, without a fine amplitude sweep between $0.5$
+and $1.0\,\si{rad/s}$, so the commanded-yaw threshold is reported as the
+interval $0.58$--$0.60\,\si{rad/s}$ rather than a point. All data come from one
+robot and one context, so no cross-robot or cross-session variability is
+reported; pre-registered criteria and deterministic re-execution mitigate this
+but do not replace replication. The two yaw campaigns differ in loop topology,
+in the ratio of commanded yaw to commanded translation, and in session. The
+dilution analysis of Sec.~\ref{sec:results:omega} rules out the simplest
+alternative, that the actuation threshold merely switches yaw off (it would
+hold for only ${\sim}2\%$ of competition samples), but cannot separate that
+ratio from feedback, because the dedicated collection removes both at once;
+separating them needs an open-loop arm with translation superimposed, which we
+did not collect. We also diagnose the bias of direct prediction-error identification on
+closed-loop data without attempting the closed-loop-aware estimators
+(instrumental-variable, two-stage, joint input--output) that the cited
+literature proposes. The Ljung--Box test rejects residual whiteness for both yaw
+fits; as pre-registered it is informative rather than a gate, since the
+smoothing differentiator colors residuals by construction. Finally, the
+firmware-implied and CAD-measured radius ratios differ by ${\sim}3.3\%$, and an
+inherited body-frame dead-zone constant of $0.3\,\si{rad/s}$ has no recoverable
+provenance and is superseded here.
+% source: results/identificacao_omega_20260724.md Etapa 4 ; qc_rotate_20260724_125828.md ;
+%   config/robot_geometry.json ; docs/PREREGISTRO_OMEGA_20260724.md
+
+\paragraph{Evaluation and scope}
+The hold-out is overwhelmingly translational, so the rotational fidelity of the
+twin, as opposed to the yaw estimate itself, is not validated against a
+distribution resembling competition play. % CORTE 2026-08-09: prosa apertada; a ressalva "fitted vs. untuned" e o
+% indicio de que parte do deficit do rSim vem do harness permanecem.
+The comparison against rSim is
+between a plant fitted to this robot and an engine left at default parameters,
+so it bounds what an untuned reference simulator delivers on this task rather
+than establishing a general dynamical advantage; the zero-parameter
+ideal-kinematics baseline also outperforms rSim at the reference horizon, which
+indicates that a substantial share of rSim's deficit comes from the replay
+harness rather than from its physics. The matched-delay ablation rules out the
+transport-delay term as the source of the gap, but does not separate the fitted
+dynamics from the residual initial-velocity mismatch, which likewise grows with
+horizon. All results come from a single dataset and hold-out split drawn from
+the same operating regime; the native grid is irregular and the free-run initial
+condition relies on a vision-derived velocity that is noisy, mitigated by
+resampling and filtering but not eliminated.

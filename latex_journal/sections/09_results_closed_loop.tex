@@ -1,0 +1,22 @@
+%==============================================================================
+% 9 RESULTS IV: CLOSED-LOOP PLAUSIBILITY
+% Plano: a estrategia real jogando contra o gemeo (sessao B3, 220 s, 6 robos);
+% round trip recorder -> harness ao nivel do mm; C4: 2/5 contra o pool
+% (pre-registrado), 5/5 contra shoot_to_goal (pos-hoc, declarado); o regime de yaw
+% diluido reaparece; rastreamento 0.865 vs 0.944 (descritivo).
+% Fontes: tab_journal_closed_loop, fig_journal_closed_loop (geradas);
+% results/session_report_sessao_01_20260907_2059.md; CHANGELOG 2026-09-07 20:59 e 21:37.
+%==============================================================================
+\section{Results IV: closed-loop plausibility}
+\label{sec:res-closed}
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=\textwidth]{fig_journal_closed_loop.pdf}
+  \caption{Commands of the team's strategy playing against the twin, against the competition logs: cumulative distributions of the commanded speed and yaw rate. Vertical line: body yaw rate equivalent to the firmware per-wheel dead zone.}
+  \label{fig:closed}
+\end{figure*}
+
+\input{tables/tab_journal_closed_loop}
+
+\pending{text of the section.}

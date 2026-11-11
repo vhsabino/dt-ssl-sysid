@@ -1,0 +1,20 @@
+%==============================================================================
+% ABSTRACT — reposicionado 2026-08-10 apos a revisao independente.
+% Mudancas:
+%  - comparador PRIMARIO passa a ser a cinematica ideal (mesmo harness, mesma
+%    inicializacao). rSim vira contexto, com a ressalva fitted-vs-untuned (B2/B3).
+%  - estatistica reportada por EVENTO (n=10), nao por janela (item 9 / C11).
+%  - acrescentadas as tres omissoes que o revisor cobrou (6.3): heading pior em
+%    horizonte longo, 99.6% da validacao e translacional, rSim nao sintonizado.
+%  - declarado o tamanho da evidencia em segundos (C11).
+% IEEE: sem simbolos matematicos, sem citacoes. ~215 palavras.
+% Numeros: 87% (CHANGELOG 2026-06-14); 71.1% (identificacao_omega_20260724.md);
+% 1% (omega_excitation_analysis_20260807_133917.json); 0.038/0.101 e
+% decomposicao (gap_decomposition_20260809_2308.md); p e efeito por evento
+% (clustered_stats_20260809_2309.md); 73.5 s idem.
+%==============================================================================
+\begin{abstract}
+Robot soccer teams in the RoboCup Small Size League develop and validate control software largely in simulation, where simplified physics leaves a reality gap to the field. This paper presents a behavioral model of an omnidirectional soccer robot identified from the competition logs that teams already record. The proposed approach models each Degree of Freedom (DoF) as a First-Order-Plus-Dead-Time (FOPDT) channel. The translational channels identified directly from in-game logs reach roughly an 87 percent hold-out fit. 
+
+The identification of the yaw channel required a short, dedicated open-loop campaign to restore the excitation and identify the channel using a 71 percent hold-out fit. The digital twin's fidelity is evaluated in free-run over horizons of 0.1 to 1.5 seconds against an ideal-kinematics baseline using an identical harness.  Over 73.5 seconds of scored motion, the model reaches a median position error of 0.039 meters at the 0.4-second horizon, compared to 0.101 for ideal kinematics and 0.129 for rSim, an ODE simulator widely used across the league.
+\end{abstract}

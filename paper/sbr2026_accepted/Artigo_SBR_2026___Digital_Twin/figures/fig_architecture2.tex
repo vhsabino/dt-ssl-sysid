@@ -1,0 +1,95 @@
+%==============================================================================
+% FIG. A2 — Scope of the plant layer (panel a) + identification/evaluation
+% pipeline (panel b). Created 2026-08-10 at the author's request, to give the
+% two opening paragraphs of Sec. III a visual anchor.
+%
+% WHY A SECOND FILE: fig_architecture.tex (2026-08-07) draws the pipeline ONLY.
+% It has no representation of the first paragraph, which is a SCOPE statement:
+% the paper delivers one of three layers of a complete twin. Panel (a) is that
+% statement; panel (b) is the old figure, compressed to a single row so the two
+% panels together cost less vertical space than the original figure alone.
+% The original file is kept untouched for the JINT extension.
+%
+% DESIGN NOTES
+%  - Panel (a): the two layers this paper does NOT deliver are drawn thin,
+%    dashed and grey; the plant layer is the only solid, filled box. The
+%    command/motion arrows deliberately cross the dashed boundary, because the
+%    point of the paragraph is that the plant layer IS the interface.
+%  - Panel (b): the dashed yaw branch is the one visual asymmetry, for the same
+%    reason as in the original figure -- it is the paper's finding, not an
+%    implementation detail.
+%  - No number is asserted here that is not in the text.
+%
+% Sources: DESIGN.md sec.2 ; phase0_replay/{io,schema,plant,rollout,metrics}.py ;
+%   automation/identify_trans_dof.m ; scripts/build_rotate_splits.py ;
+%   config/{twin_params,metrics,holdout_events}.json.
+%==============================================================================
+\begin{figure*}[!t]
+\centering
+\begin{tikzpicture}[
+  every node/.style={font=\scriptsize},
+  blk/.style={draw, rounded corners=2pt, align=center, inner sep=3pt,
+              minimum height=0.78cm},
+  oos/.style={blk, dashed, draw=black!45, text=black!45, minimum height=0.62cm},
+  mine/.style={blk, thick, fill=black!10, minimum height=0.86cm},
+  io/.style={font=\scriptsize\itshape, align=center, inner sep=1.5pt},
+  ar/.style={-{Latex[length=1.6mm]}, semithick},
+  arD/.style={-{Latex[length=1.6mm]}, semithick, dashed},
+  lbl/.style={font=\scriptsize\itshape, inner sep=1.5pt}
+]
+
+% ======================= PANEL (a): SCOPE ==================================
+\node[oos,  text width=3.0cm] (vis)   at (2.55, 0.95)
+  {Synchronized visual\\ counterpart};
+\node[oos,  text width=3.0cm] (env)   at (2.55, 0.05)
+  {Execution environment\\ for policy training};
+\node[mine, text width=3.0cm] (plant) at (2.55,-1.00)
+  {\textbf{Plant layer}\\ commanded $\rightarrow$ attained\\ body motion};
+
+\begin{scope}[on background layer]
+  \node[draw, dashed, draw=black!55, rounded corners=3pt,
+        fit=(vis)(env)(plant), inner sep=6pt] (twinbox) {};
+\end{scope}
+\node[lbl, anchor=south] at (twinbox.north) {Complete digital twin of the SSL robot};
+
+\node[io] (cmd) at (-0.62,-1.00) {body\\ command};
+\node[io] (att) at ( 5.72,-1.00) {attained\\ pose};
+\draw[ar] (cmd) -- (plant.west);
+\draw[ar] (plant.east) -- (att);
+
+\node[lbl, anchor=north, text width=5.9cm, align=center] at (2.55,-1.72)
+% ======================= PANEL (b): PIPELINE ===============================
+% Layout deliberadamente reto: uma unica linha, e os dois ramos auxiliares
+% entram por BAIXO, na vertical. Nenhuma aresta cruza caixa (a versao anterior
+% roteava o ramo tracejado por dentro de "Per-DOF window labeling").
+\node[blk, text width=1.75cm] (p1) at ( 8.40,0.30) {Vision protocol\\ and event extraction};
+
+%\node[blk, text width=1.75cm] (p2) at ( 9.75,0.30) {Event\\ extraction};
+\node[blk, text width=1.75cm] (p3) at (11.10,0.30) {Per-DOF window};
+\node[blk, text width=1.75cm] (p4) at (13.50,0.30) {Grey-box FOPDT fit};
+\node[blk, text width=1.85cm] (p5) at (15.95,0.30) {Free-run replay\\ vs.\ ground truth};
+
+\draw[ar] (p1) -- (p3);
+\draw[ar] (p3) -- (p4);
+\draw[ar] (p4) -- (p5) node[lbl, midway, above=0pt] {$\theta$};
+
+% dedicated open-loop branch -- the finding, drawn as the one asymmetry
+\node[blk, dashed, thick, fill=black!4, text width=1.95cm] (rot) at (13.50,-1.55)
+  {dedicated \\ \textbf{yaw excitation}};
+\draw[arD] (rot) -- (p4) node[lbl, midway, right=1pt] {$\omega$ only};
+
+% baselines on the same gate
+\node[blk, text width=1.85cm] (base) at (15.95,-1.55)
+  {rSim (ODE)};
+\draw[ar] (base) -- (p5) node[lbl, midway, right=1pt] {same gate};
+
+% ======================= panel captions ====================================
+\node[font=\footnotesize\bfseries] at ( 2.55,-3.00) {(a) Scope of the paper};
+\node[font=\footnotesize\bfseries] at (12.60,-3.00) {(b) Identification and evaluation pipeline};
+
+\end{tikzpicture}
+\caption{(a) The paper delivers the plant layer of a larger digital twin: the map from commanded to attained body motion. (b) Solid path: closed-loop
+competition logs. Dashed branch: the dedicated open-loop collection, which
+feeds the $\omega$ channel alone. Every comparison plant is scored on the same windows, horizons and gates as the model.}
+\label{fig:arch2}
+\end{figure*}

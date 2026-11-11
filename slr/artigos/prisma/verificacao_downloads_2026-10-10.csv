@@ -1,0 +1,60 @@
+﻿pid;origem;paginas;mb;doi_no_texto;doi_confere;titulo_confere;resultado;observacao
+SLR-2024-Bentley-3518;passada 1;2;4.8;10.1007/978-3-031-66719-0_12;sim;100%;só a prévia de 2 páginas;
+SLR-2024-Cludio-3751;passada 1;2;0.9;10.1007/978-3-031-66719-0_6;sim;100%;só a prévia de 2 páginas;
+SLR-2024-Giuseppe-3583;passada 1;2;1.5;10.1007/978-3-031-66719-0_5;sim;100%;só a prévia de 2 páginas;
+SLR-2025-J-828;passada 1;4;3.6;10.1109/icaace65325.2025.11019841;não;50%;arquivo errado: é o Haiwen-851;
+SLR-2025-S-2045;passada 1;5;1.4;10.1109/icacr68388.2025.11360024;não;11%;arquivo errado: é o Yongkui-033;
+SLR-2026-Albatati-1285;passada 1;8;0.9;10.1088/1742-6596/2803/1/012060;não;0%;arquivo errado: é o Ruwen-765;
+SLR-2023-Taeyoon-122;passada 1;24;0.3;10.1146/annurev-control-061523102310;não;100%;confere;"DOI partido pela hifenização do PDF; título confere"
+SLR-2024-Lin-2372;passada 1;14;15.3;10.3785/j.issn.1008-973x.2024.09.020;sim;100%;confere;"corpo do texto em chinês; só título e resumo em inglês: EC4?"
+SLR-2024-Ruwen-765;passada 1;8;0.9;10.1088/1742-6596/2803/1/012060;sim;100%;confere;arquivo idêntico (mesmo hash) ao salvo como Albatati-1285
+SLR-2025-Allamaa-2507;passada 1;356;57.3;;não;0%;confere;"tese de doutorado (KU Leuven, 356 p.) em inglês; o título no Notion é o holandês: EC3?"
+SLR-2025-Hannes-919;passada 1;7;1.6;;não;100%;confere;post de blog salvo do navegador (autosys, Rogue Scholar): EC3?
+SLR-2025-Maksim-1096;passada 1;15;2.2;10.21685/2307-5538-2025-3-7;sim;100%;confere;texto em russo: EC4?
+SLR-2025-Satyam-886;passada 1;3;0.6;10.69709/caic.2024.194188, 10.1109/iros47612.2022.9981587;não;100%;confere;"3 páginas, versão Zenodo; o DOI 10.69709 que aparece no texto é de uma referência: EC3?"
+SLR-2025-Stepani-2511;passada 1;87;3.2;;não;0%;confere;dissertação de mestrado em esloveno (Univ. Ljubljana, 87 p.): EC4? e EC3?
+SLR-2025-Yongkui-033;passada 1;5;1.4;10.1109/icacr68388.2025.11360024;sim;100%;confere;mesmo artigo do arquivo salvo como S-2045
+SLR-2026-Hamidreza-031;passada 1;160;11.5;;não;100%;confere;tese de doutorado (Univ. Calgary, 160 p.): EC3?
+SLR-2026-Nazarenko-501;passada 1;11;0.6;10.31548/itees.2025.02.045;sim;100%;confere;texto em inglês: não é caso de EC4
+SLR-2019-Josifovska-1119;passada 1;7;0.3;10.1109/sescps.2019.00012;sim;100%;confere;
+SLR-2022-J-2055;passada 1;5;2.3;10.1109/jrfid.2022.3207047;sim;100%;confere;
+SLR-2022-Kholood-4740;passada 1;21;1.3;10.1007/s13369-022-07459-0;sim;100%;confere;
+SLR-2022-Mahmoud-752;passada 1;6;1.4;10.1016/j.procir.2022.05.139;sim;100%;confere;
+SLR-2022-Ryota-771;passada 1;5;1.8;10.1109/hri53351.2022.9889544;sim;80%;confere;
+SLR-2022-Shang-2393;passada 1;8;1.6;10.1109/cac57257.2022.10055813;sim;100%;confere;
+SLR-2023-Chengye-441;passada 1;6;0.9;10.1109/cac59555.2023.10451913;sim;100%;confere;
+SLR-2023-Harinarayanan-3508;passada 1;17;3.8;10.1007/s10846-023-01944-w;sim;100%;confere;
+SLR-2023-Hongjiu-749;passada 1;10;2.1;10.1109/tvt.2023.3309029;sim;100%;confere;
+SLR-2023-Joo-2435;passada 1;6;4.6;10.1109/lars/sbr/wre59448.2023.10333068;sim;100%;confere;
+SLR-2023-Junru-760;passada 1;7;5.6;10.1109/iccma59762.2023.10375050;sim;100%;confere;
+SLR-2023-Sijie-850;passada 1;6;1.5;10.1109/icds59539.2023.10311448;sim;100%;confere;
+SLR-2023-Yuchen-4558;passada 1;51;4.4;10.1007/s10845-023-02246-6;sim;100%;confere;
+SLR-2024-Ahmad-2438;passada 1;6;0.3;10.1109/ictmod63116.2024.10878153;sim;100%;confere;
+SLR-2024-Jacob-781;passada 1;8;0.2;10.1109/swc62898.2024.00326;sim;100%;confere;
+SLR-2024-Jaeho-458;passada 1;4;1.2;10.1109/issm64832.2024.10874889;sim;100%;confere;
+SLR-2024-Marvin-250;passada 1;7;6.8;10.1109/icra57147.2024.10611459;sim;100%;confere;
+SLR-2024-Robert-002;passada 1;23;9.4;10.1080/0951192x.2024.2386980;sim;100%;confere;
+SLR-2024-Zhang-4532;passada 1;46;7.6;10.1007/s40430-024-04973-0;sim;100%;confere;
+SLR-2025-Binhao-025;passada 1;6;0.6;10.1109/icrae67496.2025.00013;sim;100%;confere;
+SLR-2025-Daniel-818;passada 1;25;1.4;10.3390/s25154666;sim;100%;confere;
+SLR-2025-J-223;passada 1;26;12.3;10.20517/ir.2025.11;sim;100%;confere;
+SLR-2025-M-451;passada 1;4;1.6;10.1109/smc58881.2025.11343553;sim;100%;confere;
+SLR-2025-Marrone-4886;passada 1;30;4.2;10.1007/s10489-025-06916-1;sim;100%;confere;
+SLR-2025-Marvin-1071;passada 1;8;4.0;10.1109/case58245.2025.11163879;sim;100%;confere;
+SLR-2025-Muhammad-3393;passada 1;13;8.5;10.1007/s12555-024-0506-z;sim;100%;confere;
+SLR-2025-P-1764;passada 1;5;6.1;10.1109/ccdc65474.2025.11090294;sim;100%;confere;
+SLR-2025-Protin-2360;passada 1;6;2.3;10.1109/icmt67823.2025.11298788;sim;100%;confere;
+SLR-2025-Q-2160;passada 1;6;1.1;10.1109/powercon66300.2025.11295228;sim;100%;confere;
+SLR-2025-R-2043;passada 1;36;9.3;10.1109/access.2025.3619776;sim;100%;confere;
+SLR-2025-Santiago-303;passada 1;20;4.5;10.1016/j.robot.2025.105240;sim;100%;confere;
+SLR-2025-Shou-948;passada 1;13;8.4;10.20965/jrm.2025.p1314;sim;100%;confere;
+SLR-2025-Yuanqing-870;passada 1;11;1.8;10.1109/tie.2025.3587101;sim;100%;confere;
+SLR-2026-A-2169;passada 1;6;1.1;10.1109/iciice69672.2026.11565464;sim;100%;confere;
+SLR-2026-Cristian-881;passada 1;16;4.7;10.3390/app16020650;sim;100%;confere;
+SLR-2026-Gia-3397;passada 1;18;3.0;10.1007/s12008-026-02596-4;sim;100%;confere;
+SLR-2026-Jay-450;passada 1;17;3.6;10.1007/s41315-026-00522-1;sim;100%;confere;
+SLR-2026-Mostafa-4396;passada 1;40;7.5;10.1007/s42417-025-02269-8;sim;100%;confere;
+SLR-2026-Pranjal-355;passada 1;26;17.3;10.1016/j.iswa.2026.200649;sim;100%;confere;
+SLR-2026-Shinta-855;passada 1;18;6.5;10.1080/21642583.2026.2634459;sim;100%;confere;
+SLR-2026-Sung-4334;passada 1;27;2.5;10.1007/s12555-026-00082-x;sim;100%;confere;
+SLR-2026-Zaiwu-3395;passada 1;14;3.3;10.1007/s00170-026-18546-z;sim;100%;confere;

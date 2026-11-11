@@ -77,3 +77,25 @@ desktop.ini
 *.tmp
 *~
 .claude/settings.local.json
+
+# ---- LaTeX: artigo de periodico (latex_journal/) e camera-ready (paper/*/) ----
+latex_journal/*.aux
+latex_journal/*.out
+latex_journal/*.bbl
+latex_journal/*.blg
+latex_journal/*.spl
+latex_journal/*.synctex.gz
+latex_journal/*.fdb_latexmk
+latex_journal/*.fls
+latex_journal/main.pdf
+paper/*/*.aux
+paper/*/*.out
+paper/*/*.bbl
+paper/*/*.blg
+paper/*/*.synctex.gz
+paper/*/*.fdb_latexmk
+paper/*/*.fls
+paper/*/main.pdf
+
+# PDFs de terceiros: nunca versionar
+/slr/**/*.pdf

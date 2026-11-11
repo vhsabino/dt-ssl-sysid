@@ -1,0 +1,53 @@
+%==============================================================================
+% FIG. -- robot and measurement chain (camera-ready, reviewer R2: "no image of
+% the robot nor of the velocity-measurement apparatus").
+% Photos are optional: drop figures/robot_photo.jpg (and, if wanted,
+% figures/field_photo.jpg) into the folder and they appear with the right panel
+% letters; without them the figure is the measurement-chain diagram alone.
+% Photo height is capped at 3 cm so that the paper stays at 6 pages (tested).
+% No number here that is not in the text (60 Hz: Sec. III-C; staircase: III-D).
+%==============================================================================
+\IfFileExists{figures/robot_photo.jpg}{%
+  \IfFileExists{figures/field_photo.jpg}{%
+    \def\setupphotos{\includegraphics[width=0.47\columnwidth,height=3.0cm,keepaspectratio]{robot_photo.jpg}\hfill
+      \includegraphics[width=0.47\columnwidth,height=3.0cm,keepaspectratio]{field_photo.jpg}\\[4pt]}%
+    \def\setupcap{(a)~The four-wheeled omnidirectional SSL robot used in this work.
+      (b)~The field and its overhead vision cameras. (c)~Measurement chain}}{%
+    \def\setupphotos{\includegraphics[width=0.60\columnwidth,height=3.0cm,keepaspectratio]{robot_photo.jpg}\\[4pt]}%
+    \def\setupcap{(a)~The four-wheeled omnidirectional SSL robot used in this work.
+      (b)~Measurement chain}}}{%
+  \def\setupphotos{}%
+  \def\setupcap{Measurement chain}}
+\begin{figure}[!t]
+  \centering
+  \setupphotos
+  \resizebox{\columnwidth}{!}{%
+  \begin{tikzpicture}[
+    every node/.style={font=\scriptsize},
+    blk/.style={draw, rounded corners=2pt, align=center, inner sep=2.5pt, minimum height=0.72cm},
+    aux/.style={blk, dashed},
+    ar/.style={-{Latex[length=1.5mm]}, semithick},
+    arD/.style={-{Latex[length=1.5mm]}, semithick, dashed},
+    lbl/.style={font=\scriptsize\itshape, inner sep=1.5pt}
+  ]
+    \node[blk, text width=1.55cm] (cam)   at (0.00,0) {SSL-Vision\\ overhead cameras};
+    \node[blk, text width=1.55cm] (sw)    at (2.45,0) {Team software\\ (strategy)};
+    \node[blk, text width=1.25cm] (radio) at (5.15,0) {Radio\\ link};
+    \node[blk, text width=1.75cm] (robot) at (7.55,0) {Robot firmware:\\ per-wheel PI loops};
+    \draw[ar] (cam) -- (sw) node[lbl, midway, above] {pose};
+    \draw[ar] (sw) -- (radio) node[lbl, midway, above] {$v_x, v_y, \omega$};
+    \draw[ar] (radio) -- (robot);
+    \draw[ar] (robot.north) -- ++(0,0.42) -| (cam.north)
+      node[lbl, pos=0.25, above] {motion observed on the field};
+    \node[aux, text width=2.05cm] (stair) at (2.70,-1.50)
+      {Dedicated yaw collection: scripted staircase, $v_x = v_y = 0$};
+    \draw[arD] (stair.north -| sw.south) -- (sw.south) node[lbl, midway, right] {replaces the strategy};
+    \node[aux, text width=1.75cm] (log) at (0.00,-1.50) {Logger:\\ commands + poses};
+    \draw[arD] (sw.south west) -- (log.north east);
+    \node[aux, text width=2.45cm] (off) at (6.30,-1.50)
+      {Offline: smoothed derivative of the pose $\rightarrow$ body velocity};
+    \draw[arD] (log.south) -- ++(0,-0.30) -| (off.south);
+  \end{tikzpicture}}
+  \caption[Robot and measurement chain]{\setupcap: the league vision system reports the field-frame pose at about \SI{60}{Hz}; the team software closes the loop and sends body-frame velocity commands over the radio to per-wheel loops on the robot; a logger records the commands and the poses, which is all the identification consumes. Body velocities are derived offline from the vision pose (Sec.~\ref{sec:method:data}). For the dedicated yaw collection a scripted staircase of yaw commands replaces the strategy, open loop.}
+  \label{fig:setup}
+\end{figure}

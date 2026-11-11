@@ -1,0 +1,505 @@
+diff -ruN accepted/figures/fig_architecture2.tex camera_ready/figures/fig_architecture2.tex
+--- accepted/figures/fig_architecture2.tex	2026-09-23 13:50:04.183097028 -0300
++++ camera_ready/figures/fig_architecture2.tex	2026-09-23 13:49:58.487125607 -0300
+@@ -57,7 +57,6 @@
+ \draw[ar] (cmd) -- (plant.west);
+ \draw[ar] (plant.east) -- (att);
+ 
+-\node[lbl, anchor=north, text width=5.9cm, align=center] at (2.55,-1.72)
+ % ======================= PANEL (b): PIPELINE ===============================
+ % Layout deliberadamente reto: uma unica linha, e os dois ramos auxiliares
+ % entram por BAIXO, na vertical. Nenhuma aresta cruza caixa (a versao anterior
+diff -ruN accepted/figures/fig_setup.tex camera_ready/figures/fig_setup.tex
+--- accepted/figures/fig_setup.tex	1969-12-31 21:00:00.000000000 -0300
++++ camera_ready/figures/fig_setup.tex	2026-09-23 13:49:58.488037417 -0300
+@@ -0,0 +1,53 @@
++%==============================================================================
++% FIG. -- robot and measurement chain (camera-ready, reviewer R2: "no image of
++% the robot nor of the velocity-measurement apparatus").
++% Photos are optional: drop figures/robot_photo.jpg (and, if wanted,
++% figures/field_photo.jpg) into the folder and they appear with the right panel
++% letters; without them the figure is the measurement-chain diagram alone.
++% Photo height is capped at 3 cm so that the paper stays at 6 pages (tested).
++% No number here that is not in the text (60 Hz: Sec. III-C; staircase: III-D).
++%==============================================================================
++\IfFileExists{figures/robot_photo.jpg}{%
++  \IfFileExists{figures/field_photo.jpg}{%
++    \def\setupphotos{\includegraphics[width=0.47\columnwidth,height=3.0cm,keepaspectratio]{robot_photo.jpg}\hfill
++      \includegraphics[width=0.47\columnwidth,height=3.0cm,keepaspectratio]{field_photo.jpg}\\[4pt]}%
++    \def\setupcap{(a)~The four-wheeled omnidirectional SSL robot used in this work.
++      (b)~The field and its overhead vision cameras. (c)~Measurement chain}}{%
++    \def\setupphotos{\includegraphics[width=0.60\columnwidth,height=3.0cm,keepaspectratio]{robot_photo.jpg}\\[4pt]}%
++    \def\setupcap{(a)~The four-wheeled omnidirectional SSL robot used in this work.
++      (b)~Measurement chain}}}{%
++  \def\setupphotos{}%
++  \def\setupcap{Measurement chain}}
++\begin{figure}[!t]
++  \centering
++  \setupphotos
++  \resizebox{\columnwidth}{!}{%
++  \begin{tikzpicture}[
++    every node/.style={font=\scriptsize},
++    blk/.style={draw, rounded corners=2pt, align=center, inner sep=2.5pt, minimum height=0.72cm},
++    aux/.style={blk, dashed},
++    ar/.style={-{Latex[length=1.5mm]}, semithick},
++    arD/.style={-{Latex[length=1.5mm]}, semithick, dashed},
++    lbl/.style={font=\scriptsize\itshape, inner sep=1.5pt}
++  ]
++    \node[blk, text width=1.55cm] (cam)   at (0.00,0) {SSL-Vision\\ overhead cameras};
++    \node[blk, text width=1.55cm] (sw)    at (2.45,0) {Team software\\ (strategy)};
++    \node[blk, text width=1.25cm] (radio) at (5.15,0) {Radio\\ link};
++    \node[blk, text width=1.75cm] (robot) at (7.55,0) {Robot firmware:\\ per-wheel PI loops};
++    \draw[ar] (cam) -- (sw) node[lbl, midway, above] {pose};
++    \draw[ar] (sw) -- (radio) node[lbl, midway, above] {$v_x, v_y, \omega$};
++    \draw[ar] (radio) -- (robot);
++    \draw[ar] (robot.north) -- ++(0,0.42) -| (cam.north)
++      node[lbl, pos=0.25, above] {motion observed on the field};
++    \node[aux, text width=2.05cm] (stair) at (2.70,-1.50)
++      {Dedicated yaw collection: scripted staircase, $v_x = v_y = 0$};
++    \draw[arD] (stair.north -| sw.south) -- (sw.south) node[lbl, midway, right] {replaces the strategy};
++    \node[aux, text width=1.75cm] (log) at (0.00,-1.50) {Logger:\\ commands + poses};
++    \draw[arD] (sw.south west) -- (log.north east);
++    \node[aux, text width=2.45cm] (off) at (6.30,-1.50)
++      {Offline: smoothed derivative of the pose $\rightarrow$ body velocity};
++    \draw[arD] (log.south) -- ++(0,-0.30) -| (off.south);
++  \end{tikzpicture}}
++  \caption[Robot and measurement chain]{\setupcap: the league vision system reports the field-frame pose at about \SI{60}{Hz}; the team software closes the loop and sends body-frame velocity commands over the radio to per-wheel loops on the robot; a logger records the commands and the poses, which is all the identification consumes. Body velocities are derived offline from the vision pose (Sec.~\ref{sec:method:data}). For the dedicated yaw collection a scripted staircase of yaw commands replaces the strategy, open loop.}
++  \label{fig:setup}
++\end{figure}
+diff -ruN accepted/main.tex camera_ready/main.tex
+--- accepted/main.tex	2026-09-23 13:50:04.184001941 -0300
++++ camera_ready/main.tex	2026-09-23 13:49:58.488052924 -0300
+@@ -1,17 +1,15 @@
+ %==============================================================================
+-% SBR/LARS 2026 (Robotica 2026, Joao Pessoa) — Conference paper (6 pages, IEEE)
+-% DOUBLE-BLIND submission. Template: IEEEtran (conference).
++% SBR/LARS 2026 (Robotica 2026, Joao Pessoa) -- camera-ready of submission
++% #34344 (JEMS). Template: IEEEtran (conference), A4.
+ %
+-% STATUS: SKELETON + SAFE SECTIONS. Method and Results are written from validated
+-% repository artifacts; Introduction / Related Work / Discussion / Limitations /
+-% Abstract are structured STUBS with explicit TODOs (see each file).
++% Camera-ready changes (2026-09-23): see paper/sbr2026_camera_ready/CAMERA_READY_NOTES.md
++% in the digitaltwin repository. Every number in the text comes from a
++% repository artifact cited in a "% source:" comment next to it.
+ %
+-% BASELINE NAMING: the comparison baseline is rSim (the ODE physics engine of the
+-% rSoccer environment) — NOT grSim. Use "rSim" everywhere. The first mention in
+-% the text spells out what it is.
++% Before submitting: the checklist greps for REPLACE-ME and must find nothing
++% (authors, affiliation, e-mails, acknowledgment, repository URL, video URL).
+ %
+ % Build: pdflatex main && bibtex main && pdflatex main && pdflatex main
+-% (References render once refs/references.bib is populated by the focused review.)
+ %==============================================================================
+ \documentclass[conference,a4paper]{IEEEtran}
+ \IEEEoverridecommandlockouts
+@@ -25,14 +23,10 @@
+ \usepackage{url}
+ \usepackage{tikz}
+ \usetikzlibrary{arrows.meta,positioning,fit,backgrounds,calc}
+-\usepackage{stfloats}   % permite figure*/table* no rodapé; evita floats empurrados
+-                        % para depois das referências (falha observada em 2026-08-07)
++\usepackage{stfloats}   % figure*/table* at the bottom; avoids floats pushed past the references
+ \graphicspath{{figures/}}
+ 
+ % --- Float placement -----------------------------------------------------
+-% O build de 2026-08-07 empurrou Fig.2 e Fig.3 para DUAS páginas órfãs depois
+-% das referências (8 floats: 3 figuras + 5 tabelas). Os defaults do LaTeX
+-% (topnumber=2, totalnumber=3, textfraction=0.2) são restritivos demais aqui.
+ \setcounter{topnumber}{3}
+ \setcounter{bottomnumber}{2}
+ \setcounter{totalnumber}{4}
+@@ -41,12 +35,6 @@
+ \renewcommand{\textfraction}{0.07}
+ \renewcommand{\floatpagefraction}{0.70}
+ 
+-% --- Pending-number marker (REGRA DE OURO) ---------------------------------
+-% Every number that enters the paper must come from a repository artifact.
+-% Where a number is required but does not yet exist, \TODO{origin} marks it and
+-% the exact command that produces it is registered in docs/TASKS_CLAUDE_CODE.md.
+-% MUST be empty (zero occurrences) before submission.
+-\newcommand{\TODO}[1]{\textcolor{red}{\textbf{[TODO: #1]}}}
+ \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+     T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+ 
+@@ -56,48 +44,34 @@
+ \newcommand{\SEtwo}{\mathrm{SE}(2)}
+ \newcommand{\Td}{T_{d}}
+ 
+-\begin{document}
++% --- Page budget switch ------------------------------------------------------
++% Fig. "trajectory overlays by label" (figure*, ~0.3 page) is left out so that the
++% camera-ready fits 6 pages with the new robot/measurement-chain figure. Set to
++% \keeptrajfigtrue if the JEMS page limit allows a 7th page.
++\newif\ifkeeptrajfig \keeptrajfigfalse
++
++% --- Camera-ready links (fill both; the checklist greps for REPLACE-ME) -------
++% Repository: public GitHub release of the reproduction package (+ Zenodo DOI).
++% Videos: supplementary videos (YouTube unlisted or Zenodo).
++\newcommand{\repolink}{\url{https://REPLACE-ME}}
++\newcommand{\videolink}{\url{https://REPLACE-ME}}
+ 
+-%------------------------------------------------------------------------------
+-% DOUBLE-BLIND TITLE/AUTHOR BLOCK (anonymization checklist A1,A2,A9,A10).
+-% No names, no affiliation, no funding, no ORCID until camera-ready.
+-%------------------------------------------------------------------------------
+-% --- Title decision (2026-07-31, redação): the previous title ("... from
+-% Closed-Loop Competition Logs ...") stated the inverse of the central finding
+-% (yaw is identified from a DEDICATED OPEN-LOOP collection precisely because
+-% closed-loop logs fail). Three regime-aware alternatives were considered;
+-% the first is applied below. The other two, kept for the record:
+-% Alt 2: When Competition Logs Are Not Enough: Excitation-Dependent
+-%        Identifiability in a Per-DOF Digital Twin of an Omnidirectional
+-%        Soccer Robot
+-% Alt 3: Per-DOF Grey-Box Digital Twinning of an Omnidirectional Soccer
+-%        Robot: Multi-Horizon Fidelity and Identifiability Across Excitation
+-%        Regimes
+-% --- Title revision (2026-08-07, revisão maior) -------------------------------
+-% Hybrid form approved by the author: keeps the reality-gap framing requested in
+-% the revision brief (T1) AND the central finding that the 2026-07-31 decision
+-% was built on. The literal T1 title ("A Behavioral Model for Reality-Gap
+-% Mitigation in Digital Twins of Omnidirectional Soccer Robots") was NOT applied
+-% verbatim: it drops the identifiability result and promises a gap-mitigation
+-% claim that is validated only on translation-dominated windows against an
+-% untuned rSim (reviewer B5). Deviation registered in docs/REGISTRO_DESVIOS.md.
+-% 2026-08-10: título trocado por decisão do autor após a revisão independente.
+-% O anterior ("A Behavioral Model for Reality-Gap Mitigation in Digital Twins of
+-% Omnidirectional Soccer Robots") prometia MITIGAÇÃO do reality gap, que é uma
+-% alegação sobre transferência: nenhuma política é treinada nem transferida aqui
+-% (bloqueador B5). O novo título nomeia o que o artigo de fato mede.
+-% AÇÃO DO AUTOR: atualizar o registro preliminar no JEMS.
+-% 2026-08-10 (3a volta, decisao do autor): removido "for Reality-Gap Mitigation",
+-% que prometia transferencia (treinar e transferir politica) -- algo que o artigo
+-% NAO mede, apontado por tres revisoes independentes. O reality gap permanece
+-% como MOTIVACAO na Introducao, onde e legitimo. O subtitulo nomeia a
+-% contribuicao de fato entregue. AÇÃO: atualizar o registro no JEMS.
+-\title{A Behavioral Model for Reality-Gap Mitigation in Digital Twins of Omnidirectional Soccer Robots
+-%Diagnosing Identifiability from Competition Logs
+-}
++\begin{document}
+ 
+-\author{\IEEEauthorblockN{Anonymous Author(s)}
+-\IEEEauthorblockA{\textit{Affiliation withheld for double-blind review}}}
++% Title as registered in JEMS (kept by the author on 2026-09-23). If the title is
++% changed, JEMS and this line must match.
++\title{A Behavioral Model for Reality-Gap Mitigation in Digital Twins of Omnidirectional Soccer Robots}
++
++% Author list and order exactly as registered in JEMS.
++\author{\IEEEauthorblockN{REPLACE-ME First Author\IEEEauthorrefmark{1},
++REPLACE-ME Co-author\IEEEauthorrefmark{1}}
++\IEEEauthorblockA{\IEEEauthorrefmark{1}Centro de Inform\'atica, Universidade Federal de Pernambuco (CIn-UFPE), Recife, Brazil\\
++Rob\^{o}CIn Robotics Team\\
++Email: \{REPLACE-ME\}@cin.ufpe.br}}
++
++% IEEE copyright line: enable only if the organizers send the exact text.
++% \IEEEpubid{\makebox[\columnwidth]{979-8-XXXX-XXXX-X/26/\$31.00~\copyright2026 IEEE\hfill}%
++%   \hspace{\columnsep}\makebox[\columnwidth]{ }}
+ 
+ \maketitle
+ 
+@@ -105,25 +79,20 @@
+ 
+ \begin{IEEEkeywords}
+ digital twin, system identification, robot modeling, omnidirectional robot, robot soccer
+-% FIX 2026-08-10: "sim-to-real" removido das keywords -- nenhuma transferencia
+-% e feita no artigo (opcional (i) da revisao V2). Trocado por "excitation design".
+ \end{IEEEkeywords}
+ 
+ \input{sections/01_introduction}
+ \input{sections/02_related_work}
+ \input{sections/03_method}
+ \input{sections/04_results}
+-% 2026-08-10: 06_limitations.tex saiu do build -- as Limitacoes viraram uma
+-% subsecao da Discussao (pedido do autor, corte 9->6 pag.). Arquivo mantido em
+-% sections/ para a extensao JINT.
++% Limitations are a subsection of the Discussion (05); 06_limitations.tex is not built.
+ \input{sections/05_discussion}
+ \input{sections/07_conclusion}
+ 
+-%------------------------------------------------------------------------------
+-% References. IEEEtran BibTeX style + external .bib (refs/references.bib).
+-% NOTE: the bibliography is EMPTY until the focused related-work review yields
+-% real entries. Do NOT add references from memory (project guardrail).
+-%------------------------------------------------------------------------------
++\section*{Acknowledgment}
++REPLACE-ME: funding agencies and grant numbers; the Rob\^{o}CIn team; who ran the
++dedicated yaw collection and who produced the CAD model.
++
+ \bibliographystyle{IEEEtran}
+ \bibliography{refs/references}
+ 
+diff -ruN accepted/sections/00_abstract.tex camera_ready/sections/00_abstract.tex
+--- accepted/sections/00_abstract.tex	2026-09-23 13:50:04.184103196 -0300
++++ camera_ready/sections/00_abstract.tex	2026-09-23 13:49:58.488223747 -0300
+@@ -1,20 +1,13 @@
+ %==============================================================================
+-% ABSTRACT — reposicionado 2026-08-10 apos a revisao independente.
+-% Mudancas:
+-%  - comparador PRIMARIO passa a ser a cinematica ideal (mesmo harness, mesma
+-%    inicializacao). rSim vira contexto, com a ressalva fitted-vs-untuned (B2/B3).
+-%  - estatistica reportada por EVENTO (n=10), nao por janela (item 9 / C11).
+-%  - acrescentadas as tres omissoes que o revisor cobrou (6.3): heading pior em
+-%    horizonte longo, 99.6% da validacao e translacional, rSim nao sintonizado.
+-%  - declarado o tamanho da evidencia em segundos (C11).
+-% IEEE: sem simbolos matematicos, sem citacoes. ~215 palavras.
+-% Numeros: 87% (CHANGELOG 2026-06-14); 71.1% (identificacao_omega_20260724.md);
+-% 1% (omega_excitation_analysis_20260807_133917.json); 0.038/0.101 e
+-% decomposicao (gap_decomposition_20260809_2308.md); p e efeito por evento
+-% (clustered_stats_20260809_2309.md); 73.5 s idem.
++% ABSTRACT -- camera-ready (2026-09-23): one paragraph, as reviewer R2 asked.
++% IEEE: no math symbols, no citations. Numbers unchanged from the reviewed version:
++% 87% (CHANGELOG 2026-06-14); 71.1% (results/identificacao_omega_20260724.md);
++% 1% and 56% (results/omega_excitation_analysis_20260807_133917.json,
++% results/excitation_per_dof_20260810_1022.md); 0.039/0.101/0.129 and 73.5 s
++% (results/epos_eang_three_models_20260810_1022.md, results/clustered_stats_20260809_2309.md);
++% ablation (results/ablation_orderfree_20260810_1021.md); 99.6% (Sec. IV-B,
++% results/bin_distribution_20260724_155551.md).
+ %==============================================================================
+ \begin{abstract}
+-Robot soccer teams in the RoboCup Small Size League develop and validate control software largely in simulation, where simplified physics leaves a reality gap to the field. This paper presents a behavioral model of an omnidirectional soccer robot identified from the competition logs that teams already record. The proposed approach models each Degree of Freedom (DoF) as a First-Order-Plus-Dead-Time (FOPDT) channel. The translational channels identified directly from in-game logs reach roughly an 87 percent hold-out fit. 
+-
+-The identification of the yaw channel required a short, dedicated open-loop campaign to restore the excitation and identify the channel using a 71 percent hold-out fit. The digital twin's fidelity is evaluated in free-run over horizons of 0.1 to 1.5 seconds against an ideal-kinematics baseline using an identical harness.  Over 73.5 seconds of scored motion, the model reaches a median position error of 0.039 meters at the 0.4-second horizon, compared to 0.101 for ideal kinematics and 0.129 for rSim, an ODE simulator widely used across the league.
++Teams in the RoboCup Small Size League develop and validate control software largely in simulation, where simplified physics leaves a reality gap to the field. This paper asks which behavioral model of an omnidirectional soccer robot can be identified from the competition logs teams already record, and what those logs cannot supply. Each body-frame degree of freedom is modeled as a first-order-plus-dead-time channel. The two translational channels are identified from in-game logs and reach roughly 87 percent hold-out fit. The yaw channel is not: during play the yaw command carries a median of one percent of the per-wheel actuation and explains only 56 percent of the measured rotation, so a short dedicated open-loop campaign restores the excitation and identifies the channel at 71 percent hold-out fit. Fidelity is evaluated in free run over horizons of 0.1 to 1.5 seconds, with every plant in the same harness. Over 73.5 seconds of held-out motion from ten events, the model reaches a median position error of 0.039 meters at the 0.4-second horizon, against 0.101 for ideal kinematics and 0.129 for rSim, the ODE engine of the rSoccer framework, run untuned and reported as context. The model is lower in all ten events, and an order-independent ablation attributes the gain in comparable parts to the time constant and the dead time, conditional on the measured initial velocity. Because 99.6 percent of the hold-out windows are translation-dominated, rotational fidelity remains unvalidated; a screening computable from the logs alone predicts which channels a log can identify.
+ \end{abstract}
+diff -ruN accepted/sections/01_introduction.tex camera_ready/sections/01_introduction.tex
+--- accepted/sections/01_introduction.tex	2026-09-23 13:50:04.184156975 -0300
++++ camera_ready/sections/01_introduction.tex	2026-09-23 13:49:58.488183267 -0300
+@@ -11,17 +11,17 @@
+ 
+ The RoboCup Small Size League (SSL) fields teams of fast, omnidirectional, four-wheeled robots whose coordination software is written, tuned, and regression-tested almost entirely on simulators. The league's reference simulation tools implement a simplified omnidirectional wheel model on top of a rigid-body ODE engine \cite{monajjemi2012grsim}; reinforcement-learning frameworks inherit that engine \cite{martins2021rsoccer}; and recent motion-planning policies for the SSL are trained in these environments \cite{machado2025planning}. Because the simulated dynamic response departs from that of the physical robot, behavior that passes validation in simulation often degrades once deployed. This discrepancy is what the literature calls the reality gap.
+ 
+-Recent efforts to narrow it converge on \emph{digital twins}: simulation models bound to one specific  physical asset and kept faithful to it by data measured from that asset, rather than generic models of a class of robots. Twins of mobile platforms have been built for commercial AGVs \cite{barioni2024development}, and for the navigation and control of omnidirectional robots \cite{yang2025digital}, and grey-box identification has been evaluated as the module that produces the model within such a twin \cite{brennan2025greybox}. Building one is not free: it normally presumes either a detailed physical description of the mechanism, whose mechanical parameters teams rarely have, or
++Recent efforts to narrow it converge on \emph{digital twins}: simulation models bound to one specific physical asset and kept faithful to it by data measured from that asset, rather than generic models of a class of robots. Twins of mobile platforms have been built for commercial AGVs \cite{barioni2024development}, and for the navigation and control of omnidirectional robots \cite{yang2025digital}, and grey-box identification has been evaluated as the module that produces the model within such a twin \cite{brennan2025greybox}. Building one is not free: it normally presumes either a detailed physical description of the mechanism, whose mechanical parameters teams rarely have, or
+ a dedicated excitation campaign, which demands the robot, the field, and time outside of competition.
+ 
+ Competition logs are an attractive alternative because teams already record them: body-frame velocity commands and vision poses at roughly \SI{60}{Hz} during closed-loop play. Existing work, however, reflects the difficulty of using them by avoiding it. Simulation models of omnidirectional platforms are
+-tuned on dedicated real trajectories \cite{wiedemann2024simulation,wiedemann2025automated}, identification pipelines design excitation sequences per parameter group \cite{giro2023otbot}, and real-time
+-The estimation for twins assumes informative operating data \cite{kosmaga2026digital}, and offline sim-to-real calibration presumes the pre-collected data excite the parameters of interest \cite{tiboni2023dropo}. Whether a behavioral model can be identified from closed-loop \emph{operational} logs, and which degrees of freedom (DOF) such logs support, remains underexplored. This paper answers that question for an SSL robot modeled as three decoupled first-order-plus-dead-time (FOPDT) channels, one per DOF, evaluated in  free run against a zero-parameter baseline under an identical harness.
++tuned on dedicated real trajectories \cite{wiedemann2024simulation,wiedemann2025automated}, identification pipelines design excitation sequences per parameter group \cite{giro2023otbot}, real-time
++estimation for twins assumes informative operating data \cite{kosmaga2026digital}, and offline sim-to-real calibration presumes the pre-collected data excite the parameters of interest \cite{tiboni2023dropo}. Whether a behavioral model can be identified from closed-loop \emph{operational} logs, and which degrees of freedom (DOF) such logs support, remains underexplored. This paper answers that question for an SSL robot modeled as three decoupled first-order-plus-dead-time (FOPDT) channels, one per DOF, evaluated in free run against a zero-parameter baseline under an identical harness.
+ 
+ \noindent\textbf{Contributions.}
+ \textbf{(C1)} A per-DOF grey-box FOPDT identification methodology for an omnidirectional robot from \emph{closed-loop} competition logs, validated on held-out events, for the degrees of freedom those logs excite. 
+ \textbf{(C2)} A fidelity protocol that scores the model the way it is used: driven only by the recorded commands from a known pose, with no correction from measured data inside the window. Verdicts are issued per motion regime and only when a paired test, an effect size, and a bootstrap interval agree.
+-% source: phase0_replay/{rollout,metrics}.py ; config/metrics.json
++% source: src/dtssl/sim/rollout.py ; src/dtssl/eval/metrics.py ; config/metrics.json
+ \textbf{(C3)} A translational fidelity result with the improvement attributed to its source: the model lowers the median position error of the baseline in all ten hold-out events, and an order-independent ablation splits the effect between the time constant and the dead time, conditional on the measured initial state.
+-\textbf{(C4)} A pre-fit screening procedure that predicts, from an operational log alone, which degrees of freedom that log can identify. It combines two quantities computable before any model is estimated: the share of the actuation each command carries and the variance of the attained velocity it explains. This robot separates identifiable channels from unidentifiable ones before fitting a single parameter.
++\textbf{(C4)} A pre-fit screening procedure that predicts, from an operational log alone, which degrees of freedom that log can identify. It combines two quantities computable before any model is estimated: the share of the actuation each command carries and the variance of the attained velocity it explains. On this robot it separates the identifiable channels from the unidentifiable one before a single parameter is fitted.
+ % source: results/omega_excitation_analysis_20260807_133917.json
+\ No newline at end of file
+diff -ruN accepted/sections/02_related_work.tex camera_ready/sections/02_related_work.tex
+--- accepted/sections/02_related_work.tex	2026-09-23 13:50:04.184089865 -0300
++++ camera_ready/sections/02_related_work.tex	2026-09-23 13:49:58.488130990 -0300
+@@ -1,16 +1,14 @@
+ \section{Related Work}
+ \label{sec:related}
+ 
+-\paragraph{Behavioral twins of mobile robots}
+-
+-
++\subsection{Behavioral twins of mobile robots}
+ Digital twins of mobile platforms are typically validated behaviorally, by comparing simulated and real trajectories rather than parameters \cite{barioni2024development,yang2025digital}. On the construction side, grey-box identification has been assessed as the model-generating module of a twin and has been found to be sensitive to the informativeness of its input data \cite{brennan2025greybox}. Work on omnidirectional platforms assumes dedicated experiments, whether one experiment per parameter group \cite{giro2023otbot} or tuning against motion-capture trajectories, manually and per trajectory
+ \cite{wiedemann2024simulation}, or by black-box optimization over a few high-impact parameters \cite{wiedemann2025automated}. The per-DOF FOPDT structure adopted here is the classic first-order-plus-dead-time process model of control practice \cite{astrom1995pid}. The closest precedent for reusing
+ data that already exists, rather than collecting new data, is DROPO, which estimates domain-randomization distributions from an offline, pre-collected dataset \cite{tiboni2023dropo}; like the others, it presumes that the offline data excite the parameters being estimated.
+ 
+-\paragraph{SSL simulators and league context}
+-The SSL's reference simulator, grSim, adopts a simplified dynamic model of the omni wheels for real-time performance \cite{monajjemi2012grsim}; the rSoccer framework derives its rSim engine from grSim for reinforcement-learning workloads \cite{martins2021rsoccer}, and planning policies are trained in such environments \cite{machado2025planning}. A Simscape multibody (white-box) twin of an SSL robot reports trajectory RMSE of 150--240~mm on in-game scenarios with large horizons\cite{araujo2025digital}. League practice routinely records vision poses, odometry, and onboard velocities \cite{melo2023dataset}, and SSL firmware
++\subsection{SSL simulators and league context}
++The SSL's reference simulator, grSim, adopts a simplified dynamic model of the omni wheels for real-time performance \cite{monajjemi2012grsim}; the rSoccer framework derives its rSim engine from grSim for reinforcement-learning workloads \cite{martins2021rsoccer}, and planning policies are trained in such environments \cite{machado2025planning}. A Simscape multibody (white-box) twin of an SSL robot reports trajectory RMSE of 150--240~mm on in-game scenarios with large horizons~\cite{araujo2025digital}. League practice routinely records vision poses, odometry, and onboard velocities \cite{melo2023dataset}, and SSL firmware
+ converts body commands into per-wheel velocity loops \cite{freiberger2024implementation}.
+ 
+-\paragraph{Closed-loop identification}
+-That feedback correlates the input with unmeasured disturbances, breaking methods that work in open loop are classic \cite{gustavsson1977identification,vandenhof1998closedloop,forssell1999closedloop}, as is the role of persistent excitation in prediction-error estimation \cite{ljung1999system}.
+\ No newline at end of file
++\subsection{Closed-loop identification}
++That feedback correlates the input with unmeasured disturbances, breaking methods that work in open loop, is classic \cite{gustavsson1977identification,vandenhof1998closedloop,forssell1999closedloop}, as is the role of persistent excitation in prediction-error estimation \cite{ljung1999system}.
+\ No newline at end of file
+diff -ruN accepted/sections/03_method.tex camera_ready/sections/03_method.tex
+--- accepted/sections/03_method.tex	2026-09-23 13:50:04.184169808 -0300
++++ camera_ready/sections/03_method.tex	2026-09-23 13:49:58.488198554 -0300
+@@ -3,7 +3,7 @@
+ 
+ \input{figures/fig_architecture2}
+ 
+-This paper specifies the \emph{plant layer} of a greater digital-twin effort: a complete twin of an SSL robot also needs a synchronized visual counterpart and an execution environment in which policies can be trained, but the component that governs whether such an environment reproduces the robot's behavior at all is the map from commanded to attained body motion (Fig.~\ref{fig:arch2}a).
++This paper specifies the \emph{plant layer} of a larger digital-twin effort: a complete twin of an SSL robot also needs a synchronized visual counterpart and an execution environment in which policies can be trained, but the component that governs whether such an environment reproduces the robot's behavior at all is the map from commanded to attained body motion (Fig.~\ref{fig:arch2}a).
+ 
+ The pipeline runs from the league protocol stream through event extraction and per-DOF window labeling to a grey-box FOPDT fit per channel, and the resulting nine parameters drive a free-run replay scored against ground truth (Fig.~\ref{fig:arch2}b). Competition logs feed that path end to end. Every comparison plant is scored on the same windows, horizons, and statistical gates as the model.
+ 
+@@ -27,12 +27,13 @@
+ 
+ \subsection{Data and pre-processing}
+ \label{sec:method:data}
+-The data are closed-loop competition logs of a single omnidirectional 4-wheeled SSL robot, decoded from the league protocol stream into per-event body-frame commands and field-frame pose at $\sim$\SI{60}{Hz}. Measured body velocity, used only for identification and for the initial condition, is obtained by smoothing the vision position with a low-order polynomial (Savitzky--Golay) filter, differentiating it by central differences, and rotating the result into the body frame.
++The data are closed-loop competition logs of a single omnidirectional 4-wheeled SSL robot, decoded from the league protocol stream into per-event body-frame commands and field-frame pose at $\sim$\SI{60}{Hz}. Measured body velocity, used only for identification and for the initial condition, is obtained by smoothing the vision position with a low-order polynomial (Savitzky--Golay) filter, differentiating it by central differences, and rotating the result into the body frame. Fig.~\ref{fig:setup} shows the measurement chain: the body velocity used for identification is not read from the robot's wheel encoders but derived offline from the vision pose, both for the competition logs and for the dedicated yaw collection.\footnote{Supplementary videos (the dedicated yaw collection with the velocity extraction, and the model driven by the team's strategy): \videolink.}
++
++\input{figures/fig_setup}
+ 
+ Logs arrive on an irregular time grid, since commands are transmitted in bursts: identification resamples every signal onto the uniform $1/60\,\si{s}$ grid, whereas the fidelity metric leaves the samples where they were recorded and defines its windows in seconds, so that no interpolation enters the reported error.
+ The dataset comprises $46$ events across four motion labels (\texttt{front\_to\_back}, \texttt{side\_to\_side}, \texttt{shoot\_to\_goal}, \texttt{square}); a frozen list of $10$ events is held out and was not used for fitting.
+ 
+-\paragraph{Definition of hold-out fit}
+ Throughout, \emph{fit} measures how much of the variation in the measured signal the model reproduces, on events the fit never saw:
+ \begin{equation}
+   \mathrm{fit} = 100\left(1 -
+@@ -49,14 +50,17 @@
+ \subsection{Frames, constants and replication}
+ \label{sec:method:geometry}
+ Commands and attained velocities live in the \emph{body} frame: $v_x$ longitudinal, $v_y$ lateral, $\omega$ yaw rate about the upward $z$ axis, counter-clockwise positive. Pose is integrated in the \emph{field} frame as $\dot{X} = v_x\cos\theta - v_y\sin\theta$, $\dot{Y} = v_x\sin\theta + v_y\cos\theta$, with $\theta$ unwrapped.
+-Per-wheel geometry converts the firmware's per-wheel motor threshold ($\SI{1.567}{rad/s}$) into a body yaw rate for Sec.~\ref{sec:results:omega}, through the ratio of the cennter to wheel-contact radius $R=\SI{0.0796}{m}$ to the wheel radius $r=\SI{0.0295}{m}$.
++Per-wheel geometry converts the firmware's per-wheel motor threshold ($\SI{1.567}{rad/s}$) into a body yaw rate for Sec.~\ref{sec:results:omega}, through the ratio of the center-to-wheel-contact radius $R=\SI{0.0796}{m}$ to the wheel radius $r=\SI{0.0295}{m}$.
+ 
+ \subsection{Free-run replay and multi-horizon metric}
+ \label{sec:method:metric}
+-Fidelity is measured in \emph{free-run}: segments are cut into overlapping windows at a fixed stride, each re-anchored to the true $\SEtwo$ pose at its anchor $t_0$ and rolled out to $H_{\max}=90$ samples ($\SI{1.5}{s}$) driven only by the command stream. The Euclidean position error $\epos(w,h)$ and the wrapped absolute heading error $\eang(w,h)$ at $h\in\{6,12,24,42,60,90\}$ samples ($\{0.1,0.2,0.4,0.7,1.0,1.5\}\,\si{s}$), with reference horizon $h_{\mathrm{ref}}=24$ ($\SI{0.4}{s}$) are reported separately. % source: config/metrics.json (horizons, h_ref) $\epos$ is the claim of this paper; $\eang$ is reported but bounded by the population of rotation-rich windows available (Sec .~\ref {sec:results:bins}).
++Fidelity is measured in \emph{free-run}: segments are cut into overlapping windows at a fixed stride, each re-anchored to the true $\SEtwo$ pose at its anchor $t_0$ and rolled out to $H_{\max}=90$ samples ($\SI{1.5}{s}$) driven only by the command stream. The Euclidean position error $\epos(w,h)$ and the wrapped absolute heading error $\eang(w,h)$ at $h\in\{6,12,24,42,60,90\}$ samples ($\{0.1,0.2,0.4,0.7,1.0,1.5\}\,\si{s}$), with reference horizon $h_{\mathrm{ref}}=24$ ($\SI{0.4}{s}$) are reported separately. $\epos$ is the claim of this paper; $\eang$ is reported but bounded by the population of rotation-rich windows available (Sec.~\ref{sec:results:bins}).
++% source: config/metrics.json (horizons, h_ref)
+ 
+ \subsection{Baselines}
+ \label{sec:method:baselines}
+-We compare the twin against two baselines under the \emph{same} windows, horizons, and gate. The first is an \emph{ideal-kinematics} plant in which the attained body velocity equals the command instantaneously (no gain, lag, or delay), integrated by the same trapezoidal scheme. The second is \textbf{rSim}, the ODE-based physics engine of the rSoccer environment. It is driven at adjusted parameters for the teams robots.
++We compare the twin against two baselines under the \emph{same} windows, horizons, and gate. The first is an \emph{ideal-kinematics} plant in which the attained body velocity equals the command instantaneously (no gain, lag, or delay), integrated by the same trapezoidal scheme. The second is \textbf{rSim}, the ODE-based physics engine of the rSoccer environment, run with its stock robot parameters and no fitting to these logs, so the comparison is between a plant fitted to this robot and an untuned engine; it is reported as context, not as the primary comparison. The recorded body-frame commands enter it directly as body-velocity setpoints, with no motion controller in between, and it is stepped in \SI{1}{ms} substeps interpolated back onto the $1/60\,\si{s}$ grid. rSim has no velocity setter at reset, so each window warms it up over the $15$ real pre-anchor commands before a rigid $\SEtwo$ re-anchor at $t_0$; the dead-time term of the model has no counterpart in it.
++% source: src/dtssl/models/rsim.py (robosim.SSL with stock parameters; wheel_speed=False, body-velocity action;
++%   sub_ms=1 with linear interpolation onto the 1/60 s grid; warm-up over LW=15 pre-anchor commands, rigid SE(2) re-anchor)
+ 
+ 
+diff -ruN accepted/sections/04_results.tex camera_ready/sections/04_results.tex
+--- accepted/sections/04_results.tex	2026-09-23 13:50:04.184115833 -0300
++++ camera_ready/sections/04_results.tex	2026-09-23 13:50:32.324710599 -0300
+@@ -26,7 +26,7 @@
+ \begin{figure*}[!t]
+   \centerline{\includegraphics[width=0.86\textwidth]{main_result_en.png}}
+   \caption{(a) Median free-run position error against horizon on
+-  translation-dominated hold-out windows, for the FOPDT model, ideal kinematics, and an untuned rSim. The two baselines cross near $\SI{1}{s}$. (b) The same   comparison resolved by event at $h_{\mathrm{ref}}$: each line is one of the   ten hold-out events, and the model is lower in all ten.
++  translation-dominated hold-out windows, for the FOPDT model, ideal kinematics, and an untuned rSim. The two baselines cross near $\SI{1}{s}$. (b) The same comparison resolved by event at $h_{\mathrm{ref}}$: each line is one of the ten hold-out events, and the model is lower in all ten.
+   }
+   \label{fig:main}
+ \end{figure*}
+@@ -48,19 +48,20 @@
+ event share robot, surface, session and controller, so we take the \emph{event}
+ as the unit of analysis. The model wins all ten, by a median of
+ $+\SI{0.069}{m}$ (one-sided Wilcoxon $p = 9.8\times10^{-4}$, the smallest value
+-attainable at $n = 10$); the pre-registered window-level test agrees and is the
+-less conservative of the two. Fig.~\ref{fig:trajlabels} shows the same comparison in the trajectory domain, one panel per motion label.
++attainable at $n = 10$); the pre-registered window-level test over the $49$ non-overlapping windows
++agrees and is the less conservative of the two.\ifkeeptrajfig{} Fig.~\ref{fig:trajlabels} shows the same comparison in the trajectory domain, one panel per motion label.\fi
++% source: results/gate_window_vs_event_20260810_1743.md (window n = 49, event n = 10)
+ 
+ \input{tables/tab_three_models}
+ 
+-\paragraph{What produces the improvement}
++\subsubsection{What produces the improvement}
+ We switch each of $\{K,\tau,\Td\}$ off in every combination and average over all
+ orderings, so no term is credited merely for being enabled first. Of the
+ $\SI{0.062}{m}$ separating the two plants at $h_{\mathrm{ref}}$, the time
+ constant accounts for $55\%$, the dead time for $43\%$ and the gain for $2\%$.
+ Lag and delay are comparable contributors; the gain is irrelevant.
+ 
+-\paragraph{The improvement needs the measured initial velocity}
++\subsubsection{The role of the measured initial velocity}
+ Both plants are seeded with the measured body velocity, but only the dynamic one
+ can carry it forward, and neither ingredient works alone. Extrapolating that
+ velocity at constant speed, ignoring the commands, gives $\SI{0.160}{m}$;
+@@ -71,10 +72,10 @@
+ re-deriving it with a strictly causal difference raises both errors but
+ \emph{widens} the gap, so the verdict does not rest on it.
+ 
+-\paragraph{The ODE simulator}
++\subsubsection{The untuned ODE simulator}
+ rSim reaches $\SI{0.129}{m}$ at $h_{\mathrm{ref}}$, so even the zero-parameter baseline outperforms it. Giving it the model's dead time widens rather than closes the gap.
+ 
+-\paragraph{Heading error}
++\subsubsection{Heading error}
+ The rotation and mixed bins lack a scorable population
+ (Sec.~\ref{sec:results:bins}), so heading carries no verdict. Descriptively
+ (Table~\ref{tab:three}), the model's median $\eang$ is the lowest of the three
+@@ -87,6 +88,7 @@
+ \subsection{Yaw identifiability is a function of excitation regime}
+ \label{sec:results:omega}
+ 
++\ifkeeptrajfig
+ \begin{figure*}[!t]
+   \centerline{\includegraphics[width=0.98\textwidth]{trajectory_by_label_en.png}}
+   \caption{Free-run trajectory overlays, one per motion label, over a
+@@ -98,6 +100,7 @@
+   end-of-window position error of each plant.}
+   \label{fig:trajlabels}
+ \end{figure*}
++\fi
+ 
+ The problem is visible in the logs before any model is fitted. Regressing the
+ measured body velocity on the command, aligned by its dead time, the command
+@@ -110,7 +113,7 @@
+ $60\%$ gate. Using it also \emph{worsens} free-run position, because a gain
+ above unity amplifies accumulated heading drift, so it is not promoted.
+ 
+-\paragraph{Why the logs cannot constrain yaw}
++\subsubsection{Why the logs cannot constrain yaw}
+ The firmware clamps each \emph{wheel} setpoint below $\SI{1.567}{rad/s}$, after
+ the command kinematics. Converted to body yaw rate that threshold sits at
+ $0.58$--$0.60\,\si{rad/s}$, and $94.3\%$ of commanded yaw samples in the logs
+@@ -121,12 +124,12 @@
+ but \emph{diluted}, contributing a median of $1.0\%$ of what each wheel is asked
+ to do. What the actuators receive in competition is $99\%$ translation.
+ 
+-\paragraph{The same structure, different data}
++\subsubsection{The same structure on dedicated data}
+ A short dedicated open-loop collection removes the dilution: with
+ $v_x = v_y = 0$ the yaw command becomes the sole actuation. Identified with the
+ \emph{same} structure and tooling (Fig.~\ref{fig:fits}), it gives
+ $K_\omega = 1.002$, $\tau_\omega = \SI{0.083}{s}$, $\Td{}_\omega = \SI{0.089}{s}$
+-and a hold-out fit of $71.1\%$, above the gate. Scored against the same
+-placeholder on the same competition population, the closed-loop estimate is
++and a hold-out fit of $71.1\%$, above the gate. Scored against the same fixed
++placeholder yaw channel ($K=1$, $\tau=\SI{0.1}{s}$, $\Td=0$) on the same competition population, the closed-loop estimate is
+ worse at every horizon and the open-loop one better, so the verdict inverts
+ under identical tooling.
+\ No newline at end of file
+diff -ruN accepted/sections/05_discussion.tex camera_ready/sections/05_discussion.tex
+--- accepted/sections/05_discussion.tex	2026-09-23 13:50:04.184182427 -0300
++++ camera_ready/sections/05_discussion.tex	2026-09-23 13:49:58.488211252 -0300
+@@ -62,6 +62,24 @@
+ % modelo EXCEDE o do rSim, contradizendo a Tabela III e o texto de IV-C, ja
+ % corrigidos quando o e_ang do rSim foi finalmente medido.
+ initial state, which the matched-delay ablation narrows but does not remove.
++The model is also deliberately simple, and three simplifications bound where it
++applies. The channels are decoupled: no term maps a translational command into
++yaw or a yaw command into translation, although part of the $44\%$ of the
++measured rotation that the yaw command leaves unexplained in play is plausibly
++translation-induced yaw (slip, contact and traction asymmetry), which is exactly
++what a coupled model would have to capture; a coupled (MIMO) identification on
++the same data is the natural next step and is not attempted here. The plant is
++linear, with no saturation, acceleration limit or dead zone: it is fitted and
++scored inside the envelope of the logs, where the commanded speed exceeds
++$\SI{2.9}{m/s}$ in only $0.01\%$ of the competition samples and the dedicated
++yaw steps peak at about a quarter of the per-wheel PWM limit, so its validity
++in aggressive or mixed-motion regimes is unverified. Slip enters only through
++the identified gains and lags, never as a state.
++% source: results/excitation_per_dof_20260810_1022.md (w: R^2 = 0.557);
++%   results/closed_loop_stats_20260907_2137.md (competition pool, 46 events, 22812 samples at 60 Hz:
++%   |v| > 2.9 m/s in 0.01 %, max |v| 2.91 m/s); results/qc_rotate_20260724_125828.md sec. 6
++%   (max |PWM| 20.38 at +-5 rad/s vs the firmware limit +-80, 25 %); config/robot_limits.json
++%   ("the published behavioral plant has NO saturation/acceleration limit"; deadzone off by default).
+ % source: results/identificacao_omega_20260724.md Etapa 4 ; qc_rotate_20260724_125828.md ;
+ %   config/robot_geometry.json ; docs/PREREGISTRO_OMEGA_20260724.md ;
+ %   results/window_errors_eang_summary_20260731_023856.md ;
+diff -ruN accepted/sections/07_conclusion.tex camera_ready/sections/07_conclusion.tex
+--- accepted/sections/07_conclusion.tex	2026-09-23 13:50:04.184130211 -0300
++++ camera_ready/sections/07_conclusion.tex	2026-09-23 13:49:58.488158356 -0300
+@@ -3,11 +3,10 @@
+ % De ~3 blocos para 2 parágrafos curtos. Availability preservada (fecha C10);
+ % Future work reduzido a uma frase por direção.
+ %==============================================================================
+-\section{Conclusion and Further Works}
++\section{Conclusion and Future Work}
+ \label{sec:conclusion}
+ 
+-This paper presented a per-DOF FOPDT model of an omnidirectional SSL robot, identified mostly from closed-loop competition logs, attains validated translational fidelity: over $\SI{73.5}{s}$ of scored hold-out motion it lowers the median position error of a baseline in all ten hold-out events, halving it at the reference horizon, with the improvement attributable in comparable parts to the time constant and the dead time, and only in combination with the measured initial velocity.
++This paper presented a per-DOF FOPDT model of an omnidirectional SSL robot, identified mostly from closed-loop competition logs, which attains validated translational fidelity: over $\SI{73.5}{s}$ of scored hold-out motion it lowers the median position error of a baseline in all ten hold-out events, halving it at the reference horizon, with the improvement attributable in comparable parts to the time constant and the dead time, and only in combination with the measured initial velocity.
+ Yaw needed a short dedicated open-loop campaign, after characterizing why the logs cannot support it: during play the yaw command carries a median $1\%$ of the per-wheel actuation and explains only $56\%$ of the variance of the measured rotation. Code, configurations, and both datasets are released at
+-\url{https://anonymous.4open.science/r/dt-ssl-sbr26-4207}, with instructions to reproduce every number above. Future work embeds this plant in a full digital twin inside a robot-learning environment such as Isaac Sim or MuJoCo \cite{machado2025planning}, and adds a rotation-rich validation distribution, an open-loop arm with translation superimposed, and cross-robot replication.
++\repolink, with instructions to reproduce every number above. Future work embeds this plant in a full digital twin inside a robot-learning environment such as Isaac Sim or MuJoCo \cite{machado2025planning}, and adds a rotation-rich validation distribution, an open-loop arm with translation superimposed, and cross-robot replication.
+ 
+-% Conteudo pronto em open-source/ (ver open-source/README.md).

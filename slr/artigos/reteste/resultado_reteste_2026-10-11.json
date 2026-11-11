@@ -1,0 +1,117 @@
+{
+ "n": 45,
+ "tabela": {
+  "excl_excl": 24,
+  "excl_aprov": 1,
+  "aprov_excl": 6,
+  "aprov_aprov": 14
+ },
+ "po": 0.8444444444444444,
+ "pe": 0.5185185185185185,
+ "kappa": 0.676923076923077,
+ "kappa_ic95_assintotico": [
+  0.46317596087373447,
+  0.8906701929724194
+ ],
+ "kappa_se": 0.10905465104558289,
+ "kappa_ic95_bootstrap_estratificado": [
+  0.44329896907216476,
+  0.8643216080402011
+ ],
+ "pabak": 0.6888888888888889,
+ "estrato_A": {
+  "n": 25,
+  "concordam": 24,
+  "ic95_wilson": [
+   0.8045593608838223,
+   0.9929037665766179
+  ]
+ },
+ "estrato_B": {
+  "n": 20,
+  "concordam": 14,
+  "ic95_wilson": [
+   0.4810271799475211,
+   0.8545227559784271
+  ]
+ },
+ "total_ic95_wilson": [
+  0.7121609100670803,
+  0.922545765573838
+ ],
+ "ec_nas_exclusoes_concordantes": [
+  "EC1"
+ ],
+ "divergencias": [
+  {
+   "pid": "SLR-2024-Jongmoon-4537",
+   "estrato": "A",
+   "orig": "Excluir",
+   "ret": "Aprovar",
+   "ec_ret": "",
+   "rq": "",
+   "titulo": "Deep Reinforcement Learning, Generative AI, Federated Learning, and Digital Twin Technology",
+   "obs": ""
+  },
+  {
+   "pid": "SLR-2020-I-1931",
+   "estrato": "B",
+   "orig": "Aprovar",
+   "ret": "Excluir",
+   "ec_ret": "EC1",
+   "rq": "RQ1",
+   "titulo": "Robot Collaboration Intelligence with AI",
+   "obs": ""
+  },
+  {
+   "pid": "SLR-2023-Grazioso-2365",
+   "estrato": "B",
+   "orig": "Aprovar",
+   "ret": "Excluir",
+   "ec_ret": "EC1",
+   "rq": "RQ1+RQ2",
+   "titulo": "Modeling and validation of a novel tracked robot via multibody dynamics",
+   "obs": ""
+  },
+  {
+   "pid": "SLR-2025-Febrian-2449",
+   "estrato": "B",
+   "orig": "Aprovar",
+   "ret": "Excluir",
+   "ec_ret": "EC1",
+   "rq": "RQ4",
+   "titulo": "Dynamic Passing Strategy on Middle Size League Robot Soccer ERSOW Using Potential Passing Point",
+   "obs": ""
+  },
+  {
+   "pid": "SLR-2025-Lianzhao-3590",
+   "estrato": "B",
+   "orig": "Aprovar",
+   "ret": "Excluir",
+   "ec_ret": "EC1",
+   "rq": "RQ1",
+   "titulo": "An Integrated Framework for Slip Detection and Recovery in Hexapod Robot Force Control",
+   "obs": ""
+  },
+  {
+   "pid": "SLR-2026-Philippe-4238",
+   "estrato": "B",
+   "orig": "Aprovar",
+   "ret": "Excluir",
+   "ec_ret": "EC1",
+   "rq": "RQ3",
+   "titulo": "Accelerating SME Robotics: Reinforcement Learning for Efficient Bin-Picking",
+   "obs": ""
+  },
+  {
+   "pid": "SLR-2026-Xinmao-161",
+   "estrato": "B",
+   "orig": "Aprovar",
+   "ret": "Excluir",
+   "ec_ret": "EC1",
+   "rq": "RQ3",
+   "titulo": "Hybrid offline-online reinforcement learning for AUV trajectory tracking: Physics-informed policy optimization with sample efficiency",
+   "obs": ""
+  }
+ ]
+}

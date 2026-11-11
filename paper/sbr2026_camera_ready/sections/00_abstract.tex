@@ -1,0 +1,13 @@
+%==============================================================================
+% ABSTRACT -- camera-ready (2026-09-23): one paragraph, as reviewer R2 asked.
+% IEEE: no math symbols, no citations. Numbers unchanged from the reviewed version:
+% 87% (CHANGELOG 2026-06-14); 71.1% (results/identificacao_omega_20260724.md);
+% 1% and 56% (results/omega_excitation_analysis_20260807_133917.json,
+% results/excitation_per_dof_20260810_1022.md); 0.039/0.101/0.129 and 73.5 s
+% (results/epos_eang_three_models_20260810_1022.md, results/clustered_stats_20260809_2309.md);
+% ablation (results/ablation_orderfree_20260810_1021.md); 99.6% (Sec. IV-B,
+% results/bin_distribution_20260724_155551.md).
+%==============================================================================
+\begin{abstract}
+Teams in the RoboCup Small Size League develop and validate control software largely in simulation, where simplified physics leaves a reality gap to the field. This paper asks which behavioral model of an omnidirectional soccer robot can be identified from the competition logs teams already record, and what those logs cannot supply. Each body-frame degree of freedom is modeled as a first-order-plus-dead-time channel. The two translational channels are identified from in-game logs and reach roughly 87 percent hold-out fit. The yaw channel is not: during play the yaw command carries a median of one percent of the per-wheel actuation and explains only 56 percent of the measured rotation, so a short dedicated open-loop campaign restores the excitation and identifies the channel at 71 percent hold-out fit. Fidelity is evaluated in free run over horizons of 0.1 to 1.5 seconds, with every plant in the same harness. Over 73.5 seconds of held-out motion from ten events, the model reaches a median position error of 0.039 meters at the 0.4-second horizon, against 0.101 for ideal kinematics and 0.129 for rSim, the ODE engine of the rSoccer framework, run untuned and reported as context. The model is lower in all ten events, and an order-independent ablation attributes the gain in comparable parts to the time constant and the dead time, conditional on the measured initial velocity. Because 99.6 percent of the hold-out windows are translation-dominated, rotational fidelity remains unvalidated; a screening computable from the logs alone predicts which channels a log can identify.
+\end{abstract}

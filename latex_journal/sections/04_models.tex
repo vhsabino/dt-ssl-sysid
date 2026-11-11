@@ -1,0 +1,15 @@
+%==============================================================================
+% 4 MODELS
+% Plano: planta FOPDT por DOF (Eq. do SBR); modelo acoplado de primeira ordem (Eq. do
+% modulo coupled_mimo_check: y_i[k] = A_i y_i[k-1] + sum_j B_ij u_j[k-1-M_ij]);
+% discretizacao e alinhamento (convencao da planta); estimadores (P1D por erro de
+% predicao no MATLAB para o theta promovido; minimos quadrados separaveis em erro de
+% saida para a checagem MIMO); regra de triagem pre-ajuste (fracao de atuacao por
+% comando e variancia explicada: 96/94/56 %).
+% Fontes: config/twin_params.json; docs/PREREGISTRO_MIMO_CHECK_20260923.md;
+% results/excitation_per_dof_20260810_1022.md; results/omega_excitation_analysis_20260807_133917.json.
+%==============================================================================
+\section{Models and estimators}
+\label{sec:models}
+
+\pending{per-DOF FOPDT plant; coupled first-order model; discretization; estimators; pre-fit screening rule.}

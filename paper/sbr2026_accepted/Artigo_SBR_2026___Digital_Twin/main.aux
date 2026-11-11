@@ -1,0 +1,84 @@
+\relax 
+\@writefile{toc}{\contentsline {section}{\numberline {I}Introduction}{1}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {II}Related Work}{1}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {III}Method}{1}{}\protected@file@percent }
+\newlabel{sec:method}{{III}{1}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-A}}Per-DOF FOPDT twin}{1}{}\protected@file@percent }
+\newlabel{sec:method:model}{{\mbox  {III-A}}{1}}
+\newlabel{eq:fopdt}{{1}{1}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-B}}Discretization and pose integration}{1}{}\protected@file@percent }
+\newlabel{sec:method:disc}{{\mbox  {III-B}}{1}}
+\newlabel{eq:delay}{{2}{1}}
+\newlabel{eq:lag}{{3}{1}}
+\newlabel{eq:integ}{{6}{1}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-C}}Data and pre-processing}{1}{}\protected@file@percent }
+\newlabel{sec:method:data}{{\mbox  {III-C}}{1}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-D}}Identification}{2}{}\protected@file@percent }
+\newlabel{sec:method:id}{{\mbox  {III-D}}{2}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-E}}Dedicated open-loop yaw excitation}{2}{}\protected@file@percent }
+\newlabel{sec:method:omega-data}{{\mbox  {III-E}}{2}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-F}}Free-run replay and multi-horizon metric}{2}{}\protected@file@percent }
+\newlabel{sec:method:metric}{{\mbox  {III-F}}{2}}
+\newlabel{eq:errors}{{8}{2}}
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {III-F}0a}Motion stratification}{2}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {III-F}0b}Statistical gate}{2}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {III-F}0c}Horizon grid and anchor convention}{2}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-G}}Baselines}{2}{}\protected@file@percent }
+\newlabel{sec:method:baselines}{{\mbox  {III-G}}{2}}
+\@writefile{lot}{\contentsline {table}{\numberline {I}{\ignorespaces Identified per-DOF FOPDT parameters and hold-out fit. All three channels are identified (no placeholder); $\omega $ uses a dedicated open-loop rotation-only collection (see Sec.\nobreakspace  {}\mbox  {IV-D}\hbox {}), not the closed-loop competition logs used for $v_x,v_y$.}}{3}{}\protected@file@percent }
+\newlabel{tab:sysid}{{I}{3}}
+\@writefile{toc}{\contentsline {section}{\numberline {IV}Results}{3}{}\protected@file@percent }
+\newlabel{sec:results}{{IV}{3}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-A}}Identified model}{3}{}\protected@file@percent }
+\newlabel{sec:results:id}{{\mbox  {IV-A}}{3}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-B}}Motion distribution of the hold-out}{3}{}\protected@file@percent }
+\newlabel{sec:results:bins}{{\mbox  {IV-B}}{3}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-C}}Twin vs.\ rSim: translational fidelity}{3}{}\protected@file@percent }
+\newlabel{sec:results:rsim}{{\mbox  {IV-C}}{3}}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Motion-content distribution of the hold-out windows; the population is almost entirely translation-dominated. }}{3}{}\protected@file@percent }
+\newlabel{fig:bins}{{1}{3}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Free-run fidelity vs.\ horizon, twin (FOPDT) vs.\ rSim (ODE engine of rSoccer), Mode A. Left: position error $e_{\mathrm  {pos}}$ (the claim). Right: heading error $e_{\mathrm  {ang}}$ on this (translation-dominated) population, generated with the yaw placeholder in place before $\omega $ was identified (Sec.\nobreakspace  {}\mbox  {IV-D}\hbox {}); not re-run with the identified $\omega $. Bands are moving-block bootstrap $95\%$ CIs. }}{3}{}\protected@file@percent }
+\newlabel{fig:twinrsim}{{2}{3}}
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {IV-C}0a}Robustness (Mode B)}{3}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {IV-C}0b}Twin vs.\ ideal kinematics}{3}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {IV-C}0c}Heading error}{3}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-D}}Yaw identifiability is a function of excitation regime}{3}{}\protected@file@percent }
+\newlabel{sec:results:omega}{{\mbox  {IV-D}}{3}}
+\@writefile{lot}{\contentsline {table}{\numberline {II}{\ignorespaces Twin (FOPDT) vs.\ rSim (ODE) on translation-dominated hold-out windows, Mode A (warm-up $+$ rigid $\mathrm  {SE}(2)$ re-anchor). $e_{\mathrm  {pos}}$ medians in meters; $\mathrm  {gap}=e_{\mathrm  {pos}}^{\mathrm  {rSim}}-e_{\mathrm  {pos}}^{\mathrm  {twin}}$; paired non-overlapping Wilcoxon $p$; rank-biserial effect. $N_{\mathrm  {indep}}=49$.}}{4}{}\protected@file@percent }
+\newlabel{tab:twinvsrsim}{{II}{4}}
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {IV-D}0a}The same structure, different data}{4}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {IV-D}0b}Interpretation: correlation bias, not plant gain}{4}{}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {III}{\ignorespaces Yaw (\(\omega \)) P1D identification: closed-loop competition logs vs.\ a dedicated open-loop rotation-only collection. Same model structure (Eq.\nobreakspace  {}1\hbox {}) and identification tooling; only the excitation regime differs. SE(2) gate: pooled median gap vs.\ placeholder ($K{=}1,\tau {=}0.1\,\ensuremath  {\mathrm  {s}},T_{d}{=}0$), non-overlapping Wilcoxon $p$.}}{4}{}\protected@file@percent }
+\newlabel{tab:omega-regime}{{III}{4}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Effective yaw gain vs.\ command amplitude in the closed-loop competition logs: flat $\approx 1.3$--$1.5$ with no dead-zone knee visible in the body signal -- consistent with a per-wheel, not body-frame, dead-zone, and with $94.3\%$ of commanded amplitudes falling below it. }}{4}{}\protected@file@percent }
+\newlabel{fig:omega}{{3}{4}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-E}}A joint behavioral calibration does not beat per-DOF on translation}{4}{}\protected@file@percent }
+\newlabel{sec:results:bayesopt}{{\mbox  {IV-E}}{4}}
+\@writefile{toc}{\contentsline {section}{\numberline {V}Discussion}{5}{}\protected@file@percent }
+\newlabel{sec:discussion}{{V}{5}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-A}}Identifiability is a property of the data, not the DOF}{5}{}\protected@file@percent }
+\newlabel{sec:discussion:inversion}{{\mbox  {V-A}}{5}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-B}}Correlation bias as the mechanism, not a coincidence}{5}{}\protected@file@percent }
+\newlabel{sec:discussion:bias}{{\mbox  {V-B}}{5}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-C}}Where the twin beats rSim, and why}{5}{}\protected@file@percent }
+\newlabel{sec:discussion:rsim}{{\mbox  {V-C}}{5}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-D}}Why the joint 9-parameter calibration does not help translation}{5}{}\protected@file@percent }
+\newlabel{sec:discussion:bayesopt}{{\mbox  {V-D}}{5}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-E}}A methodological lesson beyond this robot}{5}{}\protected@file@percent }
+\newlabel{sec:discussion:lesson}{{\mbox  {V-E}}{5}}
+\@writefile{toc}{\contentsline {section}{\numberline {VI}Limitations and Threats to Validity}{5}{}\protected@file@percent }
+\newlabel{sec:limitations}{{VI}{5}}
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {VI-}0a}Small sample for the yaw identification}{5}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {VI-}0b}Single robot, single session}{5}{}\protected@file@percent }
+\bibstyle{IEEEtran}
+\bibdata{refs/references}
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {VI-}0c}Rotational fidelity of the twin remains unverified}{6}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {VI-}0d}An unexplained kinematic constant}{6}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {VI-}0e}An untraceable legacy constant}{6}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {VI-}0f}Whiteness test is informative, not a gate}{6}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {VI-}0g}Baseline fairness}{6}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {VI-}0h}Scope of the evaluation data}{6}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {VI-}0i}Reproducibility of the rSim baseline}{6}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {VII}Conclusion and Future Work}{6}{}\protected@file@percent }
+\newlabel{sec:conclusion}{{VII}{6}}
+\gdef \@abspage@last{6}

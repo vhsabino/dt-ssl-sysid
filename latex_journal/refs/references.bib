@@ -1,0 +1,230 @@
+%==============================================================================
+% references.bib — SBR/LARS 2026 paper.
+%
+% Double-blind note (A5, A6, A12): cite rSoccer/rSim and any RL-for-SSL work as
+% third-party literature; render self-citations in the third person; check that no
+% citation pattern reveals authorship.
+%
+% PROJECT GUARDRAIL: do NOT add references from memory. Every entry below was
+% created from a PDF deposited in slr/pdfs/ and verified page-by-page
+% (2026-07-31, fase 2 — Agente 1 Bibliografia). Fields absent from the PDF
+% were OMITTED (see slr/EXTRACAO_CITAVEIS.md for flags), never filled in
+% from memory.
+%
+% Entries marked [3a PESSOA] are same-group — cite in third person only.
+%==============================================================================
+
+% pdf: slr/pdfs/SLR-2024-Marvin-250.pdf
+% sustenta: Intro/RW (B): modelagem de simulacao de omnidirecionais altamente dinamicos a partir de dados reais (trabalho mais proximo)
+@inproceedings{wiedemann2024simulation,
+  author    = {Wiedemann, Marvin and Ahmed, Ossama and Dieckh{\"o}fer, Anna and Gasoto, Renato and Kerner, S{\"o}ren},
+  title     = {Simulation modeling of highly dynamic omnidirectional mobile robots based on real-world data},
+  booktitle = {Proc. IEEE Int. Conf. Robot. Autom. (ICRA)},
+  address   = {Yokohama, Japan},
+  year      = {2024},
+  doi       = {10.1109/ICRA57147.2024.10611459},
+}
+
+% pdf: slr/pdfs/SLR-2025-Marvin-1071.pdf
+% sustenta: Metodo/Discussao: calibracao automatica (black-box) de parametros de simulador rigido a partir de trajetorias reais (analogo ao bayesopt de 9 params)
+@inproceedings{wiedemann2025automated,
+  author    = {Wiedemann, Marvin and Ahmed, Ossama and Hatwar, Mrunal and Gasoto, Renato and Detzner, Peter and Kerner, S{\"o}ren},
+  title     = {Automated tuning of non-differentiable rigid body simulation models for wheeled mobile robots},
+  booktitle = {Proc. IEEE Int. Conf. Autom. Sci. Eng. (CASE)},
+  address   = {Los Angeles, CA, USA},
+  year      = {2025},
+  doi       = {10.1109/CASE58245.2025.11163879},
+}
+
+% pdf: slr/pdfs/SLR-2023-Pere-3366.pdf
+% sustenta: RW (B): identificacao de parametros em omnidirecional assume experimento dedicado (sequencia de identificacao em 3 passos projetada)
+@misc{giro2023otbot,
+  author        = {Gir{\'o}, Pere and Celaya, Enric and Ros, Llu{\'i}s},
+  title         = {The {Otbot} project: Dynamic modelling, parameter identification and motion control of an omnidirectional tire-wheeled robot},
+  howpublished  = {arXiv:2311.10834},
+  year          = {2023},
+}
+
+% pdf: slr/pdfs/SLR-2024-Robert-002.pdf
+% sustenta: Intro/RW (A/B): identificacao grey-box como via de construcao de modelos de gemeo digital (trade-off fidelidade x custo computacional)
+@article{brennan2025greybox,
+  author  = {Brennan, Robert W. and Lesage, Jonathan},
+  title   = {Evaluating the use of grey-box system identification for digital twins in manufacturing automation},
+  journal = {Int. J. Comput. Integr. Manuf.},
+  volume  = {38},
+  number  = {7},
+  pages   = {893--914},
+  year    = {2025},
+  doi     = {10.1080/0951192X.2024.2386980},
+}
+
+% pdf: slr/pdfs/SLR-2023-Tiboni-SB001.pdf
+% sustenta: Intro/Discussao: estimar parametros de simulador a partir de dados offline pre-coletados (paralelo direto ao uso de logs de competicao)
+@article{tiboni2023dropo,
+  author  = {Tiboni, Gabriele and Arndt, Karol and Kyrki, Ville},
+  title   = {{DROPO}: Sim-to-real transfer with offline domain randomization},
+  journal = {Robot. Auton. Syst.},
+  volume  = {166},
+  pages   = {104432},
+  year    = {2023},
+  doi     = {10.1016/j.robot.2023.104432},
+}
+
+% pdf: slr/pdfs/SLR-2025-Victor-849.pdf  [3a PESSOA — double-blind]
+% sustenta: Intro/RW (A/D): gemeo digital Simscape de robo omnidirecional SSL (RMSE 150-240 mm em cenarios de jogo); base que o presente artigo estende
+@inproceedings{araujo2025digital,
+  author    = {Ara{\'u}jo, Victor and Barros, Edna},
+  title     = {Digital twin-based architecture and design for co-simulation of omnidirectional mobile robots},
+  booktitle = {Proc. Latin Amer. Robot. Symp. (LARS)},
+  year      = {2025},
+  doi       = {10.1109/LARS69345.2025.11273010},
+}
+
+% pdf: slr/pdfs/SLR-2024-Hongjiu-762.pdf
+% sustenta: RW (A): DT de robo omnidirecional para navegacao autonoma e sincronizacao fisico-virtual
+@article{yang2025digital,
+  author  = {Yang, Hongjiu and Qin, Ziqi and Xia, Yuanqing and Cheng, Fuyang},
+  title   = {Digital twin-based autonomous navigation and control of omnidirectional mobile robots},
+  journal = {IEEE Trans. Veh. Technol.},
+  volume  = {74},
+  number  = {4},
+  pages   = {5687--5697},
+  year    = {2025},
+  doi     = {10.1109/TVT.2024.3520991},
+}
+
+% pdf: slr/pdfs/SLR-2024-Wilson-782.pdf
+% sustenta: RW (A): como a literatura valida fidelidade de DT de robo movel comercial (protocolo de validacao)
+@inproceedings{barioni2024development,
+  author    = {Barioni, Wilson Eduardo and Latini, Igor Pardal and Barioni, Carina Toledo Scoparo and Neves-Jr, Flavio and Arruda, L. V. R. and Teixeira, Marco},
+  title     = {Development and validation of a digital twin for a commercial mobile robot},
+  booktitle = {Proc. IEEE Int. Conf. Robot. Comput. (IRC)},
+  year      = {2024},
+  doi       = {10.1109/IRC63610.2024.00042},
+}
+
+% pdf: slr/pdfs/SLR-2025-Mateus-2445.pdf  [3a PESSOA — double-blind]
+% sustenta: Intro: times SSL desenvolvem politicas de planejamento/controle em simulacao (rSoccer/SSL); consequencia do reality gap
+% ATENCAO: o PDF depositado e um preprint SEM venue/ano impressos — completar venue quando disponivel (NAO preencher de memoria).
+@misc{machado2025planning,
+  author        = {Machado, Mateus G. and Melo, Jo{\~a}o G. and Zanchettin, Cleber and Braga, Pedro H. and Cunha, Pedro V. and Barros, Edna N. S. and Bassani, Hansenclever F.},
+  title         = {Planning the path with reinforcement learning: Optimal robot motion planning in {RoboCup Small Size League} environments},
+  howpublished  = {Preprint},
+}
+
+% pdf: slr/pdfs/SLR-2023-Joo-2435.pdf  [3a PESSOA — double-blind]
+% sustenta: Discussao (Tema B): o que os logs SSL registram na pratica (poses ssl-vision, odometria e velocidades onboard)
+@inproceedings{melo2023dataset,
+  author    = {Melo, Jo{\~a}o G. and Cavalcanti, Lucas and Joaquim, Riei and Ara{\'u}jo, Victor and Barros, Edna},
+  title     = {Dataset and baseline experiments for self-localization and tracking in the {RoboCup Small Size League}},
+  booktitle = {Proc. LARS/SBR/WRE},
+  year      = {2023},
+  doi       = {10.1109/LARS/SBR/WRE59448.2023.10333068},
+}
+
+% pdf: slr/pdfs/SLR-2025-Andrei-2465.pdf
+% sustenta: Resultados/Discussao: cadeia de atuacao por roda no firmware SSL (comando de corpo -> velocidades angulares por roda -> PI por roda) — mecanismo da zona morta eletrica por roda
+@inproceedings{freiberger2024implementation,
+  author    = {Freiberger, Andrei and Maximo, Marcos R. O. A. and Loubach, Denis},
+  title     = {Implementation of firmware based on real-time operating system for {Small Size League} robot},
+  booktitle = {Proc. Brazilian Symp. Robot. (SBR/WRE)},
+  year      = {2024},
+  doi       = {10.1109/SBR/WRE63066.2024.10837771},
+}
+
+% pdf: slr/pdfs/SLR-2025-Sunny-053.pdf
+% sustenta: Intro: definicao/medicao do sim2real gap com gemeos digitais de alta fidelidade (dominio: manufatura agil)
+% ATENCAO: PDF e manuscrito de capitulo ("Chapter 2", compilado 2024-04-22) SEM titulo do livro/editora/DOI — completar quando disponivel (NAO preencher de memoria).
+@misc{katyara2024benchmarking,
+  author        = {Katyara, S. and Sharma, S. and Damacharla, P. and Garcia-Santiago, C. and Dhirani, L. and Chowdhry, B. S.},
+  title         = {Benchmarking sim2real gap: High-fidelity digital twinning of agile manufacturing},
+  howpublished  = {Book chapter manuscript},
+  year          = {2024},
+}
+
+% pdf: slr/pdfs/SLR-2026-Shinta-855.pdf
+% sustenta: RW (A/B): estimacao de parametros em tempo real de robo movel acoplada a arquitetura de gemeo digital
+@article{kosmaga2026digital,
+  author  = {Kosmaga, Shinta R. and Widyotriatmo, Augie and Rijanto, Estiko and Hasan, Agus},
+  title   = {Digital twin-enabled real-time parameter estimation of a wheeled mobile robot},
+  journal = {Syst. Sci. Control Eng.},
+  volume  = {14},
+  number  = {1},
+  pages   = {2634459},
+  year    = {2026},
+  doi     = {10.1080/21642583.2026.2634459},
+}
+
+% pdf: slr/pdfs/EXT-rsoccer-2021.pdf.pdf  [3a PESSOA — double-blind]
+% sustenta: baseline do artigo: rSim (engine derivada do grSim, sem GUI, sincrona) e framework rSoccer para RL em SSL/VSSS
+% Nota: PDF depositado e a versao arXiv; a versao LNAI (RoboCup 2021 Symposium) nao foi verificada em PDF.
+@misc{martins2021rsoccer,
+  author        = {Martins, Felipe B. and Machado, Mateus G. and Bassani, Hansenclever F. and Braga, Pedro H. M. and Barros, Edna S.},
+  title         = {{rSoccer}: A framework for studying reinforcement learning in small and very small size robot soccer},
+  howpublished  = {arXiv:2106.12895},
+  year          = {2021},
+}
+
+% pdf: slr/pdfs/EXT-grsim-2016.pdf.pdf
+% sustenta: RW (D): simulador SSL de referencia (grSim), modelo dinamico simplificado de rodas omni — origem da engine do rSim
+@inproceedings{monajjemi2012grsim,
+  author    = {Monajjemi, Valiallah and Koochakzadeh, Ali and Ghidary, Saeed Shiry},
+  title     = {{grSim} -- {RoboCup} small size robot soccer simulator},
+  booktitle = {RoboCup 2011: Robot Soccer World Cup XV, LNCS 7416},
+  publisher = {Springer},
+  pages     = {450--460},
+  year      = {2012},
+}
+
+% pdf: slr/pdfs/EXT-forssell-ljung-1999.pdf.pdf
+% sustenta: Discussao (Tema A): vies de correlacao ruido<->entrada na identificacao direta sob realimentacao
+@article{forssell1999closedloop,
+  author  = {Forssell, Urban and Ljung, Lennart},
+  title   = {Closed-loop identification revisited},
+  journal = {Automatica},
+  volume  = {35},
+  pages   = {1215--1241},
+  year    = {1999},
+}
+
+% pdf: slr/pdfs/EXT-vandenhof-1998.pdf.pdf
+% sustenta: Discussao (Tema A): survey de identificacao em malha fechada (metodos e propriedades assintoticas)
+@article{vandenhof1998closedloop,
+  author  = {Van den Hof, Paul},
+  title   = {Closed-loop issues in system identification},
+  journal = {Annu. Rev. Control},
+  volume  = {22},
+  pages   = {173--186},
+  year    = {1998},
+}
+
+% pdf: slr/pdfs/EXT-gustavsson-1977.pdf.pdf
+% sustenta: Discussao (Tema A): identificabilidade e acuracia em malha fechada (survey classico; falha de metodos que funcionam em malha aberta)
+@article{gustavsson1977identification,
+  author  = {Gustavsson, Ivar and Ljung, Lennart and S{\"o}derstr{\"o}m, Torsten},
+  title   = {Identification of processes in closed loop---identifiability and accuracy aspects},
+  journal = {Automatica},
+  volume  = {13},
+  pages   = {59--75},
+  year    = {1977},
+}
+
+% pdf: slr/pdfs/EXT-ljung-1999-book.pdf.pdf
+% sustenta: Metodo/Discussao: PEM e persistencia de excitacao (fundamento do procest/estimacao por erro de predicao)
+@book{ljung1999system,
+  author    = {Ljung, Lennart},
+  title     = {System Identification: Theory for the User},
+  edition   = {2nd},
+  publisher = {Prentice Hall PTR},
+  year      = {1999},
+}
+
+% pdf: slr/pdfs/EXT-astrom-hagglund-1995.pdf.pdf
+% sustenta: Metodo: estrutura FOPDT classica (modelo de processo de 1a ordem com tempo morto) usada no P1D
+@book{astrom1995pid,
+  author    = {{\AA}str{\"o}m, Karl J. and H{\"a}gglund, Tore},
+  title     = {{PID} Controllers: Theory, Design, and Tuning},
+  edition   = {2nd},
+  publisher = {Instrument Society of America},
+  year      = {1995},
+}

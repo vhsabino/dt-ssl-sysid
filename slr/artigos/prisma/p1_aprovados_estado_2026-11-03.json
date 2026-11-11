@@ -1,0 +1,456 @@
+{
+ "SLR-2025-N-5339": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2025-Miriana-5327": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2025-Marrone-4886": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2025-Tim-4861": {
+  "stage": "Excluded Full-Text",
+  "ec": "EC1 Fora do escopo"
+ },
+ "SLR-2026-Mostafa-4396": {
+  "stage": "Included",
+  "ec": null,
+  "skim": "11/10",
+  "status": "Read in Progress"
+ },
+ "SLR-2026-Sung-4334": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2025-Alishba-4278": {
+  "stage": "Excluded Full-Text",
+  "ec": "EC3 Não peer-reviewed"
+ },
+ "SLR-2026-Robel-4076": {
+  "stage": "Excluded Full-Text",
+  "ec": "EC1 Fora do escopo"
+ },
+ "SLR-2025-Joo-4052": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2026-Boris-3537": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2026-Philipp-3415": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2026-Gia-3397": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2026-Zaiwu-3395": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2025-Muhammad-3393": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2025-Onggo-2956": {
+  "stage": "Excluded Full-Text",
+  "ec": "EC1 Fora do escopo"
+ },
+ "SLR-2025-Stepani-2511": {
+  "stage": "Excluded Full-Text",
+  "ec": "EC4 Idioma"
+ },
+ "SLR-2025-Allamaa-2507": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2026-Gershom-2485": {
+  "stage": "Excluded Full-Text",
+  "ec": "EC6 Indisponível"
+ },
+ "SLR-2025-Riei-2446": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2025-Schrage-2388": {
+  "stage": "Excluded Full-Text",
+  "ec": "EC4 Idioma"
+ },
+ "SLR-2025-Protin-2360": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2026-Li-2282": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2026-A-2169": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2025-Q-2160": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2025-S-2045": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2025-R-2043": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2025-V-1914": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2025-P-1764": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2025-Wang-1664": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2026-Albatati-1285": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2025-Maksim-1096": {
+  "stage": "Excluded Full-Text",
+  "ec": "EC4 Idioma"
+ },
+ "SLR-2025-Marvin-1071": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2025-Shou-948": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2025-Hannes-919": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2025-Ghandali-915": {
+  "stage": "Excluded Full-Text",
+  "ec": "EC3 Não peer-reviewed"
+ },
+ "SLR-2025-Taemin-896": {
+  "stage": "Excluded Full-Text",
+  "ec": "EC4 Idioma"
+ },
+ "SLR-2025-Satyam-886": {
+  "stage": "Excluded Full-Text",
+  "ec": "EC3 Não peer-reviewed"
+ },
+ "SLR-2026-Cristian-881": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2025-Yuanqing-870": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2026-Vladyslav-865": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2026-M-857": {
+  "stage": "Excluded Full-Text",
+  "ec": "EC4 Idioma"
+ },
+ "SLR-2025-Mateo-856": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2026-Shinta-855": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2025-Haiwen-851": {
+  "stage": "Excluded Full-Text",
+  "ec": "EC1 Fora do escopo"
+ },
+ "SLR-2025-Nino-846": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2025-J-828": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2025-Daniel-818": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2026-Atul-650": {
+  "stage": "Excluded Full-Text",
+  "ec": "EC2 Sem avaliação empírica"
+ },
+ "SLR-2026-Tianwei-597": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2025-Shabi-544": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2026-Nazarenko-501": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2026-Zacheous-490": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2025-Freederia-473": {
+  "stage": "Excluded Title/Abstract",
+  "ec": "EC6 Indisponível"
+ },
+ "SLR-2026-Ziyang-467": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2026-Ruopeng-455": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2025-M-451": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2026-Jay-450": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2025-Charles-404": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2026-Pranjal-355": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2025-T-338": {
+  "stage": "Excluded Full-Text",
+  "ec": "EC4 Idioma"
+ },
+ "SLR-2025-Santiago-303": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2025-J-223": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2025-Franciszek-063": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2026-Jiarong-057": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2025-Yongkui-033": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2026-Hamidreza-031": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2025-Binhao-025": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2022-Cijyun-5223": {
+  "stage": "Excluded Full-Text",
+  "ec": "EC1 Fora do escopo"
+ },
+ "SLR-2024-Michele-4935": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2023-Ayan-4763": {
+  "stage": "Excluded Full-Text",
+  "ec": "EC1 Fora do escopo"
+ },
+ "SLR-2022-Kholood-4740": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2023-Junfeng-4633": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2023-Yuchen-4558": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2024-Zhang-4532": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2024-Cludio-3751": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2023-Jaqueline-3731": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2024-Giuseppe-3583": {
+  "stage": "Excluded Full-Text",
+  "ec": "EC1 Fora do escopo"
+ },
+ "SLR-2024-Bentley-3518": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2023-Harinarayanan-3508": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2023-Bo-3503": {
+  "stage": "Excluded Full-Text",
+  "ec": "EC1 Fora do escopo"
+ },
+ "SLR-2022-Adam-3455": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2024-Ahmad-2438": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2023-Joo-2435": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2022-Noah-2410": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2022-Shang-2393": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2024-Lin-2372": {
+  "stage": "Excluded Full-Text",
+  "ec": "EC4 Idioma"
+ },
+ "SLR-2022-G-2167": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2022-J-2055": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2024-X-1879": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2024-Liu-1421": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2022-Wang-1339": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2023-Xu-1336": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2024-Zhou-1274": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2019-Josifovska-1119": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2024-Gustavo-995": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2023-Sijie-850": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2023-Flavien-822": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2021-Xuda-797": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2024-Wilson-782": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2024-Jacob-781": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2022-Ryota-771": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2024-Ruwen-765": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2023-Junru-760": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2022-Mahmoud-752": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2023-Hongjiu-749": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2022-Xin-742": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2024-Jaeho-458": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2023-Chengye-441": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2024-Marcel-289": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2024-Marvin-250": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2023-Taeyoon-122": {
+  "stage": "Included",
+  "ec": null
+ },
+ "SLR-2023-Jonathan-007": {
+  "stage": "Excluded Full-Text",
+  "ec": "EC5 Duplicata/versão anterior"
+ },
+ "SLR-2024-Robert-002": {
+  "stage": "Included",
+  "ec": null
+ }
+}

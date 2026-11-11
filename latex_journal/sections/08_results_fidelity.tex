@@ -1,0 +1,27 @@
+%==============================================================================
+% 8 RESULTS III: FIDELITY AGAINST EVERY BASELINE
+% Plano: o modelo contra cinematica ideal, rSim (stock, e com atraso casado), MuJoCo
+% rota a (embedding = gemeo) e rota b (sem sintonia, com atraso), grSim e ER-Force
+% (teleporte cru, +atraso, pre-rolagem; tres sessoes: 10/09, 18/09, 20/09);
+% repetibilidade entre sessoes (as tres sessoes lado a lado na tabela); condicao inicial (modelo com estados zerados 0.1137, pre-rolado 0.0406);
+% atribuicao de Shapley; v0 causal; LOO; controle negativo bayesiano; heading.
+% Baseline sintonizada (C3 ou rSim): so se a orientadora aprovar (WP3).
+% Fontes: tab_journal_baselines, tab_journal_robustness, fig_journal_league_sims
+% (geradas); CHANGELOG 2026-09-07 15:15 (C2a), 2026-09-10 02:11 (C2b),
+% 2026-09-18 13:26 (C2b2 sessao 1, entrada do lote 1), 2026-09-20 11:43 (C2b2 sessao 2).
+%==============================================================================
+\section{Results III: fidelity against physics and league simulators}
+\label{sec:res-fidelity}
+
+\input{tables/tab_journal_baselines}
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=\textwidth]{fig_journal_league_sims.pdf}
+  \caption{League simulators replayed through the simulation protocol on the hold-out windows. (a) Median position error per horizon; the pre-roll lets each simulator reach the anchor with its own dynamics. (b) Per-event medians at the reference horizon in every session.}
+  \label{fig:league}
+\end{figure*}
+
+\input{tables/tab_journal_robustness}
+
+\pending{text of the section.}

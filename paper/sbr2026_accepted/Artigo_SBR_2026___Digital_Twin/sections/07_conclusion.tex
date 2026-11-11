@@ -1,0 +1,13 @@
+%==============================================================================
+% CONCLUSION — resumida 2026-08-10 (pedido do autor, corte 9->6 páginas).
+% De ~3 blocos para 2 parágrafos curtos. Availability preservada (fecha C10);
+% Future work reduzido a uma frase por direção.
+%==============================================================================
+\section{Conclusion and Further Works}
+\label{sec:conclusion}
+
+This paper presented a per-DOF FOPDT model of an omnidirectional SSL robot, identified mostly from closed-loop competition logs, attains validated translational fidelity: over $\SI{73.5}{s}$ of scored hold-out motion it lowers the median position error of a baseline in all ten hold-out events, halving it at the reference horizon, with the improvement attributable in comparable parts to the time constant and the dead time, and only in combination with the measured initial velocity.
+Yaw needed a short dedicated open-loop campaign, after characterizing why the logs cannot support it: during play the yaw command carries a median $1\%$ of the per-wheel actuation and explains only $56\%$ of the variance of the measured rotation. Code, configurations, and both datasets are released at
+\url{https://anonymous.4open.science/r/dt-ssl-sbr26-4207}, with instructions to reproduce every number above. Future work embeds this plant in a full digital twin inside a robot-learning environment such as Isaac Sim or MuJoCo \cite{machado2025planning}, and adds a rotation-rich validation distribution, an open-loop arm with translation superimposed, and cross-robot replication.
+
+% Conteudo pronto em open-source/ (ver open-source/README.md).

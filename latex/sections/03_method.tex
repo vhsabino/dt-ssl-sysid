@@ -1,326 +1,70 @@
-%==============================================================================
-% METHOD — WRITTEN COMPLETE (material validated and in-repo).
-% Primary sources (cited in comments for traceability):
-%   model + params : config/twin_params.json ; config/ssl_robot.sldd ;
-%                    automation/deadreckoning_p1d.m ; phase0_replay/plant.py
-%   discretization : phase0_replay/plant.py (AnalyticFOPDTPlant.step)
-%   identification : automation/identify_trans_dof.m ; check_excitation_trans.m
-%   metric/replay  : phase0_replay/{rollout,metrics}.py ; config/metrics.json
-%   data contract  : DESIGN.md sec.2 ; phase0_replay/{io,schema}.py
-%   hold-out       : config/holdout_events.json
-%==============================================================================
 \section{Method}
 \label{sec:method}
 
-% CORTE 2026-08-10 (9->6 pag.): Fig. 1 (arquitetura, figure* de largura dupla)
-% RETIRADA DO BUILD. Era o maior item isolado do artigo (~49 linhas de coluna,
-% ~0,42 pag.) e o unico que nao carrega evidencia: descreve o pipeline, que o
-% paragrafo abaixo agora descreve em prosa. As duas figuras remanescentes
-% (degrau de omega, trajetoria) sao evidencia medida e nao tem substituto
-% textual. Arquivo mantido em figures/ para a extensao JINT.
-% \input{figures/fig_architecture}
-%
-% REINCLUSAO 2026-08-10 (decisao do autor): entra fig_architecture2, que
-% acrescenta o painel (a) -- o ESCOPO do paragrafo abaixo, que o arquivo
-% original nao representava -- e comprime o pipeline do original em uma unica
-% linha. Citada nos DOIS paragrafos: (a) no de escopo, (b) no de pipeline.
-% CUSTO DE PAGINA: figure* de ~0,30 pag. O artigo ja esta acima do limite de 6
-% paginas do CFP; ver docs/PLANO_V3_EXECUTADO.md sec.4 para o menu de cortes.
 \input{figures/fig_architecture2}
 
-% CORTE 2026-08-09 (9->8 pag.): paragrafo de escopo comprimido de ~110 para ~55
-% palavras; a promessa "Sec. VII diz como embutir no sistema maior" virou apenas
-% a referencia entre parenteses (a Conclusao ja desenvolve isso em Future Work).
-This paper specifies the \emph{plant layer} of a larger digital-twin effort: a
-complete twin of an SSL robot also needs a synchronized visual counterpart and
-an execution environment in which policies can be trained, but the component
-that governs whether such an environment reproduces the robot's behavior at all
-is the map from commanded to attained body motion
-(Fig.~\ref{fig:arch2}a; Sec.~\ref{sec:conclusion}).
+This paper specifies the \emph{plant layer} of a larger digital-twin effort: a complete twin of an SSL robot also needs a synchronized visual counterpart and an execution environment in which policies can be trained, but the component that governs whether such an environment reproduces the robot's behavior at all is the map from commanded to attained body motion (Fig.~\ref{fig:arch2}a).
 
-The pipeline runs from the league protocol stream through event extraction and
-per-DOF window labeling to a grey-box FOPDT fit per channel, and the resulting
-nine parameters drive a free-run replay scored against ground truth
-(Fig.~\ref{fig:arch2}b). Competition
-logs feed that path end to end for $v_x$ and $v_y$; a dedicated open-loop
-collection supplies $\omega$ alone, for reasons established in
-Sec.~\ref{sec:results:omega}. That asymmetry is a finding rather than an
-implementation detail: which data a channel requires is set by the excitation
-the data contain. Every comparison plant is scored on the same windows,
-horizons and statistical gate as the model.
+The pipeline runs from the league protocol stream through event extraction and per-DOF window labeling to a grey-box FOPDT fit per channel, and the resulting nine parameters drive a free-run replay scored against ground truth (Fig.~\ref{fig:arch2}b). Competition logs feed that path end to end. Every comparison plant is scored on the same windows, horizons, and statistical gates as the model.
 
 \subsection{Per-DOF FOPDT twin}
 \label{sec:method:model}
-We model the robot as three decoupled single-input single-output channels, one per
-degree of freedom (DOF) $i\in\{v_x, v_y, \omega\}$, each a first-order-plus-dead-time
-(FOPDT) transfer function from commanded to attained body velocity,
+We model the robot as three decoupled single-input single-output channels, one per degree of freedom (DOF) $i\in\{v_x, v_y, \omega\}$, each a first-order-plus-dead-time (FOPDT) transfer function from commanded to attained body velocity,
+
 \begin{equation}
   G_i(s) \;=\; \frac{K_i\, e^{-\Td{}_i s}}{\tau_i s + 1},
   \label{eq:fopdt}
 \end{equation}
-% CORTE 2026-08-09: definicao dos sinais de entrada nao repetida aqui -- III-G
-% (Coordinate conventions) ja fixa frame, sinal e unidade de v_x, v_y e omega.
-with per-DOF gain $K_i$, time constant $\tau_i$, and transport delay $\Td{}_i$.
-The inputs are the body-frame velocity commands and the outputs the attained
-body velocities (Sec.~\ref{sec:method:geometry}). The full parameter vector has
-fixed order
-$[K_{vx},\tau_{vx},\Td{}_{vx},K_{vy},\tau_{vy},\Td{}_{vy},K_{\omega},\tau_{\omega},\Td{}_{\omega}]$
+
+with per-DOF gain $K_i$, time constant $\tau_i$, and transport delay $\Td{}_i$. The inputs are the body-frame velocity commands and the outputs are the attained body velocities. The full parameter vector has fixed order $[K_{vx},\tau_{vx},\Td{}_{vx},K_{vy},\tau_{vy},\Td{}_{vy},K_{\omega},\tau_{\omega},\Td{}_{\omega}]$
 (nine parameters). % source: config/ssl_robot.sldd ; config/twin_params.json ("order")
 This is a \emph{behavioral} (observational) model: it targets the input-to-pose
 response, not a white-box description of wheel/contact mechanics.
 
 \subsection{Discretization and pose integration}
 \label{sec:method:disc}
-% CORTE 2026-08-09 (9->8 pag.): o paragrafo "Dead-time quantization" foi FUNDIDO
-% aqui. Ele repetia tres itens ja ditos acima (dt=1/60, m_i = ceil(Td/dt), ZOH
-% exato). As tres convencoes de replicacao continuam TODAS presentes -- dt unico
-% para ID e replay, alfa exato vs. Euler, teto vs. arredondamento e o residuo --
-% apenas sem enuncia-las duas vezes.
-Identification and replay both run on a uniform grid with step
-$\Delta t = 1/60\,\si{s}$, the nominal vision rate. Each DOF's command is
-delayed by a zero-order-hold (ZOH) integer shift of
-$m_i = \lceil \Td{}_i/\Delta t\rceil$ samples (zero before the segment start),
-passed through the first-order update
-$v_i[k] = v_i[k-1] + \alpha_i(u^{d}_i[k] - v_i[k-1])$, and scaled to the
-attained body velocity $\hat v_i[k] = K_i\, v_i[k]$ (instantaneous for
-$\tau_i \to 0$). Two conventions a replication must match: $\alpha_i$ is the
-\emph{exact} ZOH coefficient $1 - e^{-\Delta t/\tau_i}$ rather than an Euler
-step $\Delta t/\tau_i$, which at the identified time constants would overstate
-the coefficient by $7$--$12\%$; and the delay takes the ceiling rather than
-rounding, so the
-% FIX 2026-08-10: dizia "close to a fifth" (~20%), errado. Valores exatos:
-% Euler/ZOH - 1 = 12.1% (vx), 6.7% (vy), 10.4% (w). Derivado de config/twin_params.json.
-delay actually applied always exceeds the identified one by a residual below
-one sample, whose effect on the verdict is reported in
-Sec.~\ref{sec:results:omega}.
-% source: config/twin_params.json ("ts") ; plant.py AnalyticFOPDTPlant.step
-The body velocity is rotated through the current heading and integrated to
-the field frame by the trapezoidal rule. As an implementation check, this
-analytic plant was reconciled against an independently built Simulink model of
-the same robot, whose FOPDT channels are continuous transfer-function and
-transport-delay blocks driving an explicit wheel chain rather than the discrete
-update above; the two agree to $\le \SI{6}{mm}$ in position and
-$\le 9\times10^{-4}\,\si{rad}$ in heading on a reference event, so the
-discretization introduces no error of practical size.
-% source: plant.py + deadreckoning_p1d.m ; RELATORIO_TECNICO sec.4
-% source: phase0_replay/plant.py AnalyticFOPDTPlant.step (a = 1 - exp(-dt/tau);
-%   src = floor(j - Td/dt + 1e-9) == j - ceil(Td/dt)) -- code inspected 2026-08-07,
-%   text and implementation AGREE (ZOH, ceiling); residuals derived arithmetically
-%   from config/twin_params.json (Td, ts). Robustness: results/reidentificacao_20260724.md Parte C.
+
+Identification and replay both run on a uniform grid with a step size of $\Delta t = 1/60\,\si{s}$, the nominal vision rate. Each DOF's command is delayed by a zero-order-hold (ZOH) integer shift of $m_i = \lceil \Td{}_i/\Delta t\rceil$ samples (zero before the segment start), passed through the first-order update $v_i[k] = v_i[k-1] + \alpha_i(u^{d}_i[k] - v_i[k-1])$, and scaled to the attained body velocity $\hat v_i[k] = K_i\, v_i[k]$ (instantaneous for $\tau_i \to 0$). 
 
 \subsection{Data and pre-processing}
 \label{sec:method:data}
-The data are closed-loop competition logs of a single omnidirectional
-4-wheeled SSL robot, decoded from the league protocol stream into per-event
-body-frame commands and field-frame pose at $\sim$\SI{60}{Hz}
-(heading unwrapped). % source: DESIGN.md sec.2, 2.4 ; phase0_replay/io.py
-Measured body velocity, used only for identification and for the initial
-condition, is obtained by smoothing the vision position with a low-order
-polynomial (Savitzky--Golay) filter, differentiating it by central differences,
-and rotating the result into the body frame.
-% source: automation/identify_trans_dof.m (load_uy_trans: sgolayfilt(px,sgo,win)
-%   e DEPOIS gradient(px)/Ts) ; check_excitation_trans.m. CORRECAO 2026-08-08:
-%   a redacao anterior dizia "Savitzky-Golay derivative", o que era impreciso --
-%   o codigo SUAVIZA com sgolayfilt e derivada por gradient(), nao usa o filtro
-%   derivativo de SG. Filtro confirmado no codigo, NAO e alucinacao.
-% CORTE 2026-08-09: prosa da grade irregular comprimida; conteudo identico.
-% FIX 2026-08-10: aqui havia um \SI cujo primeiro argumento era a fracao 1/60,
-% dentro de $...$ -- duplamente invalido no siunitx real: a macro ja entra em
-% modo matematico e o parser nao aceita fracao como numero. Trocado pela forma
-% literal $1/60\,\si{s}$, ja usada em III-B. Era o UNICO erro real do log; o
-% runaway argument, o "Missing $" em 04_results e as 4 referencias indefinidas
-% eram todos cascata dele.
-Logs arrive on an irregular time grid, since commands are transmitted in
-bursts: identification resamples every signal onto the uniform
-$1/60\,\si{s}$ grid, whereas the fidelity metric leaves the samples where they
-were recorded and defines its windows in seconds, so that no interpolation
-enters the reported error.
-% source: RELATORIO_TECNICO sec.3 ; DESIGN.md sec.2.4
-The dataset comprises $46$ events across four motion labels
-(\texttt{front\_to\_back}, \texttt{side\_to\_side}, \texttt{shoot\_to\_goal},
-\texttt{square}); a frozen list of $10$ events is held out and never used for
-fitting. % source: config/holdout_events.json
+The data are closed-loop competition logs of a single omnidirectional 4-wheeled SSL robot, decoded from the league protocol stream into per-event body-frame commands and field-frame pose at $\sim$\SI{60}{Hz}. Measured body velocity, used only for identification and for the initial condition, is obtained by smoothing the vision position with a low-order polynomial (Savitzky--Golay) filter, differentiating it by central differences, and rotating the result into the body frame. Fig.~\ref{fig:setup} shows the omnidirectional SSL robot.
 
-\paragraph{Definition of hold-out fit}
-Throughout, \emph{fit} measures how much of the variation in the measured
-signal the model reproduces, on events the fit never saw:
+\begin{figure}[!t]
+  \centering
+  \includegraphics[width=0.46\columnwidth]{figures/robot_photo.png}\hfill
+  \caption{The four-wheeled omnidirectional SSL robot used in this work.}
+  \label{fig:setup}
+\end{figure}
+
+Logs arrive on an irregular time grid, since commands are transmitted in bursts: identification resamples every signal onto the uniform $1/60\,\si{s}$ grid, whereas the fidelity metric leaves the samples where they were recorded and defines its windows in seconds, so that no interpolation enters the reported error.
+The dataset comprises $46$ events across four motion labels (\texttt{front\_to\_back}, \texttt{side\_to\_side}, \texttt{shoot\_to\_goal}, \texttt{square}); a frozen list of $10$ events is held out and was not used for fitting.
+
+Throughout, \emph{fit} measures how much of the variation in the measured signal the model reproduces, on events the fit never saw:
 \begin{equation}
   \mathrm{fit} = 100\left(1 -
   \frac{\lVert y - \hat{y}\rVert_2}{\lVert y - \bar{y}\rVert_2}\right)\ [\%],
   \label{eq:fit}
 \end{equation}
-where $y$ is the measured body velocity of the degree of freedom being
-identified, $\hat{y}$ is the model's output when driven by the commands alone,
-and $\bar{y}$ is the mean of $y$. A value of $100\%$ is an exact match and
-$0\%$ is no better than predicting the mean, so the quantity is a normalized
-RMSE expressed as a percentage. It is computed per event and averaged over the
-hold-out events, and the $60\%$ acceptance gate applies to that average.
-Filter orders, resampling and the event partition are fixed in the released
-code (Sec.~\ref{sec:conclusion}).
-% source: automation/identify_trans_dof.m (compare(dvl,m) em simulacao;
-%   fit_val_mean = mean(fit_vl)) ; fitvec na linha 112.
+where $y$ is the measured body velocity of the degree of freedom being identified, $\hat{y}$ is the model's output when driven by the commands alone, and $\bar{y}$ is the mean of $y$.
 
 \subsection{Identification}
 \label{sec:method:id}
-Each translational DOF is identified independently as a P1D (FOPDT) model by
-prediction-error minimization, with an event-level hold-out. The excitation
-diagnostic selects the cleanest source label per DOF: $v_x$ from
-\texttt{front\_to\_back} and $v_y$ from \texttt{side\_to\_side}
-(command-to-velocity cross-correlation $\approx 0.99$). % source: results/check_excitation_trans_20260614_1018.csv
-% CORTE 2026-08-09: frase de abertura ("O canal de yaw e tratado de outro modo")
-% removida -- redundante com o paragrafo da Fig. 1 e com III-E.
-Yaw is instead identified from a dedicated open-loop collection, with the same
-model structure and the same estimator, because the competition logs carry too
-little yaw excitation to support the fit (Sec.~\ref{sec:results:omega}); the
-closed-loop attempt is reported alongside it so that the two data regimes are
-compared under identical tooling.
-% source: results/identificacao_omega_20260724.md ; config/twin_params.json ("w".placeholder, now false)
-
-\subsection{Dedicated open-loop yaw excitation}
-\label{sec:method:omega-data}
-% CORTE 2026-08-10 (9->6 pag.): prosa comprimida. Escada, divisao 4/2 e os tres
-% criterios pre-registrados permanecem.
-The dedicated dataset is single-session and single-robot with $v_x=v_y=0$: an
-alternating-sign staircase of commanded yaw rates
-$\{0.25,0.5,1,2.5,5\}\,\si{rad/s}$, $\sim\SI{10}{s}$ per step. The two lowest
-amplitudes never engage the motors and serve only to characterize the per-wheel
-dead-zone; the remaining six events form the linear regime, split event-wise
-into four training and two hold-out under the same pipeline as $v_x,v_y$. Given
-the small sample, the acceptance criteria (physical bounds, hold-out fit
-$\ge 60\,\%$, and the multi-horizon $\SEtwo$ gate against the closed-loop
-placeholder) were committed \emph{before} estimation.
-% source: results/qc_rotate_20260724_125828.md sec.4 ; identificacao_omega_20260724.md
-%   Etapa 1 ; docs/PREREGISTRO_OMEGA_20260724.md
-% source: docs/PREREGISTRO_OMEGA_20260724.md
+Each translational DOF is identified independently as a P1D (FOPDT) model by prediction-error minimization, with an event-level hold-out. The excitation diagnostic selects the cleanest source label per DOF: $v_x$ from \texttt{front\_to\_back} and $v_y$ from \texttt{side\_to\_side} (command-to-velocity cross-correlation $\approx 0.99$).
+Yaw is instead identified from a dedicated open-loop collection, with the same model structure and the same estimator, because the competition logs carry too little yaw excitation to support the fit. The dedicated dataset is single-session and single-robot with $v_x=v_y=0$: an alternating-sign staircase of commanded yaw rates $\{0.25,0.5,1,2.5,5\}\,\si{rad/s}$, $\sim\SI{10}{s}$ per step.
 
 \subsection{Frames, constants and replication}
 \label{sec:method:geometry}
-% FUSAO 2026-08-10 (pedido do autor): "Geometric constants" + "Coordinate
-% conventions" unidas e resumidas (~275 -> ~135 palavras). Preservados: convencao
-% de frame e sinal, equacoes de integracao, ausencia de cinematica de roda,
-% refutacao da constante antiga por tres fontes, spread residual, e a auditoria
-% de impacto nulo. Sai a redacao expansiva de ambas.
-Commands and attained velocities live in the \emph{body} frame: $v_x$
-longitudinal, $v_y$ lateral (left positive), $\omega$ yaw rate about the upward
-$z$ axis, counter-clockwise positive. Pose is integrated in the \emph{field}
-frame as $\dot{X} = v_x\cos\theta - v_y\sin\theta$,
-$\dot{Y} = v_x\sin\theta + v_y\cos\theta$, with $\theta$ unwrapped. The model
-lives entirely in body-velocity space: no wheel-level kinematics appears in the
-identification, the plant or the metric, the chain being
-command $\rightarrow$ delay $\rightarrow$ lag $\rightarrow$ gain $\rightarrow$
-rotation $\rightarrow$ integration.
-
-Per-wheel geometry therefore enters at one point only, converting the firmware's
-per-wheel motor threshold ($\SI{1.567}{rad/s}$) into a body yaw rate for
-Sec.~\ref{sec:results:omega}, through the ratio of the wheel-contact radius
-$R=\SI{0.0796}{m}$ to the wheel radius $r=\SI{0.0295}{m}$ (CAD, $R/r=2.699$).
-An earlier ratio of $3.321$ was refuted by three independent sources: CAD;
-firmware telemetry, where the post-clamp wheel setpoint scales with commanded
-yaw by a constant factor above the dead-zone, implying $2.61$; and the measured
-body response, consistent with unit gain only under the corrected constant. The
-residual $3.3\%$ spread between the first two is reported, not resolved
-(Sec.~\ref{sec:discussion}). The correction moves no number quoted here, since
-$\epos$ is purely translational and $R$ enters only the window binning, which
-reproduces the same $264/1/0$ distribution.
-% CORTE 2026-08-10 (9->6 pag.): tab_units.tex retirada do build. REVERTE o
-% pedido M-F1 do autor de 2026-08-08 (manter os valores so na tabela), porque o
-% limite de 6 paginas foi confirmado no CFP e a tabela custava ~0,12 pag. As
-% cinco constantes que o texto usa estao inline acima; a tabela completa
-% permanece em latex/tables/tab_units.tex para a extensao JINT.
-% source: config/robot_geometry.json ; results/qc_rotate_20260724_125828.md sec.5,7 ;
-%   config/metrics.json (use_se2=false) ; results/bin_distribution_20260724_155551.md ;
-%   phase0_replay/plant.py AnalyticFOPDTPlant.step (sem cinematica de roda).
-%   NOTA INTERNA (atualizada 2026-08-10): a suspeita de defeito na matriz de
-%   odometria matlab/analytical/inverse_kinematics_solver.m foi ENCERRADA como
-%   alarme falso -- ela reconstroi pinv(K) exatamente para rodas em
-%   60/135/225/300 graus (residuo 5.7e-22). A assimetria sqrt(2) na linha de
-%   omega e o pseudo-inverso correto de um layout assimetrico. Ver CHANGELOG.
-% \input{tables/tab_units}   % retirada do build (ver nota acima)
+Commands and attained velocities live in the \emph{body} frame: $v_x$ longitudinal, $v_y$ lateral, $\omega$ yaw rate about the upward $z$ axis, counter-clockwise positive. Pose is integrated in the \emph{field} frame as $\dot{X} = v_x\cos\theta - v_y\sin\theta$, $\dot{Y} = v_x\sin\theta + v_y\cos\theta$, with $\theta$ unwrapped.
+Per-wheel geometry converts the firmware's per-wheel motor threshold ($\SI{1.567}{rad/s}$) into a body yaw rate for Sec.~\ref{sec:results:omega}, through the ratio of the center-to-wheel-contact radius $R=\SI{0.0796}{m}$ to the wheel radius $r=\SI{0.0295}{m}$.
 
 \subsection{Free-run replay and multi-horizon metric}
 \label{sec:method:metric}
-% CORTE 2026-08-09 (9->8 pag.): a re-ancoragem em t_0 era enunciada duas vezes
-% (uma na definicao de free-run, outra na de janela); fundidas numa so frase.
-Fidelity is measured in \emph{free-run}: segments are cut into overlapping
-windows at a fixed stride, each re-anchored to the true $\SEtwo$ pose at its
-anchor $t_0$ and rolled out to $H_{\max}=90$ samples ($\SI{1.5}{s}$) driven
-only by the command stream, never re-anchored inside the window (no teacher
-forcing, which would measure single-step noise and inflate apparent fidelity).
-% source: phase0_replay/rollout.py (invariant, DEFAULT_HMAX, stride)
-We report, \emph{separately}, the Euclidean position error $\epos(w,h)$ and
-the wrapped absolute heading error $\eang(w,h)$ at
-$h\in\{6,12,24,42,60,90\}$ samples
-($\{0.1,0.2,0.4,0.7,1.0,1.5\}\,\si{s}$), with reference horizon
-$h_{\mathrm{ref}}=24$ ($\SI{0.4}{s}$). % source: config/metrics.json (horizons, h_ref)
-$\epos$ is the claim of this paper; $\eang$ is reported but bounded by the
-population of rotation-rich windows available
-(Sec.~\ref{sec:results:bins}).
-
-\paragraph{Motion stratification}
-Each window is binned by its rotational fraction
-$r = a_{\mathrm{rot}}/(a_{\mathrm{rot}}+a_{\mathrm{trans}})$, where $a_{\mathrm{trans}}$
-and $a_{\mathrm{rot}}$ accumulate translational command magnitude and yaw rate scaled
-by the robot radius. Windows are \emph{translation-dominated} ($r<0.2$),
-\emph{mixed} ($0.2\le r\le 0.5$), or \emph{rotation-dominated} ($r>0.5$).
-% source: phase0_replay/metrics.py classify_bin ; config/metrics.json (bins)
-
-\paragraph{Statistical gate}
-Curves use all (dense) windows; inference uses only \emph{non-overlapping}
-windows (stride $\ge H_{\max}$) for a paired one-sided Wilcoxon signed-rank
-test, plus a moving-block bootstrap (block $\sim H_{\max}$) for the gap
-confidence interval, with any sign/order divergence flagged; effect size is
-the rank-biserial correlation of the paired differences.
-% source: phase0_replay/metrics.py (evaluate, _mbb, _wilcoxon_less)
-% CORTE 2026-08-09: clausula final ("... o que ocorre nos bins mixed/rotation")
-% removida -- IV-B ja reporta esse fato com os numeros.
-% ADICIONADO 2026-08-10 (C4 da revisao V2): declarar QUANDO a unidade de analise
-% mudou de janela para evento. A honestidade aqui custa uma frase e evita a
-% suspeita de que o teste foi escolhido depois de ver o resultado.
-Two units of analysis appear below. The gate was pre-registered over
-non-overlapping \emph{windows}; the per-\emph{event} pairing used for the
-headline comparison was adopted later, in revision, after it was pointed out
-that windows from one event share robot, surface and session. We report the
-per-event figures because they are the conservative choice --- the window-level
-test gives a much smaller $p$ --- and we flag the change rather than present it
-as pre-registered.
-
-A bin receives a \textsc{go} verdict only if, at all $h\ge h_{\mathrm{ref}}$,
-the gap is positive and non-decreasing, $p<\alpha$ ($\alpha=0.05$), the effect
-size $\ge 0.2$, and the bootstrap CI excludes zero, subject to $N_{\min}=10$
-independent windows; below $N_{\min}$ a bin is \textsc{indeterminate}.
-% source: phase0_replay/metrics.py _verdict_bin
-
-\paragraph{Horizon grid and anchor convention}
-All results use the $\SEtwo$ (full-pose) re-anchor above, but two
-independently implemented harnesses: the fidelity results
-(Sec.~\ref{sec:results:rsim}) use the horizon grid given above, while the
-per-DOF promotion gates (Secs.~\ref{sec:results:id}
-and~\ref{sec:results:omega}) reuse an earlier campaign harness with
-$h\in\{0.5,1,2,2.5,4\}\,\si{s}$. Each result is reported on its native grid,
-flagged at each point, rather than recomputed.
+Fidelity is measured in \emph{free-run}: segments are cut into overlapping windows at a fixed stride, each re-anchored to the true $\SEtwo$ pose at its anchor $t_0$ and rolled out to $H_{\max}=90$ samples ($\SI{1.5}{s}$) driven only by the command stream. The Euclidean position error $\epos(w,h)$ and the wrapped absolute heading error $\eang(w,h)$ at $h\in\{6,12,24,42,60,90\}$ samples ($\{0.1,0.2,0.4,0.7,1.0,1.5\}\,\si{s}$), with reference horizon $h_{\mathrm{ref}}=24$ ($\SI{0.4}{s}$) are reported separately; % source: config/metrics.json 
+(horizons, h\_ref) $\epos$ is the claim of this paper; $\eang$ is reported but bounded by the population of rotation-rich windows available (Sec.~\ref{sec:results:bins}).
 
 \subsection{Baselines}
 \label{sec:method:baselines}
-We compare the twin against two baselines under the \emph{same} windows, horizons,
-and gate. The first is an \emph{ideal-kinematics} plant in which the attained body
-velocity equals the command instantaneously (no gain, lag, or delay), integrated by
-the same trapezoidal scheme. % source: phase0_replay/plant.py IdealKinematicPlant
-The second is \textbf{rSim}, the ODE-based physics engine of the rSoccer
-environment, reported as context rather than as the primary comparison. It is
-driven at default parameters with the wheel-speed input disabled, so the
-recorded body-frame commands enter directly, unrotated, and the engine's motion
-controller never acts. It integrates in integer milliseconds, so it is stepped
-in $\SI{1}{ms}$ substeps accumulating one grid interval, with pose interpolated
-linearly back onto the grid and heading unwrapped.
-% source: phase0_replay/rsim_plant.py (wheel_speed=False; slots 1,2,3 = vx,vy,w;
-%   sub_ms=1; get_state -> x,y em m e theta em graus). ADICIONADO 2026-08-10:
-%   o revisor (B2) apontou que o comparador nunca era especificado o bastante
-%   para ser reimplementado.
-rSim provides no velocity setter at reset (the robot starts from rest), so two
-initial-condition fairness modes are used: \textbf{Mode A} (primary) warms the engine
-up over $L_w=15$ samples with the real pre-anchor commands and then applies a rigid
-$\SEtwo$ re-anchor at $t_0$, mirroring how the twin is seeded with the real body
-velocity; \textbf{Mode B} (robustness) uses no warm-up and discards the first $15$
-samples for \emph{both} plants. % source: phase0_replay/eval_twin_vs_rsim.py (run, mode A/B) ; results/eval_twin_vs_rsim_mode{A,B}_*.md
-The twin's transport delay has no counterpart in rSim, which is precisely where the
-twin is expected to win at short horizons.
+We compare the twin against two baselines under the \emph{same} windows, horizons, and gate. The first is an \emph{ideal-kinematics} plant in which the attained body velocity equals the command instantaneously (no gain, lag, or delay), integrated by the same trapezoidal scheme. The second is \textbf{rSim}, the ODE-based physics engine of the rSoccer environment. It is driven at adjusted parameters for the teams robots.
+
+

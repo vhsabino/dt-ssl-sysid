@@ -1,0 +1,16 @@
+\section{Related Work}
+\label{sec:related}
+
+\paragraph{Behavioral twins of mobile robots}
+
+
+Digital twins of mobile platforms are typically validated behaviorally, by comparing simulated and real trajectories rather than parameters \cite{barioni2024development,yang2025digital}. On the construction side, grey-box identification has been assessed as the model-generating module of a twin and has been found to be sensitive to the informativeness of its input data \cite{brennan2025greybox}. Work on omnidirectional platforms assumes dedicated experiments, whether one experiment per parameter group \cite{giro2023otbot} or tuning against motion-capture trajectories, manually and per trajectory
+\cite{wiedemann2024simulation}, or by black-box optimization over a few high-impact parameters \cite{wiedemann2025automated}. The per-DOF FOPDT structure adopted here is the classic first-order-plus-dead-time process model of control practice \cite{astrom1995pid}. The closest precedent for reusing
+data that already exists, rather than collecting new data, is DROPO, which estimates domain-randomization distributions from an offline, pre-collected dataset \cite{tiboni2023dropo}; like the others, it presumes that the offline data excite the parameters being estimated.
+
+\paragraph{SSL simulators and league context}
+The SSL's reference simulator, grSim, adopts a simplified dynamic model of the omni wheels for real-time performance \cite{monajjemi2012grsim}; the rSoccer framework derives its rSim engine from grSim for reinforcement-learning workloads \cite{martins2021rsoccer}, and planning policies are trained in such environments \cite{machado2025planning}. A Simscape multibody (white-box) twin of an SSL robot reports trajectory RMSE of 150--240~mm on in-game scenarios with large horizons\cite{araujo2025digital}. League practice routinely records vision poses, odometry, and onboard velocities \cite{melo2023dataset}, and SSL firmware
+converts body commands into per-wheel velocity loops \cite{freiberger2024implementation}.
+
+\paragraph{Closed-loop identification}
+That feedback correlates the input with unmeasured disturbances, breaking methods that work in open loop are classic \cite{gustavsson1977identification,vandenhof1998closedloop,forssell1999closedloop}, as is the role of persistent excitation in prediction-error estimation \cite{ljung1999system}.

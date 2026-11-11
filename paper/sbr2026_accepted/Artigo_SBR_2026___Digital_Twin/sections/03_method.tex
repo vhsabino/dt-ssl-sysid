@@ -1,0 +1,62 @@
+\section{Method}
+\label{sec:method}
+
+\input{figures/fig_architecture2}
+
+This paper specifies the \emph{plant layer} of a greater digital-twin effort: a complete twin of an SSL robot also needs a synchronized visual counterpart and an execution environment in which policies can be trained, but the component that governs whether such an environment reproduces the robot's behavior at all is the map from commanded to attained body motion (Fig.~\ref{fig:arch2}a).
+
+The pipeline runs from the league protocol stream through event extraction and per-DOF window labeling to a grey-box FOPDT fit per channel, and the resulting nine parameters drive a free-run replay scored against ground truth (Fig.~\ref{fig:arch2}b). Competition logs feed that path end to end. Every comparison plant is scored on the same windows, horizons, and statistical gates as the model.
+
+\subsection{Per-DOF FOPDT twin}
+\label{sec:method:model}
+We model the robot as three decoupled single-input single-output channels, one per degree of freedom (DOF) $i\in\{v_x, v_y, \omega\}$, each a first-order-plus-dead-time (FOPDT) transfer function from commanded to attained body velocity,
+
+\begin{equation}
+  G_i(s) \;=\; \frac{K_i\, e^{-\Td{}_i s}}{\tau_i s + 1},
+  \label{eq:fopdt}
+\end{equation}
+with per-DOF gain $K_i$, time constant $\tau_i$, and transport delay $\Td{}_i$. The inputs are the body-frame velocity commands and the outputs are the attained body velocities. The full parameter vector has fixed order $[K_{vx},\tau_{vx},\Td{}_{vx},K_{vy},\tau_{vy},\Td{}_{vy},K_{\omega},\tau_{\omega},\Td{}_{\omega}]$
+(nine parameters). % source: config/ssl_robot.sldd ; config/twin_params.json ("order")
+This is a \emph{behavioral} (observational) model: it targets the input-to-pose
+response, not a white-box description of wheel/contact mechanics.
+
+\subsection{Discretization and pose integration}
+\label{sec:method:disc}
+
+Identification and replay both run on a uniform grid with a step size of $\Delta t = 1/60\,\si{s}$, the nominal vision rate. Each DOF's command is delayed by a zero-order-hold (ZOH) integer shift of $m_i = \lceil \Td{}_i/\Delta t\rceil$ samples (zero before the segment start), passed through the first-order update $v_i[k] = v_i[k-1] + \alpha_i(u^{d}_i[k] - v_i[k-1])$, and scaled to the attained body velocity $\hat v_i[k] = K_i\, v_i[k]$ (instantaneous for $\tau_i \to 0$). 
+
+\subsection{Data and pre-processing}
+\label{sec:method:data}
+The data are closed-loop competition logs of a single omnidirectional 4-wheeled SSL robot, decoded from the league protocol stream into per-event body-frame commands and field-frame pose at $\sim$\SI{60}{Hz}. Measured body velocity, used only for identification and for the initial condition, is obtained by smoothing the vision position with a low-order polynomial (Savitzky--Golay) filter, differentiating it by central differences, and rotating the result into the body frame.
+
+Logs arrive on an irregular time grid, since commands are transmitted in bursts: identification resamples every signal onto the uniform $1/60\,\si{s}$ grid, whereas the fidelity metric leaves the samples where they were recorded and defines its windows in seconds, so that no interpolation enters the reported error.
+The dataset comprises $46$ events across four motion labels (\texttt{front\_to\_back}, \texttt{side\_to\_side}, \texttt{shoot\_to\_goal}, \texttt{square}); a frozen list of $10$ events is held out and was not used for fitting.
+
+\paragraph{Definition of hold-out fit}
+Throughout, \emph{fit} measures how much of the variation in the measured signal the model reproduces, on events the fit never saw:
+\begin{equation}
+  \mathrm{fit} = 100\left(1 -
+  \frac{\lVert y - \hat{y}\rVert_2}{\lVert y - \bar{y}\rVert_2}\right)\ [\%],
+  \label{eq:fit}
+\end{equation}
+where $y$ is the measured body velocity of the degree of freedom being identified, $\hat{y}$ is the model's output when driven by the commands alone, and $\bar{y}$ is the mean of $y$.
+
+\subsection{Identification}
+\label{sec:method:id}
+Each translational DOF is identified independently as a P1D (FOPDT) model by prediction-error minimization, with an event-level hold-out. The excitation diagnostic selects the cleanest source label per DOF: $v_x$ from \texttt{front\_to\_back} and $v_y$ from \texttt{side\_to\_side} (command-to-velocity cross-correlation $\approx 0.99$).
+Yaw is instead identified from a dedicated open-loop collection, with the same model structure and the same estimator, because the competition logs carry too little yaw excitation to support the fit. The dedicated dataset is single-session and single-robot with $v_x=v_y=0$: an alternating-sign staircase of commanded yaw rates $\{0.25,0.5,1,2.5,5\}\,\si{rad/s}$, $\sim\SI{10}{s}$ per step.
+
+\subsection{Frames, constants and replication}
+\label{sec:method:geometry}
+Commands and attained velocities live in the \emph{body} frame: $v_x$ longitudinal, $v_y$ lateral, $\omega$ yaw rate about the upward $z$ axis, counter-clockwise positive. Pose is integrated in the \emph{field} frame as $\dot{X} = v_x\cos\theta - v_y\sin\theta$, $\dot{Y} = v_x\sin\theta + v_y\cos\theta$, with $\theta$ unwrapped.
+Per-wheel geometry converts the firmware's per-wheel motor threshold ($\SI{1.567}{rad/s}$) into a body yaw rate for Sec.~\ref{sec:results:omega}, through the ratio of the cennter to wheel-contact radius $R=\SI{0.0796}{m}$ to the wheel radius $r=\SI{0.0295}{m}$.
+
+\subsection{Free-run replay and multi-horizon metric}
+\label{sec:method:metric}
+Fidelity is measured in \emph{free-run}: segments are cut into overlapping windows at a fixed stride, each re-anchored to the true $\SEtwo$ pose at its anchor $t_0$ and rolled out to $H_{\max}=90$ samples ($\SI{1.5}{s}$) driven only by the command stream. The Euclidean position error $\epos(w,h)$ and the wrapped absolute heading error $\eang(w,h)$ at $h\in\{6,12,24,42,60,90\}$ samples ($\{0.1,0.2,0.4,0.7,1.0,1.5\}\,\si{s}$), with reference horizon $h_{\mathrm{ref}}=24$ ($\SI{0.4}{s}$) are reported separately. % source: config/metrics.json (horizons, h_ref) $\epos$ is the claim of this paper; $\eang$ is reported but bounded by the population of rotation-rich windows available (Sec .~\ref {sec:results:bins}).
+
+\subsection{Baselines}
+\label{sec:method:baselines}
+We compare the twin against two baselines under the \emph{same} windows, horizons, and gate. The first is an \emph{ideal-kinematics} plant in which the attained body velocity equals the command instantaneously (no gain, lag, or delay), integrated by the same trapezoidal scheme. The second is \textbf{rSim}, the ODE-based physics engine of the rSoccer environment. It is driven at adjusted parameters for the teams robots.
+
+

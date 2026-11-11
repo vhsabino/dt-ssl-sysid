@@ -1,0 +1,99 @@
+%==============================================================================
+% SBR/LARS 2026 (Robotica 2026, Joao Pessoa) -- camera-ready of submission
+% #34344 (JEMS). Template: IEEEtran (conference), A4.
+%
+% Camera-ready changes (2026-09-23): see paper/sbr2026_camera_ready/CAMERA_READY_NOTES.md
+% in the digitaltwin repository. Every number in the text comes from a
+% repository artifact cited in a "% source:" comment next to it.
+%
+% Before submitting: the checklist greps for REPLACE-ME and must find nothing
+% (authors, affiliation, e-mails, acknowledgment, repository URL, video URL).
+%
+% Build: pdflatex main && bibtex main && pdflatex main && pdflatex main
+%==============================================================================
+\documentclass[conference,a4paper]{IEEEtran}
+\IEEEoverridecommandlockouts
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{siunitx}
+\usepackage{url}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,backgrounds,calc}
+\usepackage{stfloats}   % figure*/table* at the bottom; avoids floats pushed past the references
+\graphicspath{{figures/}}
+
+% --- Float placement -----------------------------------------------------
+\setcounter{topnumber}{3}
+\setcounter{bottomnumber}{2}
+\setcounter{totalnumber}{4}
+\renewcommand{\topfraction}{0.92}
+\renewcommand{\bottomfraction}{0.85}
+\renewcommand{\textfraction}{0.07}
+\renewcommand{\floatpagefraction}{0.70}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+% --- Notation shortcuts -------------------------------------------------------
+\newcommand{\epos}{e_{\mathrm{pos}}}
+\newcommand{\eang}{e_{\mathrm{ang}}}
+\newcommand{\SEtwo}{\mathrm{SE}(2)}
+\newcommand{\Td}{T_{d}}
+
+% --- Page budget switch ------------------------------------------------------
+% Fig. "trajectory overlays by label" (figure*, ~0.3 page) is left out so that the
+% camera-ready fits 6 pages with the new robot/measurement-chain figure. Set to
+% \keeptrajfigtrue if the JEMS page limit allows a 7th page.
+\newif\ifkeeptrajfig \keeptrajfigfalse
+
+% --- Camera-ready links (fill both; the checklist greps for REPLACE-ME) -------
+% Repository: public GitHub release of the reproduction package (+ Zenodo DOI).
+% Videos: supplementary videos (YouTube unlisted or Zenodo).
+\newcommand{\repolink}{\url{https://REPLACE-ME}}
+\newcommand{\videolink}{\url{https://REPLACE-ME}}
+
+\begin{document}
+
+% Title as registered in JEMS (kept by the author on 2026-09-23). If the title is
+% changed, JEMS and this line must match.
+\title{A Behavioral Model for Reality-Gap Mitigation in Digital Twins of Omnidirectional Soccer Robots}
+
+% Author list and order exactly as registered in JEMS.
+\author{\IEEEauthorblockN{REPLACE-ME First Author\IEEEauthorrefmark{1},
+REPLACE-ME Co-author\IEEEauthorrefmark{1}}
+\IEEEauthorblockA{\IEEEauthorrefmark{1}Centro de Inform\'atica, Universidade Federal de Pernambuco (CIn-UFPE), Recife, Brazil\\
+Rob\^{o}CIn Robotics Team\\
+Email: \{REPLACE-ME\}@cin.ufpe.br}}
+
+% IEEE copyright line: enable only if the organizers send the exact text.
+% \IEEEpubid{\makebox[\columnwidth]{979-8-XXXX-XXXX-X/26/\$31.00~\copyright2026 IEEE\hfill}%
+%   \hspace{\columnsep}\makebox[\columnwidth]{ }}
+
+\maketitle
+
+\input{sections/00_abstract}
+
+\begin{IEEEkeywords}
+digital twin, system identification, robot modeling, omnidirectional robot, robot soccer
+\end{IEEEkeywords}
+
+\input{sections/01_introduction}
+\input{sections/02_related_work}
+\input{sections/03_method}
+\input{sections/04_results}
+% Limitations are a subsection of the Discussion (05); 06_limitations.tex is not built.
+\input{sections/05_discussion}
+\input{sections/07_conclusion}
+
+\section*{Acknowledgment}
+REPLACE-ME: funding agencies and grant numbers; the Rob\^{o}CIn team; who ran the
+dedicated yaw collection and who produced the CAD model.
+
+\bibliographystyle{IEEEtran}
+\bibliography{refs/references}
+
+\end{document}

@@ -1,0 +1,93 @@
+%==============================================================================
+% FIG. A — Digital-twin architecture / identification-and-evaluation pipeline.
+% Created 2026-08-07 (revisão maior, T4). Pure TikZ, no external assets.
+%
+% DESIGN NOTE (why the dashed branch is drawn differently): the dedicated
+% open-loop collection feeding ONLY the yaw channel is the paper's central
+% contribution, so it is the one visual asymmetry in the diagram. Everything
+% reachable from the solid path comes from competition logs.
+%
+% Uses figure* (double column) deliberately: reviewer C2 flagged the existing
+% single-column figure as illegible at ~4pt effective axis labels.
+%
+% Sources for the block contents (no numbers are asserted here that are not in
+% the text): DESIGN.md sec.2 ; phase0_replay/{io,schema,plant,rollout,metrics}.py ;
+% automation/identify_trans_dof.m ; scripts/build_rotate_splits.py ;
+% config/{twin_params,metrics,holdout_events}.json.
+%==============================================================================
+\begin{figure*}[!t]
+\centering
+\begin{tikzpicture}[
+  every node/.style={font=\scriptsize},
+  blk/.style={draw, rounded corners=2pt, align=center, inner sep=3pt,
+              minimum height=1.0cm},
+  ded/.style={blk, dashed, thick, fill=black!4},
+  twn/.style={blk, fill=black!8},
+  bas/.style={draw, rounded corners=2pt, align=center, inner sep=3pt,
+              minimum height=0.62cm},
+  ar/.style={-{Latex[length=1.7mm]}, semithick},
+  arD/.style={-{Latex[length=1.7mm]}, semithick, dashed},
+  lbl/.style={font=\scriptsize\itshape, inner sep=1.5pt}
+]
+
+% ---------- Row 1: data -> model ------------------------------------------
+\node[blk, text width=1.9cm] (logs) at (1.2,0)
+  {SSL protobuf\\ match logs\\ \texttt{.log.gz}};
+\node[blk, text width=2.0cm] (etl)  at (4.0,0)
+  {ETL / event\\ extraction\\ $\rightarrow$ Parquet};
+\node[blk, text width=2.0cm] (seg)  at (6.8,0)
+  {Per-DOF\\ segmentation \&\\ window labeling};
+\node[blk, text width=2.7cm] (id)   at (10.1,0)
+  {Grey-box FOPDT\\ identification per DOF\\[2pt]
+   $G_i(s)=\dfrac{K_i\,e^{-\Td{}_i s}}{\tau_i s+1}$};
+
+\draw[ar] (logs) -- (etl);
+\draw[ar] (etl)  -- (seg);
+\draw[ar] (seg)  -- (id);
+
+% ---------- Dedicated open-loop branch (the contribution) -----------------
+\node[ded, text width=3.0cm] (rot) at (4.3,-1.85)
+  {\texttt{rotate\_raw.csv} ---\\ dedicated \textbf{open-loop}\\ yaw excitation};
+\draw[arD] (rot.east) -- (8.6,-1.85) -- (8.6,-0.52)
+  node[lbl, pos=0.98, above right=-1pt and 0pt] {};
+\node[lbl, anchor=west] at (6.05,-1.60) {feeds the $\omega$ channel only};
+
+% ---------- Row 2: model -> verdict ---------------------------------------
+\node[twn, text width=2.7cm] (twin) at (10.1,-2.9)
+  {Twin: three decoupled\\ channels\\ $v_x$, $v_y$, $\omega$};
+\node[blk, text width=2.1cm] (ik)   at (13.4,-2.9)
+  {Body-to-field rotation\\ $+$ $\SEtwo$ integration};
+\node[blk, text width=2.3cm] (ev)   at (16.3,-2.9)
+  {Free-run evaluation:\\ re-anchored $\epos$,\\ $H$ horizons};
+
+\draw[ar] ($(id.south)+(0.9,0)$) -- ($(twin.north)+(0.9,0)$)
+  node[lbl, midway, right=1pt] {$\theta$ (9 params.)};
+\draw[ar] (twin) -- (ik);
+\draw[ar] (ik)   -- (ev);
+
+% ---------- Comparison branches -------------------------------------------
+\node[bas, text width=2.1cm] (bid) at (10.9,-4.85) {Ideal kinematics};
+\node[bas, text width=2.1cm] (brs) at (13.7,-4.85) {rSim (ODE)};
+\node[bas, text width=2.3cm] (bab) at (16.4,-4.85) {rSim $+$ $\Td$\\ (ablation)};
+
+\draw[semithick] (bid.north) -- (10.9,-4.15);
+\draw[semithick] (brs.north) -- (13.7,-4.15);
+\draw[semithick] (bab.north) -- (16.4,-4.15);
+\draw[semithick] (10.9,-4.15) -- (16.4,-4.15);
+\draw[ar] (16.3,-4.15) -- (ev.south);
+\node[lbl, anchor=east] at (16.15,-3.85) {same windows, horizons and gate};
+
+\end{tikzpicture}
+\caption{Identification and evaluation pipeline of the behavioral twin.
+The solid path is driven entirely by closed-loop competition logs, which the
+league already records. The dashed branch is the dedicated \emph{open-loop}
+rotation-only collection; it feeds the $\omega$ channel alone, because
+$94.3\%$ of commanded yaw-rate samples in the competition logs fall below the
+robot's per-wheel actuation threshold (Sec.~\ref{sec:results:omega}). That
+asymmetry is a finding, not an implementation detail: which data a channel
+requires is set by the excitation the data contain. All three comparison
+plants are scored on the same windows, horizons and statistical gate as the
+twin, including the matched-delay ablation
+(Sec.~\ref{sec:results:rsim}).}
+\label{fig:arch}
+\end{figure*}

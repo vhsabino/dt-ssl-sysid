@@ -1,0 +1,135 @@
+
+\section{Results}
+\label{sec:results}
+
+\subsection{Identified model}
+\label{sec:results:id}
+
+Table~\ref{tab:sysid} reports the per-DOF parameters. Both translational
+channels identify as fast FOPDT models, with hold-out fit $86.7\%$ ($v_x$) and $87.1\%$ ($v_y$); against the previous, slower parameters, they improve every event-by-horizon cell of the $\SEtwo$ gate. Yaw is identified from a separate open-loop dataset at $71.1\%$.
+
+\input{tables/tab_sysid_params}
+
+\begin{figure}[!t]
+  \centerline{\includegraphics[width=0.70\columnwidth]{omega_stepresponse_en.png}}
+  \caption{Measured vs.\ simulated yaw rate on the dedicated open-loop
+  staircase (one training, two hold-out steps). Same model structure and
+  identification tooling as on the competition logs; only the excitation regime
+  differs.}
+  \label{fig:fits}
+\end{figure}
+
+\subsection{Motion distribution of the hold-out}
+\label{sec:results:bins}
+The hold-out windows are overwhelmingly translation-dominated: of $265$ dense windows ($49$ non-overlapping), $264$ fall in the translation bin ($99.6\%$), one is rotation-dominated, and none are mixed. Re-classifying after $\omega$ was identified reproduces the same $264/1/0$ split and leaves both other bins with $N_{\mathrm{indep}}=0$, now for lack of rotation-rich competition windows rather than for lack of a yaw model.
+
+\begin{figure*}[!t]
+  \centerline{\includegraphics[width=0.86\textwidth]{main_result_en.png}}
+  \caption{(a) Median free-run position error against horizon on
+  translation-dominated hold-out windows, for the FOPDT model, ideal kinematics, and an untuned rSim. The two baselines cross near $\SI{1}{s}$. (b) The same comparison resolved by event at $h_{\mathrm{ref}}$: each line is one of the ten hold-out events, and the model is lower in all ten.
+  }
+  \label{fig:main}
+\end{figure*}
+
+\subsection{Translational fidelity}
+\label{sec:results:rsim}
+
+Ideal kinematics is the primary comparator: both plants run in the same
+harness, start from the same measured body velocity and are scored on the same
+windows, so the model is the only difference. Its median position error is
+lower at every horizon (Fig.~\ref{fig:main}, Table~\ref{tab:three}):
+$\SI{0.039}{m}$ against $\SI{0.101}{m}$ at $h_{\mathrm{ref}}$, and
+$\SI{0.119}{m}$ against $\SI{0.291}{m}$ at $\SI{1.5}{s}$. For scale, the robot
+covers about $\SI{0.4}{m}$ within $h_{\mathrm{ref}}$ and its contact diameter is
+$\SI{0.16}{m}$: the baseline misses by two thirds of a robot, the model by a
+quarter.
+
+The hold-out is ten events, $\SI{73.5}{s}$ of scored motion. Windows from one
+event share robot, surface, session and controller, so we take the \emph{event}
+as the unit of analysis. The model wins all ten, by a median of
+$+\SI{0.069}{m}$ (one-sided Wilcoxon $p = 9.8\times10^{-4}$, the smallest value
+attainable at $n = 10$); the pre-registered window-level test over the $49$ non-overlapping windows
+agrees and is the less conservative of the two.\ifkeeptrajfig{} Fig.~\ref{fig:trajlabels} shows the same comparison in the trajectory domain, one panel per motion label.\fi
+% source: results/gate_window_vs_event_20260810_1743.md (window n = 49, event n = 10)
+
+\input{tables/tab_three_models}
+
+\subsubsection{What produces the improvement}
+We switch each of $\{K,\tau,\Td\}$ off in every combination and average over all
+orderings, so no term is credited merely for being enabled first. Of the
+$\SI{0.062}{m}$ separating the two plants at $h_{\mathrm{ref}}$, the time
+constant accounts for $55\%$, the dead time for $43\%$ and the gain for $2\%$.
+Lag and delay are comparable contributors; the gain is irrelevant.
+
+\subsubsection{The role of the measured initial velocity}
+Both plants are seeded with the measured body velocity, but only the dynamic one
+can carry it forward, and neither ingredient works alone. Extrapolating that
+velocity at constant speed, ignoring the commands, gives $\SI{0.160}{m}$;
+running the model from rest gives $\SI{0.114}{m}$. Both are worse than ideal
+kinematics, and only the combination reaches $\SI{0.039}{m}$. We treat the
+measured velocity as part of the model interface rather than privileged
+information, since a twin running alongside the robot has that estimate;
+re-deriving it with a strictly causal difference raises both errors but
+\emph{widens} the gap, so the verdict does not rest on it.
+
+\subsubsection{The untuned ODE simulator}
+rSim reaches $\SI{0.129}{m}$ at $h_{\mathrm{ref}}$, so even the zero-parameter baseline outperforms it. Giving it the model's dead time widens rather than closes the gap.
+
+\subsubsection{Heading error}
+The rotation and mixed bins lack a scorable population
+(Sec.~\ref{sec:results:bins}), so heading carries no verdict. Descriptively
+(Table~\ref{tab:three}), the model's median $\eang$ is the lowest of the three
+plants at every horizon, but the margin shrinks from roughly half the
+baselines' at $\SI{0.1}{s}$ to within $\SI{0.005}{rad}$ of both by
+$\SI{1.5}{s}$. The position advantage does not transfer to heading in the same
+proportion, which is consistent with yaw being the channel the competition logs
+cannot constrain.
+
+\subsection{Yaw identifiability is a function of excitation regime}
+\label{sec:results:omega}
+
+\ifkeeptrajfig
+\begin{figure*}[!t]
+  \centerline{\includegraphics[width=0.98\textwidth]{trajectory_by_label_en.png}}
+  \caption{Free-run trajectory overlays, one per motion label, over a
+  $\SI{1.5}{s}$ window re-anchored at the black dot. For each label we show the
+  window with the largest margin of the model over the better of the two
+  comparison plants, so these are per-label best cases rather than typical
+  windows; the median-window overlay and the full distributions are in
+  Fig.~\ref{fig:main} and Table~\ref{tab:three}. Panel titles give the
+  end-of-window position error of each plant.}
+  \label{fig:trajlabels}
+\end{figure*}
+\fi
+
+The problem is visible in the logs before any model is fitted. Regressing the
+measured body velocity on the command, aligned by its dead time, the command
+explains $96\%$ of the variance for $v_x$ and $94\%$ for $v_y$, but only $56\%$
+for $\omega$: nearly half the rotation the cameras see in play is not
+attributable to the yaw command.
+
+Fitting the same structure to the highest-rotation competition events gives
+$K_\omega = 1.378$ and a hold-out fit of $44.8\%$, below the pre-registered
+$60\%$ gate. Using it also \emph{worsens} free-run position, because a gain
+above unity amplifies accumulated heading drift, so it is not promoted.
+
+\subsubsection{Why the logs cannot constrain yaw}
+The firmware clamps each \emph{wheel} setpoint below $\SI{1.567}{rad/s}$, after
+the command kinematics. Converted to body yaw rate that threshold sits at
+$0.58$--$0.60\,\si{rad/s}$, and $94.3\%$ of commanded yaw samples in the logs
+fall below it. The statistic is easy to misread: it does not mean yaw is
+switched off. In play the wheels are already turning because of translation, so
+among those samples the median per-wheel translational setpoint is $15\times$
+the clamp and only $2.2\%$ are fully clamped. The yaw command is not suppressed
+but \emph{diluted}, contributing a median of $1.0\%$ of what each wheel is asked
+to do. What the actuators receive in competition is $99\%$ translation.
+
+\subsubsection{The same structure on dedicated data}
+A short dedicated open-loop collection removes the dilution: with
+$v_x = v_y = 0$ the yaw command becomes the sole actuation. Identified with the
+\emph{same} structure and tooling (Fig.~\ref{fig:fits}), it gives
+$K_\omega = 1.002$, $\tau_\omega = \SI{0.083}{s}$, $\Td{}_\omega = \SI{0.089}{s}$
+and a hold-out fit of $71.1\%$, above the gate. Scored against the same fixed
+placeholder yaw channel ($K=1$, $\tau=\SI{0.1}{s}$, $\Td=0$) on the same competition population, the closed-loop estimate is
+worse at every horizon and the open-loop one better, so the verdict inverts
+under identical tooling.

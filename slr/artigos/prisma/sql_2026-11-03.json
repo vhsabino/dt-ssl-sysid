@@ -1,0 +1,578 @@
+{
+ "fonte": "Notion, consulta SQL agregada (UNION ALL) de 03/11/2026, identica linha a linha a de 23/10/2026 (nenhuma mudanca no banco entre as duas datas); fonte e string copiados da v4. Colunas novas: skim (Notes iniciando em \"SKIM \") e, nas tabelas rq e tipo, via (P1 = nota PRE-TRIAGEM IA 27/09; TC = demais). Os 3 SKIM: 2 da RQ2 (13/09) e Mostafa-4396 (11/10).",
+ "q1_stage": [
+  [
+   "Excluded Full-Text",
+   "Finished",
+   "EC1 Fora do escopo",
+   2,
+   0,
+   0,
+   0,
+   0
+  ],
+  [
+   "Excluded Full-Text",
+   "Not read",
+   "EC1 Fora do escopo",
+   2,
+   0,
+   0,
+   0,
+   0
+  ],
+  [
+   "Excluded Full-Text",
+   "Not read",
+   "EC5 Duplicata/versão anterior",
+   1,
+   0,
+   0,
+   0,
+   0
+  ],
+  [
+   "Excluded Full-Text",
+   "Not read",
+   "EC6 Indisponível",
+   1,
+   0,
+   0,
+   0,
+   0
+  ],
+  [
+   "Excluded Full-Text",
+   "Recommended Full Read",
+   "EC1 Fora do escopo",
+   227,
+   162,
+   52,
+   0,
+   0
+  ],
+  [
+   "Excluded Full-Text",
+   "Recommended Full Read",
+   "EC2 Sem avaliação empírica",
+   6,
+   2,
+   4,
+   0,
+   0
+  ],
+  [
+   "Excluded Full-Text",
+   "Recommended Full Read",
+   "EC3 Não peer-reviewed",
+   8,
+   3,
+   5,
+   0,
+   0
+  ],
+  [
+   "Excluded Full-Text",
+   "Recommended Full Read",
+   "EC4 Idioma",
+   11,
+   8,
+   1,
+   0,
+   0
+  ],
+  [
+   "Excluded Full-Text",
+   "Recommended Full Read",
+   "EC5 Duplicata/versão anterior",
+   2,
+   1,
+   1,
+   0,
+   0
+  ],
+  [
+   "Excluded Full-Text",
+   "Recommended Full Read",
+   "EC6 Indisponível",
+   2,
+   1,
+   1,
+   0,
+   0
+  ],
+  [
+   "Excluded Title/Abstract",
+   "Not read",
+   null,
+   1,
+   0,
+   0,
+   0,
+   0
+  ],
+  [
+   "Excluded Title/Abstract",
+   "Not read",
+   "EC1 Fora do escopo",
+   5068,
+   0,
+   0,
+   0,
+   0
+  ],
+  [
+   "Excluded Title/Abstract",
+   "Not read",
+   "EC2 Sem avaliação empírica",
+   2,
+   0,
+   0,
+   0,
+   0
+  ],
+  [
+   "Excluded Title/Abstract",
+   "Not read",
+   "EC4 Idioma",
+   4,
+   0,
+   0,
+   0,
+   0
+  ],
+  [
+   "Excluded Title/Abstract",
+   "Not read",
+   "EC5 Duplicata/versão anterior",
+   40,
+   0,
+   0,
+   0,
+   0
+  ],
+  [
+   "Excluded Title/Abstract",
+   "Recommended Full Read",
+   "EC1 Fora do escopo",
+   3,
+   2,
+   1,
+   0,
+   0
+  ],
+  [
+   "Excluded Title/Abstract",
+   "Recommended Full Read",
+   "EC6 Indisponível",
+   1,
+   1,
+   0,
+   0,
+   0
+  ],
+  [
+   "Included",
+   "Read in Progress",
+   null,
+   1,
+   1,
+   0,
+   1,
+   1
+  ],
+  [
+   "Included",
+   "Recommended Full Read",
+   null,
+   183,
+   90,
+   86,
+   2,
+   0
+  ]
+ ],
+ "q1_stage_colunas": [
+  "stage",
+  "status",
+  "ec",
+  "n",
+  "com_pretriagem_27-09",
+  "com_preskim",
+  "skim",
+  "skim_e_pretriagem"
+ ],
+ "q1_outros_metodos": [
+  [
+   "Included",
+   "[\"Manual\"]",
+   "Snowball-B",
+   1
+  ],
+  [
+   "Included",
+   "[\"Snowballing\"]",
+   "Snowball-B",
+   1
+  ]
+ ],
+ "q1_rq_stage": [
+  [
+   null,
+   "Excluded Full-Text",
+   "TC",
+   6,
+   0
+  ],
+  [
+   "[\"RQ1\",\"RQ2\"]",
+   "Included",
+   "TC",
+   3,
+   0
+  ],
+  [
+   "[\"RQ1\",\"RQ3\"]",
+   "Excluded Full-Text",
+   "TC",
+   2,
+   0
+  ],
+  [
+   "[\"RQ1\",\"RQ3\"]",
+   "Included",
+   "TC",
+   3,
+   0
+  ],
+  [
+   "[\"RQ1\"]",
+   "Excluded Full-Text",
+   "P1",
+   155,
+   0
+  ],
+  [
+   "[\"RQ1\"]",
+   "Included",
+   "P1",
+   85,
+   1
+  ],
+  [
+   "[\"RQ2\",\"RQ3\"]",
+   "Included",
+   "TC",
+   1,
+   0
+  ],
+  [
+   "[\"RQ2\"]",
+   "Excluded Full-Text",
+   "TC",
+   21,
+   0
+  ],
+  [
+   "[\"RQ2\"]",
+   "Included",
+   "TC",
+   19,
+   2
+  ],
+  [
+   "[\"RQ3\"]",
+   "Excluded Full-Text",
+   "TC",
+   56,
+   0
+  ],
+  [
+   "[\"RQ3\"]",
+   "Included",
+   "TC",
+   67,
+   0
+  ],
+  [
+   "[\"RQ4\"]",
+   "Excluded Full-Text",
+   "P1",
+   22,
+   0
+  ],
+  [
+   "[\"RQ4\"]",
+   "Included",
+   "P1",
+   6,
+   0
+  ]
+ ],
+ "q1_fonte": [
+  [
+   "[\"ACM DL\",\"IEEE Xplore\",\"OpenAlex/Claude Science\",\"Scopus\"]",
+   2
+  ],
+  [
+   "[\"ACM DL\",\"IEEE Xplore\"]",
+   8
+  ],
+  [
+   "[\"ACM DL\",\"OpenAlex/Claude Science\",\"Scopus\"]",
+   10
+  ],
+  [
+   "[\"ACM DL\",\"Scopus\"]",
+   5
+  ],
+  [
+   "[\"ACM DL\"]",
+   1409
+  ],
+  [
+   "[\"IEEE Xplore\",\"OpenAlex/Claude Science\",\"Scopus\"]",
+   210
+  ],
+  [
+   "[\"IEEE Xplore\",\"OpenAlex/Claude Science\"]",
+   9
+  ],
+  [
+   "[\"IEEE Xplore\",\"Scopus\"]",
+   34
+  ],
+  [
+   "[\"IEEE Xplore\"]",
+   420
+  ],
+  [
+   "[\"Manual\"]",
+   1
+  ],
+  [
+   "[\"OpenAlex/Claude Science\",\"Scopus\",\"SpringerLink\"]",
+   68
+  ],
+  [
+   "[\"OpenAlex/Claude Science\",\"Scopus\"]",
+   317
+  ],
+  [
+   "[\"OpenAlex/Claude Science\",\"SpringerLink\"]",
+   15
+  ],
+  [
+   "[\"OpenAlex/Claude Science\"]",
+   642
+  ],
+  [
+   "[\"Scopus\",\"SpringerLink\"]",
+   10
+  ],
+  [
+   "[\"Scopus\"]",
+   280
+  ],
+  [
+   "[\"Snowballing\"]",
+   1
+  ],
+  [
+   "[\"SpringerLink\"]",
+   2124
+  ]
+ ],
+ "q1_string": [
+  [
+   "S1",
+   1399
+  ],
+  [
+   "S2",
+   164
+  ],
+  [
+   "S3",
+   597
+  ],
+  [
+   "S4",
+   2610
+  ],
+  [
+   "S5",
+   793
+  ],
+  [
+   "Snowball-B",
+   2
+  ]
+ ],
+ "q2_tipo": [
+  [
+   "Excluded Full-Text",
+   "(vazio)",
+   "P1",
+   176,
+   0
+  ],
+  [
+   "Excluded Full-Text",
+   "(vazio)",
+   "TC",
+   85,
+   0
+  ],
+  [
+   "Excluded Full-Text",
+   "Survey",
+   "P1",
+   1,
+   0
+  ],
+  [
+   "Excluded Title/Abstract",
+   "(vazio)",
+   "P1",
+   3,
+   0
+  ],
+  [
+   "Excluded Title/Abstract",
+   "(vazio)",
+   "TC",
+   5116,
+   0
+  ],
+  [
+   "Included",
+   "(vazio)",
+   "P1",
+   76,
+   0
+  ],
+  [
+   "Included",
+   "(vazio)",
+   "TC",
+   83,
+   2
+  ],
+  [
+   "Included",
+   "Journal",
+   "P1",
+   1,
+   1
+  ],
+  [
+   "Included",
+   "Journal",
+   "TC",
+   1,
+   0
+  ],
+  [
+   "Included",
+   "Preprint",
+   "TC",
+   1,
+   0
+  ],
+  [
+   "Included",
+   "Survey",
+   "P1",
+   14,
+   0
+  ],
+  [
+   "Included",
+   "Survey",
+   "TC",
+   8,
+   0
+  ]
+ ],
+ "q2_extracao": {
+  "Data Extracted": 0,
+  "Quality Score preenchido": 1,
+  "Cite": 1
+ },
+ "log_de_busca_protocolo_s3": {
+  "datas": "11-12/07/2026",
+  "IEEE Xplore": [
+   58,
+   4,
+   68,
+   406,
+   186
+  ],
+  "Scopus": [
+   81,
+   14,
+   80,
+   509,
+   350
+  ],
+  "ACM DL": [
+   538,
+   101,
+   199,
+   1132,
+   201
+  ],
+  "SpringerLink": [
+   677,
+   184,
+   344,
+   1000,
+   355
+  ],
+  "OpenAlex": [
+   94,
+   0,
+   139,
+   616,
+   383
+  ],
+  "Semantic Scholar": [
+   56,
+   0,
+   91,
+   362,
+   220
+  ],
+  "arXiv": [
+   17,
+   0,
+   56,
+   98,
+   16
+  ],
+  "ordem": [
+   "S1",
+   "S2",
+   "S3",
+   "S4",
+   "S5"
+  ]
+ },
+ "plano_execucao_s5": "27-28/08: retirada de 1 registro vazio (5.565 para 5.564); dedup por titulo normalizado",
+ "p1_decididos_rows": "p1_decididos_base.json (passada 1 congelada: 113 Included, 158 Excluded) e p1_aprovados_estado_2026-10-23.json (estado atual dos 113; chave skim = confirmado na passada 2)",
+ "q1_rq_stage_colunas": [
+  "rq",
+  "stage",
+  "via",
+  "n",
+  "skim"
+ ],
+ "q2_tipo_colunas": [
+  "stage",
+  "tipo",
+  "via",
+  "n",
+  "skim"
+ ]
+}

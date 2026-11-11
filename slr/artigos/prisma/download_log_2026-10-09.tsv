@@ -1,0 +1,17 @@
+pid	url	status	bytes
+SLR-2025-Joo-4052	https://link.springer.com/content/pdf/10.1007/s10846-025-02259-8.pdf	ok	3293713
+SLR-2025-Wang-1664	https://arxiv.org/pdf/2107.01272	ok	5303308
+SLR-2026-Albatati-1285	https://www.preprints.org/frontend/manuscript/73fa3673b64a0b9c5b59d8002361b665/download_pub	erro:The server returned the status 403 with message "Forbidden" in respons	0
+SLR-2026-Cristian-881	https://www.mdpi.com/2076-3417/16/2/650/pdf?version=1767866460	erro:The server returned the status 403 with message "Forbidden" in respons	0
+SLR-2026-M-857	https://izvestswsu.elpub.ru/jour/article/download/1590/782	ok	1470276
+SLR-2025-Daniel-818	https://www.mdpi.com/1424-8220/25/15/4666/pdf?version=1753712771	erro:The server returned the status 403 with message "Forbidden" in respons	0
+SLR-2025-Franciszek-063	http://www.wpias.edu.pl/ojs/index.php/JAAT/article/download/182/209	ok	2378273
+SLR-2023-Junfeng-4633	https://vciba.springeropen.com/counter/pdf/10.1186/s42492-023-00137-4	ok	6375487
+SLR-2022-Adam-3455	https://arxiv.org/pdf/2208.14197	ok	4008905
+SLR-2023-Xu-1336	https://arxiv.org/pdf/2309.15995	ok	1315057
+SLR-2024-Zhou-1274	https://arxiv.org/pdf/2308.00055	ok	3792457
+SLR-2024-Ruwen-765	https://iopscience.iop.org/article/10.1088/1742-6596/2803/1/012060/pdf	erro:The server returned the status 302 with message "Moved Temporarily" in	0
+SLR-2022-Mahmoud-752	https://www.sciencedirect.com/science/article/pii/S2212827122004231/pdf	erro:The server returned the status 403 with message "Forbidden" in respons	0
+SLR-2024-Robert-002	https://www.tandfonline.com/doi/pdf/10.1080/0951192X.2024.2386980?needAccess=true	erro:The server returned the status 403 with message "Forbidden" in respons	0
+SLR-2022-U-276	https://api.taylorfrancis.com/content/chapters/oa-edit/download?identifierName=doi&identifierValue=10.1201/9781003337119-6&type=chapterpdf	ok	3751590
+FIM		9 ok	0
