@@ -99,3 +99,6 @@ paper/*/main.pdf
 
 # PDFs de terceiros: nunca versionar
 /slr/**/*.pdf
+
+# PDFs de terceiros: nunca versionar
+/slr/**/*.pdf
